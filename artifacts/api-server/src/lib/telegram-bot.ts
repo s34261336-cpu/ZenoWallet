@@ -160,6 +160,20 @@ async function sendError(
   error: unknown,
 ): Promise<void> {
   logSupabaseError(error, "Zeno Wallet command failed");
+  if (
+    error instanceof Error &&
+    /Could not find the table ['"]public\.wallet['"]/.test(error.message)
+  ) {
+    await telegram.sendMessage(
+      chatId,
+      [
+        "Хранилище кошелька ещё не настроено.",
+        "",
+        "Администратору нужно один раз выполнить файл <code>supabase/schema.sql</code> в Supabase SQL Editor, затем повторить команду.",
+      ].join("\n"),
+    );
+    return;
+  }
   await telegram.sendMessage(
     chatId,
     "Не удалось выполнить операцию. Попробуйте ещё раз позже.",

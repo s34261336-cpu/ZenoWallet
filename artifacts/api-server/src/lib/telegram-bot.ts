@@ -25,6 +25,14 @@ type TelegramMessage = {
 type TelegramUpdate = {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
+};
+
+type TelegramCallbackQuery = {
+  id: string;
+  from: TelegramUser;
+  data?: string;
+  message?: TelegramMessage;
 };
 
 type TelegramResponse<T> = {
@@ -38,6 +46,37 @@ type TelegramBotInfo = {
 };
 
 const DAILY_COOLDOWN_HOURS = 24;
+const MENU_KEYBOARD = {
+  keyboard: [
+    [{ text: "Открыть кейс" }, { text: "Ежедневный бонус" }],
+    [{ text: "Мой баланс" }, { text: "Пригласить друзей" }],
+    [{ text: "Вывести монеты" }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+  input_field_placeholder: "Выберите действие",
+};
+const WITHDRAW_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: "10", callback_data: "withdraw:10" },
+      { text: "50", callback_data: "withdraw:50" },
+      { text: "100", callback_data: "withdraw:100" },
+    ],
+    [
+      { text: "200", callback_data: "withdraw:200" },
+      { text: "Ввести свою сумму", callback_data: "withdraw:custom" },
+    ],
+  ],
+};
+const BUTTON_ACTIONS: Record<string, string> = {
+  "Открыть кейс": "case",
+  "Ежедневный бонус": "daily",
+  "Мой баланс": "balance",
+  "Пригласить друзей": "referral",
+  "Вывести монеты": "withdraw_menu",
+};
+const pendingWithdraw = new Set<number>();
 
 function escapeHtml(value: string): string {
   return value
@@ -71,11 +110,7 @@ const HELP_TEXT = [
   "",
   "Зарабатывайте монеты и переводите их в Zeno.",
   "",
-  "/case — открыть кейс с наградой от 5 до 100 монет",
-  "/daily — получить ежедневный бонус +10",
-  "/referral — получить реферальную ссылку",
-  "/balance — посмотреть баланс",
-  "/withdraw [сумма] — вывести монеты в Zeno",
+  "Выберите действие в меню ниже.",
 ].join("\n");
 
 class TelegramApi {
@@ -109,20 +144,41 @@ class TelegramApi {
     return this.call<TelegramBotInfo>("getMe");
   }
 
+  setMyCommands(): Promise<unknown> {
+    return this.call("setMyCommands", {
+      commands: [{ command: "start", description: "Открыть главное меню" }],
+    });
+  }
+
   getUpdates(offset: number, signal: AbortSignal): Promise<TelegramUpdate[]> {
     return this.call<TelegramUpdate[]>(
       "getUpdates",
-      { offset, timeout: 25, allowed_updates: ["message"] },
+      {
+        offset,
+        timeout: 25,
+        allowed_updates: ["message", "callback_query"],
+      },
       signal,
     );
   }
 
-  sendMessage(chatId: number, text: string): Promise<unknown> {
+  answerCallbackQuery(callbackId: string): Promise<unknown> {
+    return this.call("answerCallbackQuery", {
+      callback_query_id: callbackId,
+    });
+  }
+
+  sendMessage(
+    chatId: number,
+    text: string,
+    replyMarkup: Record<string, unknown> = MENU_KEYBOARD,
+  ): Promise<unknown> {
     return this.call("sendMessage", {
       chat_id: chatId,
       text,
       parse_mode: "HTML",
       disable_web_page_preview: true,
+      reply_markup: replyMarkup,
     });
   }
 }
@@ -152,6 +208,31 @@ function getReferralId(args: string[]): number | null {
   }
   const id = Number(rawId);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function processWithdraw(
+  telegram: TelegramApi,
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  chatId: number,
+  userId: number,
+  amount: number,
+): Promise<void> {
+  const result = await supabase.withdraw(userId, amount);
+  if (!result.withdrawn) {
+    await telegram.sendMessage(
+      chatId,
+      `Недостаточно заработанных монет.\n\nВаш баланс: <b>${result.wallet.earn_balance}</b> монет`,
+    );
+    return;
+  }
+
+  await telegram.sendMessage(
+    chatId,
+    `Вывод выполнен: <b>${amount} монет</b> переведено в Zeno.\n\n${formatWallet(
+      result.wallet,
+      result.zenoBalance,
+    )}`,
+  );
 }
 
 async function sendError(
@@ -202,12 +283,31 @@ async function handleMessage(
   }
 
   const { command, args } = parseCommand(text);
-  if (!command) {
+  const action = BUTTON_ACTIONS[text.trim()];
+  const selectedCommand = action ?? command;
+  if (pendingWithdraw.has(user.id) && !text.startsWith("/")) {
+    const amount = parsePositiveAmount(text.trim());
+    if (amount !== null) {
+      pendingWithdraw.delete(user.id);
+      try {
+        await processWithdraw(telegram, supabase, message.chat.id, user.id, amount);
+      } catch (error) {
+        await sendError(telegram, message.chat.id, error);
+      }
+      return;
+    }
+    await telegram.sendMessage(
+      message.chat.id,
+      "Введите положительную целую сумму, например <code>100</code>.",
+    );
+    return;
+  }
+  if (!selectedCommand) {
     return;
   }
 
   try {
-    if (command === "start") {
+    if (selectedCommand === "start") {
       const referralId = getReferralId(args);
       let referralMessage = "";
 
@@ -227,7 +327,16 @@ async function handleMessage(
       return;
     }
 
-    if (command === "case") {
+    if (selectedCommand === "withdraw_menu") {
+      await telegram.sendMessage(
+        message.chat.id,
+        "Выберите сумму вывода или введите свою сумму:",
+        WITHDRAW_KEYBOARD,
+      );
+      return;
+    }
+
+    if (selectedCommand === "case") {
       const reward = Math.floor(Math.random() * 96) + 5;
       const wallet = await supabase.openCase(user.id, reward);
       const zenoBalance = await supabase.getZenoBalance(user.id);
@@ -241,7 +350,7 @@ async function handleMessage(
       return;
     }
 
-    if (command === "daily") {
+    if (selectedCommand === "daily") {
       const result = await supabase.claimDaily(user.id);
       if (!result.claimed) {
         await telegram.sendMessage(
@@ -264,7 +373,7 @@ async function handleMessage(
       return;
     }
 
-    if (command === "referral") {
+    if (selectedCommand === "referral") {
       const link = `https://t.me/${botUsername}?start=ref_${user.id}`;
       await telegram.sendMessage(
         message.chat.id,
@@ -279,7 +388,7 @@ async function handleMessage(
       return;
     }
 
-    if (command === "balance") {
+    if (selectedCommand === "balance") {
       const wallet = await supabase.ensureWallet(user.id);
       const zenoBalance = await supabase.getZenoBalance(user.id);
       await telegram.sendMessage(
@@ -289,38 +398,64 @@ async function handleMessage(
       return;
     }
 
-    if (command === "withdraw") {
+    if (selectedCommand === "withdraw") {
       const amount = parsePositiveAmount(args[0]);
       if (amount === null) {
+        pendingWithdraw.add(user.id);
         await telegram.sendMessage(
           message.chat.id,
-          "Укажите положительную целую сумму.\nПример: <code>/withdraw 100</code>",
+          "Введите сумму вывода одним сообщением, например <code>100</code>.",
         );
         return;
       }
 
-      const result = await supabase.withdraw(user.id, amount);
-      if (!result.withdrawn) {
-        await telegram.sendMessage(
-          message.chat.id,
-          `Недостаточно заработанных монет.\n\nВаш баланс: <b>${result.wallet.earn_balance}</b> монет`,
-        );
-        return;
-      }
-
-      await telegram.sendMessage(
-        message.chat.id,
-        `Вывод выполнен: <b>${amount} монет</b> переведено в Zeno.\n\n${formatWallet(
-          result.wallet,
-          result.zenoBalance,
-        )}`,
-      );
+      await processWithdraw(telegram, supabase, message.chat.id, user.id, amount);
       return;
     }
 
     await telegram.sendMessage(message.chat.id, HELP_TEXT);
   } catch (error) {
     await sendError(telegram, message.chat.id, error);
+  }
+}
+
+async function handleCallback(
+  telegram: TelegramApi,
+  update: TelegramUpdate,
+): Promise<void> {
+  const callback = update.callback_query;
+  if (!callback) {
+    return;
+  }
+
+  await telegram.answerCallbackQuery(callback.id);
+  const data = callback.data ?? "";
+  if (!data.startsWith("withdraw:")) {
+    return;
+  }
+
+  const userId = callback.from.id;
+  const chatId = callback.message?.chat.id ?? userId;
+  const value = data.slice("withdraw:".length);
+  if (value === "custom") {
+    pendingWithdraw.add(userId);
+    await telegram.sendMessage(
+      chatId,
+      "Введите сумму вывода одним сообщением, например <code>100</code>.",
+    );
+    return;
+  }
+
+  const amount = parsePositiveAmount(value);
+  const supabase = getSupabaseClient();
+  if (!supabase || amount === null) {
+    return;
+  }
+
+  try {
+    await processWithdraw(telegram, supabase, chatId, userId, amount);
+  } catch (error) {
+    await sendError(telegram, chatId, error);
   }
 }
 
@@ -344,6 +479,7 @@ export function startTelegramBot(): void {
   void (async () => {
     try {
       const bot = await telegram.getMe();
+      await telegram.setMyCommands();
       const botUsername = bot.username ?? "zeno_wallet_bot";
       logger.info({ botUsername }, "Zeno Wallet Telegram bot started");
 
@@ -355,6 +491,7 @@ export function startTelegramBot(): void {
           for (const update of updates) {
             offset = Math.max(offset, update.update_id + 1);
             await handleMessage(telegram, botUsername, update);
+            await handleCallback(telegram, update);
           }
         } catch (error) {
           if (!stopped) {

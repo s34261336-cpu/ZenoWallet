@@ -268,17 +268,43 @@ class TelegramApi:
     def get_me(self) -> dict[str, Any]:
         return self.call("getMe")
 
+    def set_my_commands(self) -> None:
+        self.call(
+            "setMyCommands",
+            {
+                "commands": [
+                    {
+                        "command": "start",
+                        "description": "Открыть главное меню",
+                    }
+                ]
+            },
+        )
+
     def delete_webhook(self) -> None:
         self.call("deleteWebhook", {"drop_pending_updates": False})
 
     def get_updates(self, offset: int) -> list[dict[str, Any]]:
         return self.call(
             "getUpdates",
-            {"offset": offset, "timeout": 25, "allowed_updates": ["message"]},
+            {
+                "offset": offset,
+                "timeout": 25,
+                "allowed_updates": ["message", "callback_query"],
+            },
             timeout=35,
         )
 
-    def send_message(self, chat_id: int, text: str) -> None:
+    def answer_callback(self, callback_id: str) -> None:
+        self.call("answerCallbackQuery", {"callback_query_id": callback_id})
+
+    def send_message(
+        self,
+        chat_id: int,
+        text: str,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> None:
+        markup = reply_markup if reply_markup is not None else MENU_KEYBOARD
         self.call(
             "sendMessage",
             {
@@ -286,6 +312,7 @@ class TelegramApi:
                 "text": text,
                 "parse_mode": "HTML",
                 "disable_web_page_preview": True,
+                "reply_markup": markup,
             },
         )
 
@@ -320,14 +347,44 @@ def format_wallet(wallet: dict[str, Any], zeno_balance: int | float) -> str:
     )
 
 
+MENU_KEYBOARD = {
+    "keyboard": [
+        [{"text": "Открыть кейс"}, {"text": "Ежедневный бонус"}],
+        [{"text": "Мой баланс"}, {"text": "Пригласить друзей"}],
+        [{"text": "Вывести монеты"}],
+    ],
+    "resize_keyboard": True,
+    "is_persistent": True,
+    "input_field_placeholder": "Выберите действие",
+}
+
+WITHDRAW_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "10", "callback_data": "withdraw:10"},
+            {"text": "50", "callback_data": "withdraw:50"},
+            {"text": "100", "callback_data": "withdraw:100"},
+        ],
+        [
+            {"text": "200", "callback_data": "withdraw:200"},
+            {"text": "Ввести свою сумму", "callback_data": "withdraw:custom"},
+        ],
+    ]
+}
+
+BUTTON_ACTIONS = {
+    "Открыть кейс": "case",
+    "Ежедневный бонус": "daily",
+    "Мой баланс": "balance",
+    "Пригласить друзей": "referral",
+    "Вывести монеты": "withdraw_menu",
+}
+
+
 HELP_TEXT = (
     "<b>Zeno Wallet</b>\n\n"
     "Зарабатывайте монеты и переводите их в Zeno.\n\n"
-    "/case — открыть кейс с наградой от 5 до 100 монет\n"
-    "/daily — получить ежедневный бонус +10\n"
-    "/referral — получить реферальную ссылку\n"
-    "/balance — посмотреть баланс\n"
-    "/withdraw [сумма] — вывести монеты в Zeno"
+    "Выберите действие в меню ниже."
 )
 
 
@@ -350,6 +407,7 @@ class WalletBot:
         self.bot_username = "zeno_wallet_bot"
         self.running = True
         self.operation_lock = threading.Lock()
+        self.pending_withdraw: set[int] = set()
 
     def send_error(self, chat_id: int, error: Exception) -> None:
         log.exception("Zeno Wallet command failed", exc_info=error)
@@ -363,6 +421,21 @@ class WalletBot:
             message = "Не удалось выполнить операцию. Попробуйте ещё раз позже."
         self.telegram.send_message(chat_id, message)
 
+    def process_withdraw(self, chat_id: int, user_id: int, amount: int) -> None:
+        withdrawn, wallet, zeno = self.supabase.withdraw(user_id, amount)
+        if not withdrawn:
+            self.telegram.send_message(
+                chat_id,
+                f"Недостаточно заработанных монет.\n\nВаш баланс: "
+                f"<b>{wallet['earn_balance']}</b> монет",
+            )
+            return
+        self.telegram.send_message(
+            chat_id,
+            f"Вывод выполнен: <b>{amount} монет</b> переведено в Zeno.\n\n"
+            f"{format_wallet(wallet, zeno or 0)}",
+        )
+
     def handle_message(self, message: dict[str, Any]) -> None:
         user = message.get("from")
         text = message.get("text")
@@ -371,7 +444,24 @@ class WalletBot:
 
         chat_id = int(message["chat"]["id"])
         user_id = int(user["id"])
+        if user_id in self.pending_withdraw and not text.startswith("/"):
+            amount = parse_amount(text.strip())
+            if amount is not None:
+                self.pending_withdraw.remove(user_id)
+                try:
+                    with self.operation_lock:
+                        self.process_withdraw(chat_id, user_id, amount)
+                except Exception as error:
+                    self.send_error(chat_id, error)
+                return
+            self.telegram.send_message(
+                chat_id,
+                "Введите положительную целую сумму, например <code>100</code>.",
+            )
+            return
+
         command, args = parse_command(text)
+        command = BUTTON_ACTIONS.get(text.strip(), command)
         if not command:
             return
 
@@ -386,6 +476,14 @@ class WalletBot:
                             "\nРеферал засчитан. Пригласивший получил +50 монет."
                         )
                     self.telegram.send_message(chat_id, "\n".join(message_parts))
+                    return
+
+                if command == "withdraw_menu":
+                    self.telegram.send_message(
+                        chat_id,
+                        "Выберите сумму вывода или введите свою сумму:",
+                        reply_markup=WITHDRAW_KEYBOARD,
+                    )
                     return
 
                 if command == "case":
@@ -439,33 +537,51 @@ class WalletBot:
                 if command == "withdraw":
                     amount = parse_amount(args[0] if args else None)
                     if amount is None:
+                        self.pending_withdraw.add(user_id)
                         self.telegram.send_message(
                             chat_id,
-                            "Укажите положительную целую сумму.\n"
-                            "Пример: <code>/withdraw 100</code>",
+                            "Введите сумму вывода одним сообщением, например "
+                            "<code>100</code>.",
                         )
                         return
-                    withdrawn, wallet, zeno = self.supabase.withdraw(user_id, amount)
-                    if not withdrawn:
-                        self.telegram.send_message(
-                            chat_id,
-                            f"Недостаточно заработанных монет.\n\nВаш баланс: "
-                            f"<b>{wallet['earn_balance']}</b> монет",
-                        )
-                        return
-                    self.telegram.send_message(
-                        chat_id,
-                        f"Вывод выполнен: <b>{amount} монет</b> переведено в Zeno.\n\n"
-                        f"{format_wallet(wallet, zeno or 0)}",
-                    )
+                    self.process_withdraw(chat_id, user_id, amount)
                     return
 
                 self.telegram.send_message(chat_id, HELP_TEXT)
         except Exception as error:
             self.send_error(chat_id, error)
 
+    def handle_callback(self, callback: dict[str, Any]) -> None:
+        callback_id = str(callback["id"])
+        user = callback.get("from", {})
+        data = str(callback.get("data", ""))
+        chat = callback.get("message", {}).get("chat", {})
+        chat_id = int(chat.get("id", user.get("id")))
+        user_id = int(user["id"])
+        self.telegram.answer_callback(callback_id)
+
+        if not data.startswith("withdraw:"):
+            return
+        value = data.split(":", 1)[1]
+        if value == "custom":
+            self.pending_withdraw.add(user_id)
+            self.telegram.send_message(
+                chat_id,
+                "Введите сумму вывода одним сообщением, например <code>100</code>.",
+            )
+            return
+        amount = parse_amount(value)
+        if amount is None:
+            return
+        try:
+            with self.operation_lock:
+                self.process_withdraw(chat_id, user_id, amount)
+        except Exception as error:
+            self.send_error(chat_id, error)
+
     def run(self) -> None:
         self.telegram.delete_webhook()
+        self.telegram.set_my_commands()
         bot = self.telegram.get_me()
         self.bot_username = bot.get("username", self.bot_username)
         log.info("Zeno Wallet bot started as @%s", self.bot_username)
@@ -478,6 +594,9 @@ class WalletBot:
                     message = update.get("message")
                     if message:
                         self.handle_message(message)
+                    callback = update.get("callback_query")
+                    if callback:
+                        self.handle_callback(callback)
             except Exception:
                 if self.running:
                     log.exception("Telegram polling failed")

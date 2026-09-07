@@ -1,6 +1,6 @@
-# [Project name]
+# Zeno Wallet Telegram Bot
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Telegram-бот для заработка монет и перевода заработанного баланса в Zeno.
 
 ## Run & Operate
 
@@ -30,7 +30,14 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- `/start` показывает приветствие и список команд.
+- `/case` начисляет случайную награду от 5 до 100 монет.
+- `/daily` начисляет 10 монет раз в 24 часа.
+- `/referral` выдаёт персональную ссылку и начисляет пригласившему 50 монет за нового пользователя.
+- `/balance` показывает заработанный баланс и баланс Zeno.
+- `/withdraw [сумма]` переводит сумму из `earn_balance` в `zeno_balance`.
+
+Supabase SQL для таблицы кошелька находится в `supabase/schema.sql`. Перед первым запуском его нужно выполнить в SQL Editor Supabase.
 
 ## User preferences
 
@@ -38,7 +45,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Бот работает в режиме long polling; не запускайте несколько экземпляров одновременно с одним BOT_TOKEN.
+- `BOT_TOKEN`, `SUPABASE_URL` и `SUPABASE_KEY` должны быть добавлены в Secrets.
+- Сервер использует Supabase REST API напрямую и не передаёт ключ в Telegram или клиентский код.
 
 ## Pointers
 

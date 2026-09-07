@@ -18,6 +18,24 @@ type SupabaseError = {
 };
 
 type JsonObject = Record<string, unknown>;
+export type CaseSettings = {
+  odds: Record<string, number>;
+  hourly_limit: number;
+};
+
+export type CaseResult = {
+  allowed: boolean;
+  reward: number | null;
+  wallet: Wallet;
+  remaining: number;
+  nextAvailableAt: Date | null;
+};
+
+const CASE_REWARDS = [0, 5, 10, 25, 50, 100] as const;
+const DEFAULT_CASE_SETTINGS: CaseSettings = {
+  odds: { "0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4 },
+  hourly_limit: 5,
+};
 
 export class SupabaseClient {
   private readonly baseUrl: string;
@@ -165,10 +183,6 @@ export class SupabaseClient {
     return { claimed: true, wallet: updated };
   }
 
-  async openCase(userId: number, reward: number): Promise<Wallet> {
-    return this.credit(userId, reward);
-  }
-
   private async getUsersState(): Promise<JsonObject> {
     const rows = await this.request<Array<{ state_value: unknown }>>(
       "bot_state?select=state_value&state_key=eq.users&limit=1",
@@ -186,6 +200,138 @@ export class SupabaseClient {
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ state_value: stateValue }),
     });
+  }
+
+  async getCaseSettings(): Promise<CaseSettings> {
+    let rows = await this.request<Array<{ state_value: unknown }>>(
+      "bot_state?select=state_value&state_key=eq.case_settings&limit=1",
+    );
+    if (rows.length === 0) {
+      try {
+        rows = await this.request<Array<{ state_value: unknown }>>("bot_state", {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({
+            state_key: "case_settings",
+            state_value: DEFAULT_CASE_SETTINGS,
+          }),
+        });
+      } catch {
+        rows = await this.request<Array<{ state_value: unknown }>>(
+          "bot_state?select=state_value&state_key=eq.case_settings&limit=1",
+        );
+      }
+    }
+
+    const raw =
+      rows[0]?.state_value &&
+      typeof rows[0].state_value === "object" &&
+      !Array.isArray(rows[0].state_value)
+        ? (rows[0].state_value as JsonObject)
+        : {};
+    const rawOdds =
+      raw["odds"] &&
+      typeof raw["odds"] === "object" &&
+      !Array.isArray(raw["odds"])
+        ? (raw["odds"] as JsonObject)
+        : {};
+    const odds = Object.fromEntries(
+      CASE_REWARDS.map((reward) => [
+        String(reward),
+        Number(rawOdds[String(reward)] ?? DEFAULT_CASE_SETTINGS.odds[String(reward)]),
+      ]),
+    );
+    const hourlyLimit = Number(raw["hourly_limit"] ?? DEFAULT_CASE_SETTINGS.hourly_limit);
+    if (
+      CASE_REWARDS.some(
+        (reward) =>
+          !Number.isFinite(odds[String(reward)]) || odds[String(reward)] < 0,
+      ) ||
+      Object.values(odds).reduce((sum, value) => sum + value, 0) !== 100 ||
+      !Number.isSafeInteger(hourlyLimit) ||
+      hourlyLimit < 1
+    ) {
+      return {
+        odds: { ...DEFAULT_CASE_SETTINGS.odds },
+        hourly_limit: DEFAULT_CASE_SETTINGS.hourly_limit,
+      };
+    }
+    return { odds, hourly_limit: hourlyLimit };
+  }
+
+  async updateCaseSettings(
+    values: Partial<CaseSettings>,
+  ): Promise<CaseSettings> {
+    const current = await this.getCaseSettings();
+    const settings: CaseSettings = {
+      odds: values.odds ?? current.odds,
+      hourly_limit: values.hourly_limit ?? current.hourly_limit,
+    };
+    await this.request("bot_state?state_key=eq.case_settings", {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ state_value: settings }),
+    });
+    return settings;
+  }
+
+  async openCase(userId: number): Promise<CaseResult> {
+    const settings = await this.getCaseSettings();
+    const wallet = await this.ensureWallet(userId);
+    const usersState = await this.getUsersState();
+    const userKey = String(userId);
+    const previous = usersState[userKey];
+    const userState =
+      typeof previous === "object" &&
+      previous !== null &&
+      !Array.isArray(previous)
+        ? (previous as JsonObject)
+        : {};
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    const recentAttempts = Array.isArray(userState["case_attempts"])
+      ? userState["case_attempts"]
+          .map((value) => new Date(String(value)))
+          .filter((date) => !Number.isNaN(date.getTime()) && date.getTime() > cutoff)
+      : [];
+
+    if (recentAttempts.length >= settings.hourly_limit) {
+      const oldest = Math.min(...recentAttempts.map((date) => date.getTime()));
+      return {
+        allowed: false,
+        reward: null,
+        wallet,
+        remaining: 0,
+        nextAvailableAt: new Date(oldest + 60 * 60 * 1000),
+      };
+    }
+
+    recentAttempts.push(new Date());
+    await this.updateUsersState({
+      ...usersState,
+      [userKey]: {
+        ...userState,
+        case_attempts: recentAttempts.map((date) => date.toISOString()),
+      },
+    });
+
+    const roll = Math.random() * 100;
+    let cursor = 0;
+    let reward = 0;
+    for (const candidate of CASE_REWARDS) {
+      cursor += settings.odds[String(candidate)];
+      if (roll < cursor) {
+        reward = candidate;
+        break;
+      }
+    }
+    const updatedWallet = reward > 0 ? await this.credit(userId, reward) : wallet;
+    return {
+      allowed: true,
+      reward,
+      wallet: updatedWallet,
+      remaining: settings.hourly_limit - recentAttempts.length,
+      nextAvailableAt: null,
+    };
   }
 
   async getZenoBalance(userId: number): Promise<number> {

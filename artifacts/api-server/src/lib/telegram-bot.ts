@@ -2,6 +2,7 @@ import { logger } from "./logger";
 import {
   getSupabaseClient,
   logSupabaseError,
+  type CaseSettings,
   type Wallet,
 } from "./supabase";
 
@@ -88,11 +89,19 @@ const ADMIN_KEYBOARD = {
     ],
     [{ text: "Всего валюты", callback_data: "admin:total" }],
     [{ text: "Рассылка всем", callback_data: "admin:broadcast" }],
+    [{ text: "Настройки кейсов", callback_data: "admin:case_settings" }],
     [
       { text: "Забанить юзера", callback_data: "admin:ban" },
       { text: "Разбанить", callback_data: "admin:unban" },
     ],
     [{ text: "Закрыть панель", callback_data: "admin:close" }],
+  ],
+};
+const CASE_SETTINGS_KEYBOARD = {
+  inline_keyboard: [
+    [{ text: "Изменить шансы", callback_data: "admin:case_odds" }],
+    [{ text: "Лимит кейсов в час", callback_data: "admin:case_limit" }],
+    [{ text: "Назад", callback_data: "admin:case_back" }],
   ],
 };
 const BUTTON_ACTIONS: Record<string, string> = {
@@ -130,6 +139,21 @@ function formatWallet(wallet: Wallet, zenoBalance = wallet.zeno_balance): string
     "",
     `Заработано: <b>${wallet.earn_balance}</b> монет`,
     `В Zeno: <b>${zenoBalance}</b> монет`,
+  ].join("\n");
+}
+
+function formatCaseSettings(settings: CaseSettings): string {
+  return [
+    "<b>Настройки кейсов</b>",
+    "",
+    `Может ничего не выпасть: <b>${settings.odds["0"]}%</b> (самое частое по умолчанию)`,
+    `5 монет: <b>${settings.odds["5"]}%</b>`,
+    `10 монет: <b>${settings.odds["10"]}%</b>`,
+    `25 монет: <b>${settings.odds["25"]}%</b>`,
+    `50 монет: <b>${settings.odds["50"]}%</b>`,
+    `100 монет: <b>${settings.odds["100"]}%</b>`,
+    "",
+    `Лимит: <b>${settings.hourly_limit}</b> открытий в час на пользователя`,
   ].join("\n");
 }
 
@@ -193,6 +217,13 @@ class TelegramApi {
   answerCallbackQuery(callbackId: string): Promise<unknown> {
     return this.call("answerCallbackQuery", {
       callback_query_id: callbackId,
+    });
+  }
+
+  sendDice(chatId: number): Promise<unknown> {
+    return this.call("sendDice", {
+      chat_id: chatId,
+      emoji: "🎰",
     });
   }
 
@@ -297,6 +328,48 @@ async function handleAdminInput(
       chatId,
       `Рассылка завершена.\n\nДоставлено: <b>${delivered}</b>\nОшибок: <b>${failed}</b>`,
     );
+    return;
+  }
+
+  if (action === "case_odds") {
+    const values = new Map<string, number>();
+    for (const item of text.trim().split(/\s+/)) {
+      const [rawReward, rawChance] = item.split("=");
+      if (!rawReward || !rawChance || !/^\d+$/.test(rawReward) || !/^\d+$/.test(rawChance)) {
+        throw new Error("Формат: 0=55 5=15 10=12 25=8 50=6 100=4");
+      }
+      values.set(rawReward, Number(rawChance));
+    }
+    const expected = ["0", "5", "10", "25", "50", "100"];
+    if (
+      expected.some((reward) => !values.has(reward)) ||
+      values.size !== expected.length ||
+      [...values.values()].some((chance) => chance < 0 || chance > 100) ||
+      [...values.values()].reduce((sum, chance) => sum + chance, 0) !== 100
+    ) {
+      throw new Error(
+        "Нужны все шансы от 0 до 100%, а их сумма должна быть ровно 100%",
+      );
+    }
+    const supabaseSettings = await supabase.updateCaseSettings({
+      odds: Object.fromEntries(values),
+    });
+    await telegram.sendMessage(chatId, formatCaseSettings(supabaseSettings));
+    return;
+  }
+
+  if (action === "case_limit") {
+    if (!/^\d+$/.test(text.trim())) {
+      throw new Error("Введите целое число открытий в час");
+    }
+    const hourlyLimit = Number(text.trim());
+    if (!Number.isSafeInteger(hourlyLimit) || hourlyLimit < 1 || hourlyLimit > 1000) {
+      throw new Error("Лимит должен быть от 1 до 1000 кейсов в час");
+    }
+    const settings = await supabase.updateCaseSettings({
+      hourly_limit: hourlyLimit,
+    });
+    await telegram.sendMessage(chatId, formatCaseSettings(settings));
     return;
   }
 
@@ -463,7 +536,7 @@ async function handleMessage(
         const referral = await supabase.claimReferral(referralId, user.id);
         if (referral.rewarded) {
           referralMessage =
-            "\n\nРеферал засчитан. Пригласивший получил +50 монет.";
+            "\n\nРеферал засчитан. Пригласивший получил +5 монет.";
         }
       }
 
@@ -495,13 +568,36 @@ async function handleMessage(
     }
 
     if (selectedCommand === "case") {
-      const reward = Math.floor(Math.random() * 96) + 5;
-      const wallet = await supabase.openCase(user.id, reward);
+      const result = await supabase.openCase(user.id);
+      if (!result.allowed) {
+        await telegram.sendMessage(
+          message.chat.id,
+          `Лимит открытий исчерпан. Попробуйте снова через <b>${formatDuration(
+            result.nextAvailableAt!.getTime() - Date.now(),
+          )}</b>.`,
+        );
+        return;
+      }
+      try {
+        await telegram.sendDice(message.chat.id);
+      } catch (error) {
+        logger.warn({ err: error }, "Could not send case animation");
+      }
       const zenoBalance = await supabase.getZenoBalance(user.id);
+      if (result.reward === 0) {
+        await telegram.sendMessage(
+          message.chat.id,
+          `В этот раз ничего не выпало.\n\nОсталось открытий в час: <b>${result.remaining}</b>\n\n${formatWallet(
+            result.wallet,
+            zenoBalance,
+          )}`,
+        );
+        return;
+      }
       await telegram.sendMessage(
         message.chat.id,
-        `Кейс открыт.\n\nВаша награда: <b>+${reward} монет</b>\n\n${formatWallet(
-          wallet,
+        `Кейс открыт.\n\nВаша награда: <b>+${result.reward} монет</b>\nОсталось открытий в час: <b>${result.remaining}</b>\n\n${formatWallet(
+          result.wallet,
           zenoBalance,
         )}`,
       );
@@ -540,7 +636,7 @@ async function handleMessage(
           "",
           `<code>${escapeHtml(link)}</code>`,
           "",
-          "Пригласите друга — вы получите +50 монет после его первого запуска бота.",
+          "Пригласите друга — вы получите +5 монет после его первого запуска бота.",
         ].join("\n"),
       );
       return;
@@ -618,11 +714,39 @@ async function handleCallback(
       }
       return;
     }
+    if (action === "case_settings") {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return;
+      }
+      try {
+        const settings = await supabase.getCaseSettings();
+        await telegram.sendMessage(
+          chatId,
+          formatCaseSettings(settings),
+          CASE_SETTINGS_KEYBOARD,
+        );
+      } catch (error) {
+        await sendError(telegram, chatId, error);
+      }
+      return;
+    }
+    if (action === "case_back") {
+      await telegram.sendMessage(
+        chatId,
+        "<b>Админ-панель Zeno Wallet</b>\n\nВыберите нужное действие:",
+        ADMIN_KEYBOARD,
+      );
+      return;
+    }
     const prompts: Record<string, string> = {
       grant: "Введите Telegram ID и сумму для выдачи через пробел:",
       take: "Введите Telegram ID и сумму для списания через пробел:",
       balance: "Введите Telegram ID пользователя:",
       broadcast: "Введите текст сообщения для рассылки:",
+      case_odds:
+        "Введите шансы одной строкой в формате:\n<code>0=55 5=15 10=12 25=8 50=6 100=4</code>\nСумма должна быть ровно 100%.",
+      case_limit: "Введите максимальное количество открытий кейсов в час (1–1000):",
       ban: "Введите Telegram ID пользователя для блокировки:",
       unban: "Введите Telegram ID пользователя для разблокировки:",
     };

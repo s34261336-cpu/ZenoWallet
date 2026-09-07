@@ -23,6 +23,11 @@ logging.basicConfig(
 )
 log = logging.getLogger("zeno-wallet")
 ADMIN_ID = 5814345235
+CASE_REWARDS = (0, 5, 10, 25, 50, 100)
+DEFAULT_CASE_SETTINGS = {
+    "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
+    "hourly_limit": 5,
+}
 
 
 def required_env(name: str) -> str:
@@ -156,6 +161,125 @@ class SupabaseClient:
             prefer="return=minimal",
         )
 
+    def get_case_settings(self) -> dict[str, Any]:
+        rows = self.request(
+            "bot_state?select=state_value&state_key=eq.case_settings&limit=1"
+        )
+        if not rows:
+            try:
+                rows = self.request(
+                    "bot_state",
+                    method="POST",
+                    body={
+                        "state_key": "case_settings",
+                        "state_value": DEFAULT_CASE_SETTINGS,
+                    },
+                    prefer="return=representation",
+                )
+            except RuntimeError:
+                rows = self.request(
+                    "bot_state?select=state_value&state_key=eq.case_settings&limit=1"
+                )
+        raw = rows[0].get("state_value") if rows else {}
+        raw_odds = (
+            raw.get("odds")
+            if isinstance(raw, dict) and isinstance(raw.get("odds"), dict)
+            else {}
+        )
+        odds = {
+            str(reward): int(raw_odds.get(str(reward), DEFAULT_CASE_SETTINGS["odds"][str(reward)]))
+            for reward in CASE_REWARDS
+        }
+        try:
+            limit = (
+                int(raw.get("hourly_limit", DEFAULT_CASE_SETTINGS["hourly_limit"]))
+                if isinstance(raw, dict)
+                else DEFAULT_CASE_SETTINGS["hourly_limit"]
+            )
+        except (TypeError, ValueError):
+            limit = DEFAULT_CASE_SETTINGS["hourly_limit"]
+        if sum(odds.values()) != 100 or limit < 1:
+            return {
+                "odds": dict(DEFAULT_CASE_SETTINGS["odds"]),
+                "hourly_limit": DEFAULT_CASE_SETTINGS["hourly_limit"],
+            }
+        return {"odds": odds, "hourly_limit": limit}
+
+    def update_case_settings(
+        self, odds: dict[str, int] | None = None, hourly_limit: int | None = None
+    ) -> dict[str, Any]:
+        current = self.get_case_settings()
+        settings = {
+            "odds": odds if odds is not None else current["odds"],
+            "hourly_limit": hourly_limit
+            if hourly_limit is not None
+            else current["hourly_limit"],
+        }
+        self.request(
+            "bot_state?state_key=eq.case_settings",
+            method="PATCH",
+            body={"state_value": settings},
+            prefer="return=minimal",
+        )
+        return settings
+
+    def open_case(
+        self, user_id: int
+    ) -> tuple[bool, int | None, dict[str, Any], int, datetime | None]:
+        settings = self.get_case_settings()
+        wallet = self.ensure_wallet(user_id)
+        users_state = self.get_users_state()
+        user_key = str(user_id)
+        previous_user = users_state.get(user_key)
+        user_state = dict(previous_user) if isinstance(previous_user, dict) else {}
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=1)
+        recent_attempts: list[str] = []
+        for raw_timestamp in user_state.get("case_attempts", []):
+            try:
+                timestamp = datetime.fromisoformat(
+                    str(raw_timestamp).replace("Z", "+00:00")
+                )
+                if timestamp > cutoff:
+                    recent_attempts.append(timestamp.isoformat())
+            except (TypeError, ValueError):
+                continue
+
+        if len(recent_attempts) >= settings["hourly_limit"]:
+            oldest = min(
+                datetime.fromisoformat(value.replace("Z", "+00:00"))
+                for value in recent_attempts
+            )
+            return (
+                False,
+                None,
+                wallet,
+                0,
+                oldest + timedelta(hours=1),
+            )
+
+        recent_attempts.append(now.isoformat())
+        users_state[user_key] = {**user_state, "case_attempts": recent_attempts}
+        self.update_users_state(users_state)
+
+        roll = random.uniform(0, 100)
+        cursor = 0.0
+        reward = 0
+        for candidate in CASE_REWARDS:
+            cursor += settings["odds"][str(candidate)]
+            if roll < cursor:
+                reward = candidate
+                break
+        if reward:
+            wallet = self.credit(user_id, reward)
+        return (
+            True,
+            reward,
+            wallet,
+            settings["hourly_limit"] - len(recent_attempts),
+            None,
+        )
+
     def list_user_ids(self) -> list[int]:
         state = self.get_users_state()
         result: list[int] = []
@@ -254,7 +378,7 @@ class SupabaseClient:
             friend_id,
             {"referred_by": inviter_id, "referral_rewarded": True},
         )
-        self.credit(inviter_id, 50)
+        self.credit(inviter_id, 5)
         return True
 
     def withdraw(
@@ -356,6 +480,9 @@ class TelegramApi:
     def answer_callback(self, callback_id: str) -> None:
         self.call("answerCallbackQuery", {"callback_query_id": callback_id})
 
+    def send_dice(self, chat_id: int) -> None:
+        self.call("sendDice", {"chat_id": chat_id, "emoji": "🎰"})
+
     def send_message(
         self,
         chat_id: int,
@@ -451,6 +578,9 @@ ADMIN_KEYBOARD = {
             {"text": "Рассылка всем", "callback_data": "admin:broadcast"},
         ],
         [
+            {"text": "Настройки кейсов", "callback_data": "admin:case_settings"},
+        ],
+        [
             {"text": "Забанить юзера", "callback_data": "admin:ban"},
             {"text": "Разбанить", "callback_data": "admin:unban"},
         ],
@@ -485,6 +615,30 @@ def format_duration(delta: timedelta) -> str:
 
 def escape(value: str) -> str:
     return html.escape(value, quote=True)
+
+
+def format_case_settings(settings: dict[str, Any]) -> str:
+    odds = settings["odds"]
+    return (
+        "<b>Настройки кейсов</b>\n\n"
+        f"Может ничего не выпасть: <b>{odds['0']}%</b> "
+        "(самое частое по умолчанию)\n"
+        f"5 монет: <b>{odds['5']}%</b>\n"
+        f"10 монет: <b>{odds['10']}%</b>\n"
+        f"25 монет: <b>{odds['25']}%</b>\n"
+        f"50 монет: <b>{odds['50']}%</b>\n"
+        f"100 монет: <b>{odds['100']}%</b>\n\n"
+        f"Лимит: <b>{settings['hourly_limit']}</b> открытий в час на пользователя"
+    )
+
+
+CASE_SETTINGS_KEYBOARD = {
+    "inline_keyboard": [
+        [{"text": "Изменить шансы", "callback_data": "admin:case_odds"}],
+        [{"text": "Лимит кейсов в час", "callback_data": "admin:case_limit"}],
+        [{"text": "Назад", "callback_data": "admin:case_back"}],
+    ]
+}
 
 
 class WalletBot:
@@ -565,6 +719,47 @@ class WalletBot:
                 f"Рассылка завершена.\n\nДоставлено: <b>{delivered}</b>\n"
                 f"Ошибок: <b>{failed}</b>",
             )
+            return
+
+        if action == "case_odds":
+            values: dict[str, int] = {}
+            try:
+                for item in text.strip().split():
+                    reward, chance = item.split("=", 1)
+                    if reward not in {str(value) for value in CASE_REWARDS}:
+                        raise ValueError
+                    values[reward] = int(chance)
+            except (ValueError, TypeError):
+                self.send(
+                    chat_id,
+                    "Формат: <code>0=55 5=15 10=12 25=8 50=6 100=4</code>",
+                )
+                return
+            expected = {str(value) for value in CASE_REWARDS}
+            if (
+                set(values) != expected
+                or any(chance < 0 or chance > 100 for chance in values.values())
+                or sum(values.values()) != 100
+            ):
+                self.send(
+                    chat_id,
+                    "Нужны все шансы от 0 до 100%, а их сумма должна быть ровно 100%.",
+                )
+                return
+            settings = self.supabase.update_case_settings(odds=values)
+            self.send(chat_id, format_case_settings(settings))
+            return
+
+        if action == "case_limit":
+            if not text.strip().isdigit():
+                self.send(chat_id, "Введите целое число открытий в час от 1 до 1000.")
+                return
+            hourly_limit = int(text.strip())
+            if hourly_limit < 1 or hourly_limit > 1000:
+                self.send(chat_id, "Лимит должен быть от 1 до 1000 кейсов в час.")
+                return
+            settings = self.supabase.update_case_settings(hourly_limit=hourly_limit)
+            self.send(chat_id, format_case_settings(settings))
             return
 
         parts = text.strip().split()
@@ -659,7 +854,7 @@ class WalletBot:
                     inviter = referral_id(args)
                     if inviter and self.supabase.claim_referral(inviter, user_id):
                         message_parts.append(
-                            "\nРеферал засчитан. Пригласивший получил +50 монет."
+                            "\nРеферал засчитан. Пригласивший получил +5 монет."
                         )
                     self.send(chat_id, "\n".join(message_parts))
                     return
@@ -678,12 +873,33 @@ class WalletBot:
                     return
 
                 if command == "case":
-                    reward = random.randint(5, 100)
-                    wallet = self.supabase.credit(user_id, reward)
+                    allowed, reward, wallet, remaining, next_available = (
+                        self.supabase.open_case(user_id)
+                    )
+                    if not allowed and next_available:
+                        self.send(
+                            chat_id,
+                            "Лимит открытий исчерпан. Попробуйте снова через "
+                            f"<b>{format_duration(next_available - datetime.now(timezone.utc))}</b>.",
+                        )
+                        return
+                    try:
+                        self.telegram.send_dice(chat_id)
+                    except Exception:
+                        log.exception("Could not send case animation")
                     zeno = self.supabase.get_zeno_balance(user_id)
+                    if reward == 0:
+                        self.send(
+                            chat_id,
+                            "В этот раз ничего не выпало.\n\n"
+                            f"Осталось открытий в час: <b>{remaining}</b>\n\n"
+                            f"{format_wallet(wallet, zeno)}",
+                        )
+                        return
                     self.send(
                         chat_id,
-                        f"Кейс открыт.\n\nВаша награда: <b>+{reward} монет</b>\n\n"
+                        f"Кейс открыт.\n\nВаша награда: <b>+{reward} монет</b>\n"
+                        f"Осталось открытий в час: <b>{remaining}</b>\n\n"
                         f"{format_wallet(wallet, zeno)}",
                     )
                     return
@@ -714,7 +930,7 @@ class WalletBot:
                         chat_id,
                         "<b>Ваша реферальная ссылка</b>\n\n"
                         f"<code>{escape(link)}</code>\n\n"
-                        "Пригласите друга — вы получите +50 монет после его "
+                        "Пригласите друга — вы получите +5 монет после его "
                         "первого запуска бота.",
                     )
                     return
@@ -772,11 +988,28 @@ class WalletBot:
                 except Exception as error:
                     self.send_error(chat_id, error)
                 return
+            if action == "case_settings":
+                try:
+                    with self.operation_lock:
+                        settings = self.supabase.get_case_settings()
+                    self.send(chat_id, format_case_settings(settings), CASE_SETTINGS_KEYBOARD)
+                except Exception as error:
+                    self.send_error(chat_id, error)
+                return
+            if action == "case_back":
+                self.show_admin_panel(chat_id)
+                return
             prompts = {
                 "grant": "Введите Telegram ID и сумму для выдачи через пробел:",
                 "take": "Введите Telegram ID и сумму для списания через пробел:",
                 "balance": "Введите Telegram ID пользователя:",
                 "broadcast": "Введите текст сообщения для рассылки:",
+                "case_odds": (
+                    "Введите шансы одной строкой в формате:\n"
+                    "<code>0=55 5=15 10=12 25=8 50=6 100=4</code>\n"
+                    "Сумма должна быть ровно 100%."
+                ),
+                "case_limit": "Введите максимальное количество открытий кейсов в час (1–1000):",
                 "ban": "Введите Telegram ID пользователя для блокировки:",
                 "unban": "Введите Telegram ID пользователя для разблокировки:",
             }

@@ -1,0 +1,1 @@
+- [Persisted case settings](case-settings.md) — keep odds, limits, and usage state shared through Supabase across both bot runtimes.

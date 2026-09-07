@@ -17,6 +17,8 @@ type SupabaseError = {
   code?: string;
 };
 
+type JsonObject = Record<string, unknown>;
+
 export class SupabaseClient {
   private readonly baseUrl: string;
   private readonly key: string;
@@ -167,6 +169,40 @@ export class SupabaseClient {
     return this.credit(userId, reward);
   }
 
+  private async getUsersState(): Promise<JsonObject> {
+    const rows = await this.request<Array<{ state_value: unknown }>>(
+      "bot_state?select=state_value&state_key=eq.users&limit=1",
+    );
+    const state = rows[0]?.state_value;
+    if (!state || typeof state !== "object" || Array.isArray(state)) {
+      throw new Error("Supabase bot_state.users must contain a JSON object");
+    }
+    return state as JsonObject;
+  }
+
+  private async updateUsersState(stateValue: JsonObject): Promise<void> {
+    await this.request("bot_state?state_key=eq.users", {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ state_value: stateValue }),
+    });
+  }
+
+  async getZenoBalance(userId: number): Promise<number> {
+    const usersState = await this.getUsersState();
+    const userState = usersState[String(userId)];
+    if (!userState || typeof userState !== "object" || Array.isArray(userState)) {
+      return 0;
+    }
+
+    const zenotoken = (userState as JsonObject)["zenotoken"];
+    return typeof zenotoken === "number" &&
+      Number.isFinite(zenotoken) &&
+      zenotoken >= 0
+      ? zenotoken
+      : 0;
+  }
+
   async claimReferral(
     inviterId: number,
     friendId: number,
@@ -188,7 +224,7 @@ export class SupabaseClient {
   }
 
   async withdraw(userId: number, amount: number): Promise<
-    | { withdrawn: true; wallet: Wallet }
+    | { withdrawn: true; wallet: Wallet; zenoBalance: number }
     | { withdrawn: false; wallet: Wallet }
   > {
     const wallet = await this.ensureWallet(userId);
@@ -196,11 +232,59 @@ export class SupabaseClient {
       return { withdrawn: false, wallet };
     }
 
-    const updated = await this.updateWallet(userId, {
-      earn_balance: wallet.earn_balance - amount,
-      zeno_balance: wallet.zeno_balance + amount,
-    });
-    return { withdrawn: true, wallet: updated };
+    const usersState = await this.getUsersState();
+    const userKey = String(userId);
+    const previousUserState = usersState[userKey];
+    const userState =
+      previousUserState &&
+      typeof previousUserState === "object" &&
+      !Array.isArray(previousUserState)
+        ? (previousUserState as JsonObject)
+        : {};
+    const currentZenoBalance =
+      typeof userState["zenotoken"] === "number" &&
+      Number.isFinite(userState["zenotoken"]) &&
+      userState["zenotoken"] >= 0
+        ? userState["zenotoken"]
+        : 0;
+    const nextZenoBalance = currentZenoBalance + amount;
+    const nextUsersState: JsonObject = {
+      ...usersState,
+      [userKey]: {
+        ...userState,
+        zenotoken: nextZenoBalance,
+      },
+    };
+
+    // Update the Zeno-owned state first. If the wallet update fails, restore
+    // the original JSON so a retry cannot mint Zeno tokens.
+    await this.updateUsersState(nextUsersState);
+    try {
+      const updated = await this.updateWallet(userId, {
+        earn_balance: wallet.earn_balance - amount,
+      });
+      return {
+        withdrawn: true,
+        wallet: updated,
+        zenoBalance: nextZenoBalance,
+      };
+    } catch (error) {
+      try {
+        const rollbackState = { ...usersState };
+        if (previousUserState === undefined) {
+          delete rollbackState[userKey];
+        } else {
+          rollbackState[userKey] = previousUserState;
+        }
+        await this.updateUsersState(rollbackState);
+      } catch (rollbackError) {
+        logger.error(
+          { err: rollbackError },
+          "Failed to roll back Zeno balance after wallet update failure",
+        );
+      }
+      throw error;
+    }
   }
 }
 

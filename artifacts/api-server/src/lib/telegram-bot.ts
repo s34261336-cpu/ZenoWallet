@@ -57,12 +57,12 @@ function formatDuration(ms: number): string {
   return minutes === 0 ? `${hours} ч.` : `${hours} ч. ${minutes} мин.`;
 }
 
-function formatWallet(wallet: Wallet): string {
+function formatWallet(wallet: Wallet, zenoBalance = wallet.zeno_balance): string {
   return [
     "<b>Ваш баланс</b>",
     "",
     `Заработано: <b>${wallet.earn_balance}</b> монет`,
-    `В Zeno: <b>${wallet.zeno_balance}</b> монет`,
+    `В Zeno: <b>${zenoBalance}</b> монет`,
   ].join("\n");
 }
 
@@ -230,9 +230,13 @@ async function handleMessage(
     if (command === "case") {
       const reward = Math.floor(Math.random() * 96) + 5;
       const wallet = await supabase.openCase(user.id, reward);
+      const zenoBalance = await supabase.getZenoBalance(user.id);
       await telegram.sendMessage(
         message.chat.id,
-        `Кейс открыт.\n\nВаша награда: <b>+${reward} монет</b>\n\n${formatWallet(wallet)}`,
+        `Кейс открыт.\n\nВаша награда: <b>+${reward} монет</b>\n\n${formatWallet(
+          wallet,
+          zenoBalance,
+        )}`,
       );
       return;
     }
@@ -249,10 +253,12 @@ async function handleMessage(
         return;
       }
 
+      const zenoBalance = await supabase.getZenoBalance(user.id);
       await telegram.sendMessage(
         message.chat.id,
         `Ежедневный бонус начислен: <b>+10 монет</b>\n\n${formatWallet(
           result.wallet,
+          zenoBalance,
         )}`,
       );
       return;
@@ -275,7 +281,11 @@ async function handleMessage(
 
     if (command === "balance") {
       const wallet = await supabase.ensureWallet(user.id);
-      await telegram.sendMessage(message.chat.id, formatWallet(wallet));
+      const zenoBalance = await supabase.getZenoBalance(user.id);
+      await telegram.sendMessage(
+        message.chat.id,
+        formatWallet(wallet, zenoBalance),
+      );
       return;
     }
 
@@ -302,6 +312,7 @@ async function handleMessage(
         message.chat.id,
         `Вывод выполнен: <b>${amount} монет</b> переведено в Zeno.\n\n${formatWallet(
           result.wallet,
+          result.zenoBalance,
         )}`,
       );
       return;

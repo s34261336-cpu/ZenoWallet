@@ -22,6 +22,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 log = logging.getLogger("zeno-wallet")
+ADMIN_ID = 5814345235
 
 
 def required_env(name: str) -> str:
@@ -138,6 +139,15 @@ class SupabaseClient:
             raise RuntimeError("Supabase bot_state.users must contain a JSON object")
         return state
 
+    def ensure_user_state(self, user_id: int) -> None:
+        state = self.get_users_state()
+        key = str(user_id)
+        current = state.get(key)
+        if isinstance(current, dict):
+            return
+        state[key] = {"zenotoken": 0}
+        self.update_users_state(state)
+
     def update_users_state(self, state: dict[str, Any]) -> None:
         self.request(
             "bot_state?state_key=eq.users",
@@ -145,6 +155,54 @@ class SupabaseClient:
             body={"state_value": state},
             prefer="return=minimal",
         )
+
+    def list_user_ids(self) -> list[int]:
+        state = self.get_users_state()
+        result: list[int] = []
+        for key in state:
+            if str(key).isdigit():
+                result.append(int(key))
+        return result
+
+    def is_banned(self, user_id: int) -> bool:
+        state = self.get_users_state()
+        user = state.get(str(user_id))
+        return isinstance(user, dict) and user.get("banned") is True
+
+    def set_banned(self, user_id: int, banned: bool) -> None:
+        state = self.get_users_state()
+        key = str(user_id)
+        user = state.get(key)
+        user_state = dict(user) if isinstance(user, dict) else {"zenotoken": 0}
+        user_state["banned"] = banned
+        state[key] = user_state
+        self.update_users_state(state)
+
+    def get_all_wallets(self) -> list[dict[str, Any]]:
+        return self.request(
+            "wallet?select=user_id,earn_balance,zeno_balance&limit=10000"
+        )
+
+    def admin_adjust_earn(self, user_id: int, amount: int) -> dict[str, Any]:
+        wallet = self.ensure_wallet(user_id)
+        next_balance = int(wallet["earn_balance"]) + amount
+        if next_balance < 0:
+            raise ValueError(
+                f"У пользователя только {wallet['earn_balance']} заработанных монет"
+            )
+        return self.update_wallet(user_id, {"earn_balance": next_balance})
+
+    def admin_stats(self) -> tuple[int, int]:
+        users_state = self.get_users_state()
+        wallets = self.get_all_wallets()
+        total_earn = sum(int(wallet.get("earn_balance", 0)) for wallet in wallets)
+        total_zeno = 0
+        for user in users_state.values():
+            if isinstance(user, dict):
+                value = user.get("zenotoken", 0)
+                if isinstance(value, (int, float)) and value >= 0:
+                    total_zeno += int(value)
+        return len(self.list_user_ids()), total_earn + total_zeno
 
     def get_zeno_balance(self, user_id: int) -> int:
         state = self.get_users_state()
@@ -304,7 +362,7 @@ class TelegramApi:
         text: str,
         reply_markup: dict[str, Any] | None = None,
     ) -> None:
-        markup = reply_markup if reply_markup is not None else MENU_KEYBOARD
+        markup = reply_markup if reply_markup is not None else menu_keyboard(False)
         self.call(
             "sendMessage",
             {
@@ -347,16 +405,20 @@ def format_wallet(wallet: dict[str, Any], zeno_balance: int | float) -> str:
     )
 
 
-MENU_KEYBOARD = {
-    "keyboard": [
+def menu_keyboard(is_admin: bool = False) -> dict[str, Any]:
+    keyboard = [
         [{"text": "Открыть кейс"}, {"text": "Ежедневный бонус"}],
         [{"text": "Мой баланс"}, {"text": "Пригласить друзей"}],
         [{"text": "Вывести монеты"}],
-    ],
-    "resize_keyboard": True,
-    "is_persistent": True,
-    "input_field_placeholder": "Выберите действие",
-}
+    ]
+    if is_admin:
+        keyboard.append([{"text": "Админ-панель"}])
+    return {
+        "keyboard": keyboard,
+        "resize_keyboard": True,
+        "is_persistent": True,
+        "input_field_placeholder": "Выберите действие",
+    }
 
 WITHDRAW_KEYBOARD = {
     "inline_keyboard": [
@@ -372,12 +434,37 @@ WITHDRAW_KEYBOARD = {
     ]
 }
 
+ADMIN_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "Выдать валюту", "callback_data": "admin:grant"},
+            {"text": "Забрать валюту", "callback_data": "admin:take"},
+        ],
+        [
+            {"text": "Баланс пользователя", "callback_data": "admin:balance"},
+            {"text": "Количество юзеров", "callback_data": "admin:users"},
+        ],
+        [
+            {"text": "Всего валюты", "callback_data": "admin:total"},
+        ],
+        [
+            {"text": "Рассылка всем", "callback_data": "admin:broadcast"},
+        ],
+        [
+            {"text": "Забанить юзера", "callback_data": "admin:ban"},
+            {"text": "Разбанить", "callback_data": "admin:unban"},
+        ],
+        [{"text": "Закрыть панель", "callback_data": "admin:close"}],
+    ]
+}
+
 BUTTON_ACTIONS = {
     "Открыть кейс": "case",
     "Ежедневный бонус": "daily",
     "Мой баланс": "balance",
     "Пригласить друзей": "referral",
     "Вывести монеты": "withdraw_menu",
+    "Админ-панель": "admin_menu",
 }
 
 
@@ -408,6 +495,7 @@ class WalletBot:
         self.running = True
         self.operation_lock = threading.Lock()
         self.pending_withdraw: set[int] = set()
+        self.pending_admin: dict[int, str] = {}
 
     def send_error(self, chat_id: int, error: Exception) -> None:
         log.exception("Zeno Wallet command failed", exc_info=error)
@@ -419,22 +507,108 @@ class WalletBot:
             )
         else:
             message = "Не удалось выполнить операцию. Попробуйте ещё раз позже."
-        self.telegram.send_message(chat_id, message)
+        self.send(chat_id, message)
+
+    def send(
+        self,
+        chat_id: int,
+        text: str,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> None:
+        markup = (
+            reply_markup
+            if reply_markup is not None
+            else menu_keyboard(chat_id == ADMIN_ID)
+        )
+        self.telegram.send_message(chat_id, text, markup)
 
     def process_withdraw(self, chat_id: int, user_id: int, amount: int) -> None:
         withdrawn, wallet, zeno = self.supabase.withdraw(user_id, amount)
         if not withdrawn:
-            self.telegram.send_message(
+            self.send(
                 chat_id,
                 f"Недостаточно заработанных монет.\n\nВаш баланс: "
                 f"<b>{wallet['earn_balance']}</b> монет",
             )
             return
-        self.telegram.send_message(
+        self.send(
             chat_id,
             f"Вывод выполнен: <b>{amount} монет</b> переведено в Zeno.\n\n"
             f"{format_wallet(wallet, zeno or 0)}",
         )
+
+    def show_admin_panel(self, chat_id: int) -> None:
+        self.send(
+            chat_id,
+            "<b>Админ-панель Zeno Wallet</b>\n\nВыберите нужное действие:",
+            ADMIN_KEYBOARD,
+        )
+
+    def handle_admin_input(self, chat_id: int, text: str) -> None:
+        action = self.pending_admin.pop(ADMIN_ID, None)
+        if action is None:
+            return
+
+        if action == "broadcast":
+            delivered = 0
+            failed = 0
+            for user_id in self.supabase.list_user_ids():
+                if user_id == ADMIN_ID or self.supabase.is_banned(user_id):
+                    continue
+                try:
+                    self.send(user_id, f"<b>Сообщение от Zeno Wallet</b>\n\n{escape(text)}")
+                    delivered += 1
+                except Exception:
+                    failed += 1
+            self.send(
+                chat_id,
+                f"Рассылка завершена.\n\nДоставлено: <b>{delivered}</b>\n"
+                f"Ошибок: <b>{failed}</b>",
+            )
+            return
+
+        parts = text.strip().split()
+        try:
+            if action in ("grant", "take"):
+                if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                    raise ValueError("Формат: Telegram ID и сумма через пробел")
+                target_id = int(parts[0])
+                amount = int(parts[1])
+                if amount <= 0:
+                    raise ValueError("Сумма должна быть больше нуля")
+                delta = amount if action == "grant" else -amount
+                wallet = self.supabase.admin_adjust_earn(target_id, delta)
+                verb = "Выдано" if action == "grant" else "Забрано"
+                self.send(
+                    chat_id,
+                    f"{verb}: <b>{amount}</b> монет.\n"
+                    f"Баланс пользователя: <b>{wallet['earn_balance']}</b>",
+                )
+                return
+
+            if action == "balance":
+                if len(parts) != 1 or not parts[0].isdigit():
+                    raise ValueError("Укажите Telegram ID пользователя")
+                target_id = int(parts[0])
+                wallet = self.supabase.ensure_wallet(target_id)
+                zeno = self.supabase.get_zeno_balance(target_id)
+                self.send(chat_id, format_wallet(wallet, zeno))
+                return
+
+            if action in ("ban", "unban"):
+                if len(parts) != 1 or not parts[0].isdigit():
+                    raise ValueError("Укажите Telegram ID пользователя")
+                target_id = int(parts[0])
+                if target_id == ADMIN_ID:
+                    raise ValueError("Нельзя изменить статус главного администратора")
+                self.supabase.set_banned(target_id, action == "ban")
+                status = "заблокирован" if action == "ban" else "разблокирован"
+                self.send(chat_id, f"Пользователь <b>{target_id}</b> {status}.")
+                return
+
+            raise ValueError("Неизвестное действие")
+        except Exception as error:
+            self.send(chat_id, f"Не удалось выполнить действие: <b>{escape(str(error))}</b>")
 
     def handle_message(self, message: dict[str, Any]) -> None:
         user = message.get("from")
@@ -444,6 +618,17 @@ class WalletBot:
 
         chat_id = int(message["chat"]["id"])
         user_id = int(user["id"])
+        if user_id != ADMIN_ID and self.supabase.is_banned(user_id):
+            return
+
+        if user_id == ADMIN_ID and user_id in self.pending_admin and not text.startswith("/"):
+            try:
+                with self.operation_lock:
+                    self.handle_admin_input(chat_id, text)
+            except Exception as error:
+                self.send_error(chat_id, error)
+            return
+
         if user_id in self.pending_withdraw and not text.startswith("/"):
             amount = parse_amount(text.strip())
             if amount is not None:
@@ -454,7 +639,7 @@ class WalletBot:
                 except Exception as error:
                     self.send_error(chat_id, error)
                 return
-            self.telegram.send_message(
+            self.send(
                 chat_id,
                 "Введите положительную целую сумму, например <code>100</code>.",
             )
@@ -469,17 +654,23 @@ class WalletBot:
             with self.operation_lock:
                 if command == "start":
                     self.supabase.ensure_wallet(user_id)
+                    self.supabase.ensure_user_state(user_id)
                     message_parts = [HELP_TEXT]
                     inviter = referral_id(args)
                     if inviter and self.supabase.claim_referral(inviter, user_id):
                         message_parts.append(
                             "\nРеферал засчитан. Пригласивший получил +50 монет."
                         )
-                    self.telegram.send_message(chat_id, "\n".join(message_parts))
+                    self.send(chat_id, "\n".join(message_parts))
+                    return
+
+                if command == "admin_menu":
+                    if user_id == ADMIN_ID:
+                        self.show_admin_panel(chat_id)
                     return
 
                 if command == "withdraw_menu":
-                    self.telegram.send_message(
+                    self.send(
                         chat_id,
                         "Выберите сумму вывода или введите свою сумму:",
                         reply_markup=WITHDRAW_KEYBOARD,
@@ -490,7 +681,7 @@ class WalletBot:
                     reward = random.randint(5, 100)
                     wallet = self.supabase.credit(user_id, reward)
                     zeno = self.supabase.get_zeno_balance(user_id)
-                    self.telegram.send_message(
+                    self.send(
                         chat_id,
                         f"Кейс открыт.\n\nВаша награда: <b>+{reward} монет</b>\n\n"
                         f"{format_wallet(wallet, zeno)}",
@@ -503,14 +694,14 @@ class WalletBot:
                         wait = format_duration(
                             next_available - datetime.now(timezone.utc)
                         )
-                        self.telegram.send_message(
+                        self.send(
                             chat_id,
                             f"Ежедневный бонус уже получен. Возвращайтесь через "
                             f"<b>{wait}</b>.",
                         )
                         return
                     zeno = self.supabase.get_zeno_balance(user_id)
-                    self.telegram.send_message(
+                    self.send(
                         chat_id,
                         f"Ежедневный бонус начислен: <b>+10 монет</b>\n\n"
                         f"{format_wallet(wallet, zeno)}",
@@ -519,7 +710,7 @@ class WalletBot:
 
                 if command == "referral":
                     link = f"https://t.me/{self.bot_username}?start=ref_{user_id}"
-                    self.telegram.send_message(
+                    self.send(
                         chat_id,
                         "<b>Ваша реферальная ссылка</b>\n\n"
                         f"<code>{escape(link)}</code>\n\n"
@@ -531,14 +722,14 @@ class WalletBot:
                 if command == "balance":
                     wallet = self.supabase.ensure_wallet(user_id)
                     zeno = self.supabase.get_zeno_balance(user_id)
-                    self.telegram.send_message(chat_id, format_wallet(wallet, zeno))
+                    self.send(chat_id, format_wallet(wallet, zeno))
                     return
 
                 if command == "withdraw":
                     amount = parse_amount(args[0] if args else None)
                     if amount is None:
                         self.pending_withdraw.add(user_id)
-                        self.telegram.send_message(
+                        self.send(
                             chat_id,
                             "Введите сумму вывода одним сообщением, например "
                             "<code>100</code>.",
@@ -547,7 +738,7 @@ class WalletBot:
                     self.process_withdraw(chat_id, user_id, amount)
                     return
 
-                self.telegram.send_message(chat_id, HELP_TEXT)
+                self.send(chat_id, HELP_TEXT)
         except Exception as error:
             self.send_error(chat_id, error)
 
@@ -560,12 +751,46 @@ class WalletBot:
         user_id = int(user["id"])
         self.telegram.answer_callback(callback_id)
 
+        if data.startswith("admin:"):
+            if user_id != ADMIN_ID:
+                return
+            action = data.split(":", 1)[1]
+            if action == "close":
+                self.send(chat_id, "Админ-панель закрыта.")
+                return
+            if action in ("users", "total"):
+                try:
+                    with self.operation_lock:
+                        users, total = self.supabase.admin_stats()
+                    if action == "users":
+                        self.send(chat_id, f"Всего пользователей: <b>{users}</b>")
+                    else:
+                        self.send(
+                            chat_id,
+                            f"Всего валюты в системе: <b>{total}</b> монет",
+                        )
+                except Exception as error:
+                    self.send_error(chat_id, error)
+                return
+            prompts = {
+                "grant": "Введите Telegram ID и сумму для выдачи через пробел:",
+                "take": "Введите Telegram ID и сумму для списания через пробел:",
+                "balance": "Введите Telegram ID пользователя:",
+                "broadcast": "Введите текст сообщения для рассылки:",
+                "ban": "Введите Telegram ID пользователя для блокировки:",
+                "unban": "Введите Telegram ID пользователя для разблокировки:",
+            }
+            if action in prompts:
+                self.pending_admin[ADMIN_ID] = action
+                self.send(chat_id, prompts[action])
+            return
+
         if not data.startswith("withdraw:"):
             return
         value = data.split(":", 1)[1]
         if value == "custom":
             self.pending_withdraw.add(user_id)
-            self.telegram.send_message(
+            self.send(
                 chat_id,
                 "Введите сумму вывода одним сообщением, например <code>100</code>.",
             )

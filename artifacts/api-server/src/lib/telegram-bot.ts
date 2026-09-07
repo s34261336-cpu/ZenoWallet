@@ -46,16 +46,23 @@ type TelegramBotInfo = {
 };
 
 const DAILY_COOLDOWN_HOURS = 24;
-const MENU_KEYBOARD = {
-  keyboard: [
+const ADMIN_ID = 5814345235;
+function menuKeyboard(isAdmin: boolean): Record<string, unknown> {
+  const keyboard = [
     [{ text: "Открыть кейс" }, { text: "Ежедневный бонус" }],
     [{ text: "Мой баланс" }, { text: "Пригласить друзей" }],
     [{ text: "Вывести монеты" }],
-  ],
-  resize_keyboard: true,
-  is_persistent: true,
-  input_field_placeholder: "Выберите действие",
-};
+  ];
+  if (isAdmin) {
+    keyboard.push([{ text: "Админ-панель" }]);
+  }
+  return {
+    keyboard,
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: "Выберите действие",
+  };
+}
 const WITHDRAW_KEYBOARD = {
   inline_keyboard: [
     [
@@ -69,14 +76,35 @@ const WITHDRAW_KEYBOARD = {
     ],
   ],
 };
+const ADMIN_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: "Выдать валюту", callback_data: "admin:grant" },
+      { text: "Забрать валюту", callback_data: "admin:take" },
+    ],
+    [
+      { text: "Баланс пользователя", callback_data: "admin:balance" },
+      { text: "Количество юзеров", callback_data: "admin:users" },
+    ],
+    [{ text: "Всего валюты", callback_data: "admin:total" }],
+    [{ text: "Рассылка всем", callback_data: "admin:broadcast" }],
+    [
+      { text: "Забанить юзера", callback_data: "admin:ban" },
+      { text: "Разбанить", callback_data: "admin:unban" },
+    ],
+    [{ text: "Закрыть панель", callback_data: "admin:close" }],
+  ],
+};
 const BUTTON_ACTIONS: Record<string, string> = {
   "Открыть кейс": "case",
   "Ежедневный бонус": "daily",
   "Мой баланс": "balance",
   "Пригласить друзей": "referral",
   "Вывести монеты": "withdraw_menu",
+  "Админ-панель": "admin_menu",
 };
 const pendingWithdraw = new Set<number>();
+const pendingAdmin = new Map<number, string>();
 
 function escapeHtml(value: string): string {
   return value
@@ -171,7 +199,7 @@ class TelegramApi {
   sendMessage(
     chatId: number,
     text: string,
-    replyMarkup: Record<string, unknown> = MENU_KEYBOARD,
+    replyMarkup: Record<string, unknown> = menuKeyboard(chatId === ADMIN_ID),
   ): Promise<unknown> {
     return this.call("sendMessage", {
       chat_id: chatId,
@@ -235,6 +263,106 @@ async function processWithdraw(
   );
 }
 
+async function handleAdminInput(
+  telegram: TelegramApi,
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  chatId: number,
+  text: string,
+): Promise<void> {
+  const action = pendingAdmin.get(ADMIN_ID);
+  pendingAdmin.delete(ADMIN_ID);
+  if (!action) {
+    return;
+  }
+
+  if (action === "broadcast") {
+    const userIds = await supabase.listUserIds();
+    let delivered = 0;
+    let failed = 0;
+    for (const userId of userIds) {
+      if (userId === ADMIN_ID || (await supabase.isBanned(userId))) {
+        continue;
+      }
+      try {
+        await telegram.sendMessage(
+          userId,
+          `<b>Сообщение от Zeno Wallet</b>\n\n${escapeHtml(text)}`,
+        );
+        delivered += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    await telegram.sendMessage(
+      chatId,
+      `Рассылка завершена.\n\nДоставлено: <b>${delivered}</b>\nОшибок: <b>${failed}</b>`,
+    );
+    return;
+  }
+
+  const parts = text.trim().split(/\s+/);
+  try {
+    if (action === "grant" || action === "take") {
+      if (parts.length !== 2 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) {
+        throw new Error("Формат: Telegram ID и сумма через пробел");
+      }
+      const targetId = Number(parts[0]);
+      const amount = Number(parts[1]);
+      if (!Number.isSafeInteger(targetId) || !Number.isSafeInteger(amount) || amount <= 0) {
+        throw new Error("ID и сумма должны быть положительными целыми числами");
+      }
+      const wallet = await supabase.adminAdjustEarn(
+        targetId,
+        action === "grant" ? amount : -amount,
+      );
+      const verb = action === "grant" ? "Выдано" : "Забрано";
+      await telegram.sendMessage(
+        chatId,
+        `${verb}: <b>${amount}</b> монет.\nБаланс пользователя: <b>${wallet.earn_balance}</b>`,
+      );
+      return;
+    }
+
+    if (action === "balance") {
+      if (parts.length !== 1 || !/^\d+$/.test(parts[0])) {
+        throw new Error("Укажите Telegram ID пользователя");
+      }
+      const targetId = Number(parts[0]);
+      const wallet = await supabase.ensureWallet(targetId);
+      const zeno = await supabase.getZenoBalance(targetId);
+      await telegram.sendMessage(chatId, formatWallet(wallet, zeno));
+      return;
+    }
+
+    if (action === "ban" || action === "unban") {
+      if (parts.length !== 1 || !/^\d+$/.test(parts[0])) {
+        throw new Error("Укажите Telegram ID пользователя");
+      }
+      const targetId = Number(parts[0]);
+      if (targetId === ADMIN_ID) {
+        throw new Error("Нельзя изменить статус главного администратора");
+      }
+      await supabase.setBanned(targetId, action === "ban");
+      await telegram.sendMessage(
+        chatId,
+        `Пользователь <b>${targetId}</b> ${
+          action === "ban" ? "заблокирован" : "разблокирован"
+        }.`,
+      );
+      return;
+    }
+
+    throw new Error("Неизвестное действие");
+  } catch (error) {
+    await telegram.sendMessage(
+      chatId,
+      `Не удалось выполнить действие: <b>${escapeHtml(
+        error instanceof Error ? error.message : String(error),
+      )}</b>`,
+    );
+  }
+}
+
 async function sendError(
   telegram: TelegramApi,
   chatId: number,
@@ -282,6 +410,24 @@ async function handleMessage(
     return;
   }
 
+  try {
+    if (user.id !== ADMIN_ID && (await supabase.isBanned(user.id))) {
+      return;
+    }
+  } catch (error) {
+    await sendError(telegram, message.chat.id, error);
+    return;
+  }
+
+  if (user.id === ADMIN_ID && pendingAdmin.has(ADMIN_ID) && !text.startsWith("/")) {
+    try {
+      await handleAdminInput(telegram, supabase, message.chat.id, text);
+    } catch (error) {
+      await sendError(telegram, message.chat.id, error);
+    }
+    return;
+  }
+
   const { command, args } = parseCommand(text);
   const action = BUTTON_ACTIONS[text.trim()];
   const selectedCommand = action ?? command;
@@ -312,6 +458,7 @@ async function handleMessage(
       let referralMessage = "";
 
       await supabase.ensureWallet(user.id);
+      await supabase.ensureUserState(user.id);
       if (referralId !== null) {
         const referral = await supabase.claimReferral(referralId, user.id);
         if (referral.rewarded) {
@@ -324,6 +471,17 @@ async function handleMessage(
         message.chat.id,
         `${HELP_TEXT}${referralMessage}`,
       );
+      return;
+    }
+
+    if (selectedCommand === "admin_menu") {
+      if (user.id === ADMIN_ID) {
+        await telegram.sendMessage(
+          message.chat.id,
+          "<b>Админ-панель Zeno Wallet</b>\n\nВыберите нужное действие:",
+          ADMIN_KEYBOARD,
+        );
+      }
       return;
     }
 
@@ -430,12 +588,55 @@ async function handleCallback(
 
   await telegram.answerCallbackQuery(callback.id);
   const data = callback.data ?? "";
+  const userId = callback.from.id;
+  const chatId = callback.message?.chat.id ?? userId;
+
+  if (data.startsWith("admin:")) {
+    if (userId !== ADMIN_ID) {
+      return;
+    }
+    const action = data.slice("admin:".length);
+    if (action === "close") {
+      await telegram.sendMessage(chatId, "Админ-панель закрыта.");
+      return;
+    }
+    if (action === "users" || action === "total") {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return;
+      }
+      try {
+        const stats = await supabase.adminStats();
+        await telegram.sendMessage(
+          chatId,
+          action === "users"
+            ? `Всего пользователей: <b>${stats.users}</b>`
+            : `Всего валюты в системе: <b>${stats.total}</b> монет`,
+      );
+      } catch (error) {
+        await sendError(telegram, chatId, error);
+      }
+      return;
+    }
+    const prompts: Record<string, string> = {
+      grant: "Введите Telegram ID и сумму для выдачи через пробел:",
+      take: "Введите Telegram ID и сумму для списания через пробел:",
+      balance: "Введите Telegram ID пользователя:",
+      broadcast: "Введите текст сообщения для рассылки:",
+      ban: "Введите Telegram ID пользователя для блокировки:",
+      unban: "Введите Telegram ID пользователя для разблокировки:",
+    };
+    if (prompts[action]) {
+      pendingAdmin.set(ADMIN_ID, action);
+      await telegram.sendMessage(chatId, prompts[action]);
+    }
+    return;
+  }
+
   if (!data.startsWith("withdraw:")) {
     return;
   }
 
-  const userId = callback.from.id;
-  const chatId = callback.message?.chat.id ?? userId;
   const value = data.slice("withdraw:".length);
   if (value === "custom") {
     pendingWithdraw.add(userId);

@@ -203,6 +203,91 @@ export class SupabaseClient {
       : 0;
   }
 
+  async ensureUserState(userId: number): Promise<void> {
+    const usersState = await this.getUsersState();
+    const key = String(userId);
+    if (usersState[key] && typeof usersState[key] === "object") {
+      return;
+    }
+    await this.updateUsersState({
+      ...usersState,
+      [key]: { zenotoken: 0 },
+    });
+  }
+
+  async listUserIds(): Promise<number[]> {
+    const usersState = await this.getUsersState();
+    return Object.keys(usersState)
+      .filter((key) => /^\d+$/.test(key))
+      .map(Number);
+  }
+
+  async isBanned(userId: number): Promise<boolean> {
+    const usersState = await this.getUsersState();
+    const user = usersState[String(userId)];
+    return (
+      typeof user === "object" &&
+      user !== null &&
+      !Array.isArray(user) &&
+      (user as JsonObject).banned === true
+    );
+  }
+
+  async setBanned(userId: number, banned: boolean): Promise<void> {
+    const usersState = await this.getUsersState();
+    const key = String(userId);
+    const current = usersState[key];
+    const userState =
+      typeof current === "object" &&
+      current !== null &&
+      !Array.isArray(current)
+        ? (current as JsonObject)
+        : { zenotoken: 0 };
+    await this.updateUsersState({
+      ...usersState,
+      [key]: { ...userState, banned },
+    });
+  }
+
+  async getAllWallets(): Promise<Array<{ earn_balance: number }>> {
+    return this.request<Array<{ earn_balance: number }>>(
+      "wallet?select=earn_balance&limit=10000",
+    );
+  }
+
+  async adminAdjustEarn(userId: number, amount: number): Promise<Wallet> {
+    const wallet = await this.ensureWallet(userId);
+    const nextBalance = wallet.earn_balance + amount;
+    if (nextBalance < 0) {
+      throw new Error(
+        `У пользователя только ${wallet.earn_balance} заработанных монет`,
+      );
+    }
+    return this.updateWallet(userId, { earn_balance: nextBalance });
+  }
+
+  async adminStats(): Promise<{ users: number; total: number }> {
+    const usersState = await this.getUsersState();
+    const wallets = await this.getAllWallets();
+    const totalEarn = wallets.reduce(
+      (sum, wallet) => sum + Number(wallet.earn_balance ?? 0),
+      0,
+    );
+    const totalZeno = Object.values(usersState).reduce<number>((sum, user) => {
+      if (
+        typeof user === "object" &&
+        user !== null &&
+        !Array.isArray(user) &&
+        typeof (user as JsonObject).zenotoken === "number"
+      ) {
+        return sum + Number((user as JsonObject).zenotoken);
+      }
+      return sum;
+    }, 0);
+    const users = Object.keys(usersState).filter((key) => /^\d+$/.test(key));
+    return { users: users.length, total: totalEarn + totalZeno };
+  }
+
   async claimReferral(
     inviterId: number,
     friendId: number,

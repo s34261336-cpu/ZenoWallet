@@ -58,7 +58,7 @@ create index if not exists season_scores_leaderboard_idx
 create table if not exists public.season_rewards (
   season_id bigint not null references public.seasons(id) on delete cascade,
   user_id bigint not null,
-  place integer not null check (place between 1 and 10),
+  place integer not null check (place between 1 and 3),
   username text,
   display_name text not null default '',
   token_reward bigint not null default 0 check (token_reward >= 0),
@@ -167,7 +167,7 @@ begin
 end;
 $$;
 
--- Finishes one expired season, pays the top 10, and opens the next one.
+-- Finishes one expired season, pays the top 3, and opens the next one.
 -- The row lock plus unique reward keys makes repeated maintenance calls safe.
 create or replace function public.season_finalize_expired()
 returns jsonb
@@ -202,14 +202,14 @@ begin
       from public.season_scores
      where season_id = v_season.id
      order by points desc, updated_at asc, user_id asc
-     limit 10
+     limit 3
   loop
     v_place := v_place + 1;
     v_token := case
       when v_place = 1 then 100
       when v_place = 2 then 75
       when v_place = 3 then 50
-      else 25
+      else 0
     end;
     v_bonus := v_token;
 

@@ -80,6 +80,9 @@ create table if not exists public.season_rewards (
   unique (season_id, place)
 );
 
+alter table public.season_rewards
+  add column if not exists zeno_token_synced_at timestamptz;
+
 create or replace function public.season_ensure_active()
 returns jsonb
 language plpgsql
@@ -112,6 +115,57 @@ begin
     'ends_at', v_season.ends_at,
     'status', v_season.status
   );
+end;
+$$;
+
+-- Move rewards created by older versions from wallet-only storage into the
+-- Zeno bot's canonical bot_state balance. The marker makes this idempotent.
+do $$
+declare
+  v_users_state jsonb;
+  v_reward record;
+  v_current_zeno bigint;
+begin
+  select state_value
+    into v_users_state
+    from public.bot_state
+   where state_key = 'users'
+   for update;
+
+  if found and v_users_state is not null and jsonb_typeof(v_users_state) = 'object' then
+    for v_reward in
+      select season_id, user_id, token_reward
+        from public.season_rewards
+       where zeno_token_synced_at is null
+       order by awarded_at, season_id, place
+    loop
+      if coalesce(v_users_state -> v_reward.user_id::text ->> 'zenotoken', '') ~ '^[0-9]+$' then
+        v_current_zeno := (v_users_state -> v_reward.user_id::text ->> 'zenotoken')::bigint;
+      else
+        v_current_zeno := 0;
+      end if;
+
+      v_users_state := jsonb_set(
+        v_users_state,
+        array[v_reward.user_id::text],
+        coalesce(v_users_state -> v_reward.user_id::text, '{}'::jsonb)
+          || jsonb_build_object(
+            'zenotoken',
+            v_current_zeno + v_reward.token_reward
+          ),
+        true
+      );
+
+      update public.season_rewards
+         set zeno_token_synced_at = now()
+       where season_id = v_reward.season_id
+         and user_id = v_reward.user_id;
+    end loop;
+
+    update public.bot_state
+       set state_value = v_users_state
+     where state_key = 'users';
+  end if;
 end;
 $$;
 
@@ -236,6 +290,8 @@ declare
   v_token bigint;
   v_bonus bigint;
   v_winners jsonb := '[]'::jsonb;
+  v_users_state jsonb;
+  v_current_zeno bigint;
 begin
   select *
     into v_season
@@ -248,6 +304,16 @@ begin
 
   if not found then
     return jsonb_build_object('finalized', false);
+  end if;
+
+  select state_value
+    into v_users_state
+    from public.bot_state
+   where state_key = 'users'
+   for update;
+
+  if not found or v_users_state is null or jsonb_typeof(v_users_state) <> 'object' then
+    raise exception 'Supabase bot_state row state_key=users was not found or is invalid';
   end if;
 
   for v_score in
@@ -287,6 +353,25 @@ begin
              zeno_balance = zeno_balance + v_token,
              updated_at = now()
        where user_id = v_score.user_id;
+
+      if coalesce(v_users_state -> v_score.user_id::text ->> 'zenotoken', '') ~ '^[0-9]+$' then
+        v_current_zeno := (v_users_state -> v_score.user_id::text ->> 'zenotoken')::bigint;
+      else
+        v_current_zeno := 0;
+      end if;
+
+      v_users_state := jsonb_set(
+        v_users_state,
+        array[v_score.user_id::text],
+        coalesce(v_users_state -> v_score.user_id::text, '{}'::jsonb)
+          || jsonb_build_object('zenotoken', v_current_zeno + v_token),
+        true
+      );
+
+      update public.season_rewards
+         set zeno_token_synced_at = now()
+       where season_id = v_season.id
+         and user_id = v_score.user_id;
     end if;
 
     v_winners := v_winners || jsonb_build_object(
@@ -299,6 +384,10 @@ begin
       'bonus_reward', v_bonus
     );
   end loop;
+
+  update public.bot_state
+     set state_value = v_users_state
+   where state_key = 'users';
 
   update public.seasons
      set status = 'finished', finished_at = now()

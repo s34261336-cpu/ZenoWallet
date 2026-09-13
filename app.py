@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("zeno-wallet")
 ADMIN_ID = 5814345235
-SEASON_CHANNEL_ID = -1004423195226
+SEASON_CHANNEL_ID = os.getenv("SEASON_CHANNEL_ID", "-1004423195226")
 SEASON_ACTIVITY_POINTS = 1
 SEASON_CASE_POINTS = 5
 CASE_REWARDS = (0, 5, 10, 25, 50, 100)
@@ -426,21 +426,12 @@ class SupabaseClient:
         users_state = self.get_users_state()
         wallets = self.get_all_wallets()
         total_earn = sum(int(wallet.get("earn_balance", 0)) for wallet in wallets)
-        total_zeno = 0
-        for user in users_state.values():
-            if isinstance(user, dict):
-                value = user.get("zenotoken", 0)
-                if isinstance(value, (int, float)) and value >= 0:
-                    total_zeno += int(value)
+        total_zeno = sum(int(wallet.get("zeno_balance", 0)) for wallet in wallets)
         return len(self.list_user_ids()), total_earn + total_zeno
 
     def get_zeno_balance(self, user_id: int) -> int:
-        state = self.get_users_state()
-        user = state.get(str(user_id))
-        if not isinstance(user, dict):
-            return 0
-        value = user.get("zenotoken", 0)
-        return value if isinstance(value, (int, float)) and value >= 0 else 0
+        wallet = self.ensure_wallet(user_id)
+        return int(wallet.get("zeno_balance", 0))
 
     def credit(self, user_id: int, amount: int) -> dict[str, Any]:
         wallet = self.ensure_wallet(user_id)
@@ -495,35 +486,16 @@ class SupabaseClient:
         if earn_balance < amount:
             return False, wallet, None
 
-        users_state = self.get_users_state()
-        user_key = str(user_id)
-        previous_user = users_state.get(user_key)
-        user_state = dict(previous_user) if isinstance(previous_user, dict) else {}
-        current_zeno = user_state.get("zenotoken", 0)
-        if not isinstance(current_zeno, (int, float)) or current_zeno < 0:
-            current_zeno = 0
-        next_zeno = int(current_zeno) + amount
-
-        next_state = dict(users_state)
-        next_state[user_key] = {**user_state, "zenotoken": next_zeno}
-        self.update_users_state(next_state)
-
-        try:
-            updated_wallet = self.update_wallet(
-                user_id, {"earn_balance": earn_balance - amount}
-            )
-            return True, updated_wallet, next_zeno
-        except Exception:
-            rollback = dict(users_state)
-            if previous_user is None:
-                rollback.pop(user_key, None)
-            else:
-                rollback[user_key] = previous_user
-            try:
-                self.update_users_state(rollback)
-            except Exception:
-                log.exception("Could not roll back bot_state after wallet failure")
-            raise
+        current_zeno = int(wallet.get("zeno_balance", 0))
+        next_zeno = current_zeno + amount
+        updated_wallet = self.update_wallet(
+            user_id,
+            {
+                "earn_balance": earn_balance - amount,
+                "zeno_balance": next_zeno,
+            },
+        )
+        return True, updated_wallet, next_zeno
 
 
 class TelegramApi:
@@ -545,7 +517,17 @@ class TelegramApi:
         try:
             with urlopen(request, timeout=timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, TimeoutError) as error:
+        except HTTPError as error:
+            details: Any = error.reason
+            try:
+                payload = json.loads(error.read().decode("utf-8"))
+                details = payload.get("description") or details
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                pass
+            raise RuntimeError(
+                f"Telegram {method} request failed ({error.code}): {details}"
+            ) from error
+        except (URLError, TimeoutError) as error:
             raise RuntimeError(f"Telegram {method} request failed: {error}") from error
         if not payload.get("ok"):
             raise RuntimeError(
@@ -928,9 +910,11 @@ class WalletBot:
                 name = escape(
                     str(winner.get("display_name") or f"ID {winner['user_id']}")
                 )
+                points = winner.get("points")
+                points_text = f"{points} очков, " if points is not None else ""
                 lines.append(
                     f"<b>{winner['place']}.</b> {name} — "
-                    f"{winner['points']} очков, "
+                    f"{points_text}"
                     f"+{winner['token_reward']} токенов и "
                     f"+{winner['bonus_reward']} бонусов"
                 )

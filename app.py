@@ -695,8 +695,8 @@ ADMIN_KEYBOARD = {
             {"text": "Настройки кейсов", "callback_data": "admin:case_settings"},
         ],
         [
-            {"text": "Завершить сезон", "callback_data": "admin:season_finish"},
-            {"text": "Номер сезона", "callback_data": "admin:season_number"},
+            {"text": "Сбросить → следующий", "callback_data": "admin:season_finish"},
+            {"text": "Изменить № сезона", "callback_data": "admin:season_number"},
         ],
         [
             {"text": "Забанить юзера", "callback_data": "admin:ban"},
@@ -1321,13 +1321,21 @@ class WalletBot:
                 self.show_admin_panel(chat_id)
                 return
             if action == "season_finish":
-                self.send(
-                    chat_id,
-                    "<b>Завершить текущий сезон?</b>\n\n"
-                    "Будут выданы награды за 1–3 места, текущие очки "
-                    "закроются и начнётся новый сезон.",
-                    SEASON_FINISH_CONFIRM_KEYBOARD,
-                )
+                try:
+                    season = self.supabase.get_active_season()
+                    if not season:
+                        self.send(chat_id, "Активный сезон не найден.")
+                        return
+                    current_number = int(season["season_number"])
+                    self.send(
+                        chat_id,
+                        f"<b>Завершить сезон #{current_number}?</b>\n\n"
+                        "Будут выданы награды за 1–3 места, очки будут сброшены, "
+                        f"и начнётся сезон <b>#{current_number + 1}</b>.",
+                        SEASON_FINISH_CONFIRM_KEYBOARD,
+                    )
+                except Exception as error:
+                    self.send_error(chat_id, error)
                 return
             if action == "season_finish_cancel":
                 self.show_admin_panel(chat_id)

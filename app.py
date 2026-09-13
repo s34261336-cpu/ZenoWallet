@@ -612,17 +612,15 @@ class TelegramApi:
         text: str,
         reply_markup: dict[str, Any] | None = None,
     ) -> None:
-        markup = reply_markup if reply_markup is not None else menu_keyboard(False)
-        self.call(
-            "sendMessage",
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": True,
-                "reply_markup": markup,
-            },
-        )
+        body: dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+        if reply_markup is not None:
+            body["reply_markup"] = reply_markup
+        self.call("sendMessage", body)
 
 
 def parse_command(text: str) -> tuple[str, list[str]]:
@@ -954,7 +952,6 @@ class WalletBot:
             self.telegram.send_message(
                 SEASON_CHANNEL_ID,
                 self.season_announcement(season_number, winners),
-                {"remove_keyboard": True},
             )
             self.supabase.mark_season_announced(season_id)
             log.info("Season %s results announced", season_number)

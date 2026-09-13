@@ -23,6 +23,9 @@ logging.basicConfig(
 )
 log = logging.getLogger("zeno-wallet")
 ADMIN_ID = 5814345235
+SEASON_CHANNEL_ID = -1004423195226
+SEASON_ACTIVITY_POINTS = 1
+SEASON_CASE_POINTS = 5
 CASE_REWARDS = (0, 5, 10, 25, 50, 100)
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
@@ -222,6 +225,99 @@ class SupabaseClient:
             prefer="return=minimal",
         )
         return settings
+
+    def _rpc(self, function: str, body: dict[str, Any]) -> Any:
+        return self.request(f"rpc/{function}", method="POST", body=body)
+
+    @staticmethod
+    def _rpc_object(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, list) and value and isinstance(value[0], dict):
+            return value[0]
+        return {}
+
+    def finalize_expired_season(self) -> dict[str, Any]:
+        return self._rpc_object(self._rpc("season_finalize_expired", {}))
+
+    def get_active_season(self) -> dict[str, Any] | None:
+        rows = self.request(
+            "seasons?"
+            "select=id,starts_at,ends_at,status"
+            "&status=eq.active&order=starts_at.desc&limit=1"
+        )
+        return rows[0] if rows else None
+
+    def ensure_active_season(self) -> dict[str, Any]:
+        self.finalize_expired_season()
+        season = self.get_active_season()
+        if season:
+            return season
+        result = self._rpc_object(self._rpc("season_ensure_active", {}))
+        season_id = result.get("season_id")
+        if not season_id:
+            raise RuntimeError("Could not create an active season")
+        season = self.get_active_season()
+        if not season:
+            raise RuntimeError("Active season was not returned after creation")
+        return season
+
+    def add_season_points(
+        self,
+        user_id: int,
+        username: str | None,
+        display_name: str,
+        activity_points: int = 0,
+        case_points: int = 0,
+    ) -> dict[str, Any]:
+        result = self._rpc_object(self._rpc("season_add_points", {
+            "p_user_id": user_id,
+            "p_username": username,
+            "p_display_name": display_name,
+            "p_activity_points": activity_points,
+            "p_case_points": case_points,
+        }))
+        if result.get("expired"):
+            self.finalize_expired_season()
+            result = self._rpc_object(self._rpc("season_add_points", {
+                "p_user_id": user_id,
+                "p_username": username,
+                "p_display_name": display_name,
+                "p_activity_points": activity_points,
+                "p_case_points": case_points,
+            }))
+        return result
+
+    def get_season_scores(self, season_id: int) -> list[dict[str, Any]]:
+        return self.request(
+            "season_scores?"
+            "select=user_id,username,display_name,points,activity_count,"
+            f"cases_opened,updated_at&season_id=eq.{season_id}"
+            "&order=points.desc,updated_at.asc,user_id.asc&limit=10000"
+        )
+
+    def get_season_rewards(self, season_id: int) -> list[dict[str, Any]]:
+        return self.request(
+            "season_rewards?"
+            "select=place,user_id,username,display_name,token_reward,bonus_reward"
+            f"&season_id=eq.{season_id}&order=place.asc&limit=10"
+        )
+
+    def get_pending_season_announcements(self) -> list[dict[str, Any]]:
+        return self.request(
+            "seasons?"
+            "select=id,starts_at,ends_at"
+            "&status=eq.finished&announcement_sent_at=is.null"
+            "&order=ends_at.asc&limit=10"
+        )
+
+    def mark_season_announced(self, season_id: int) -> None:
+        self.request(
+            f"seasons?id=eq.{season_id}",
+            method="PATCH",
+            body={"announcement_sent_at": datetime.now(timezone.utc).isoformat()},
+            prefer="return=minimal",
+        )
 
     def open_case(
         self, user_id: int
@@ -458,7 +554,15 @@ class TelegramApi:
                     {
                         "command": "start",
                         "description": "Открыть главное меню",
-                    }
+                    },
+                    {
+                        "command": "season",
+                        "description": "Текущий сезон и мой прогресс",
+                    },
+                    {
+                        "command": "season_top",
+                        "description": "Топ-10 сезона",
+                    },
                 ]
             },
         )
@@ -613,8 +717,50 @@ def format_duration(delta: timedelta) -> str:
     return f"{hours} ч." if remaining == 0 else f"{hours} ч. {remaining} мин."
 
 
+def format_season_remaining(delta: timedelta) -> str:
+    seconds = max(0, int(delta.total_seconds()))
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes = (remainder + 59) // 60
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days} дн.")
+    if hours:
+        parts.append(f"{hours} ч.")
+    if minutes and len(parts) < 2:
+        parts.append(f"{minutes} мин.")
+    return " ".join(parts) or "меньше минуты"
+
+
 def escape(value: str) -> str:
     return html.escape(value, quote=True)
+
+
+def season_display_name(user: dict[str, Any]) -> str:
+    username = str(user.get("username") or "").strip()
+    if username:
+        return f"@{username}"
+    first_name = str(user.get("first_name") or "").strip()
+    last_name = str(user.get("last_name") or "").strip()
+    full_name = " ".join(part for part in (first_name, last_name) if part)
+    return full_name or f"ID {user.get('id', '?')}"
+
+
+def season_profile(user: dict[str, Any]) -> tuple[str | None, str]:
+    username = str(user.get("username") or "").strip() or None
+    return username, season_display_name(user)
+
+
+def format_season_top(scores: list[dict[str, Any]]) -> str:
+    if not scores:
+        return "<b>Топ сезона</b>\n\nПока никто не набрал очки."
+    lines = ["<b>Топ-10 сезона</b>", ""]
+    for place, score in enumerate(scores[:10], 1):
+        name = escape(str(score.get("display_name") or f"ID {score['user_id']}"))
+        lines.append(
+            f"<b>{place}.</b> {name} — <b>{int(score.get('points', 0))}</b> очков"
+        )
+    return "\n".join(lines)
 
 
 def format_case_settings(settings: dict[str, Any]) -> str:
@@ -653,7 +799,12 @@ class WalletBot:
 
     def send_error(self, chat_id: int, error: Exception) -> None:
         log.exception("Zeno Wallet command failed", exc_info=error)
-        if "Could not find the table 'public.wallet'" in str(error):
+        error_text = str(error)
+        if (
+            "Could not find the table 'public.wallet'" in error_text
+            or "Could not find the table 'public.seasons'" in error_text
+            or "Could not find the function public.season_" in error_text
+        ):
             message = (
                 "Хранилище кошелька ещё не настроено.\n\n"
                 "Администратору нужно выполнить файл "
@@ -675,6 +826,121 @@ class WalletBot:
             else menu_keyboard(chat_id == ADMIN_ID)
         )
         self.telegram.send_message(chat_id, text, markup)
+
+    def record_season_activity(self, user: dict[str, Any], case_points: int = 0) -> None:
+        user_id = int(user["id"])
+        if user_id == ADMIN_ID:
+            return
+        username, display_name = season_profile(user)
+        try:
+            self.supabase.add_season_points(
+                user_id,
+                username,
+                display_name,
+                activity_points=SEASON_ACTIVITY_POINTS if case_points == 0 else 0,
+                case_points=case_points,
+            )
+        except Exception:
+            # Season tracking must not prevent the wallet bot from responding.
+            log.exception("Could not update season score for user %s", user_id)
+
+    def season_status(self, user_id: int) -> str:
+        self.supabase.finalize_expired_season()
+        season = self.supabase.ensure_active_season()
+        scores = self.supabase.get_season_scores(int(season["id"]))
+        ordered = sorted(
+            scores,
+            key=lambda row: (
+                -int(row.get("points", 0)),
+                str(row.get("updated_at", "")),
+                int(row.get("user_id", 0)),
+            ),
+        )
+        current = next(
+            (row for row in ordered if int(row.get("user_id", 0)) == user_id),
+            None,
+        )
+        points = int(current.get("points", 0)) if current else 0
+        rank = next(
+            (
+                index
+                for index, row in enumerate(ordered, 1)
+                if int(row.get("user_id", 0)) == user_id
+            ),
+            len(ordered) + 1,
+        )
+        leader_points = int(ordered[0].get("points", 0)) if ordered else 0
+        progress = 100 if leader_points == 0 and points else (
+            int(points * 100 / leader_points) if leader_points else 0
+        )
+        ends_at = datetime.fromisoformat(
+            str(season["ends_at"]).replace("Z", "+00:00")
+        )
+        return (
+            f"<b>Сезон #{season['id']}</b>\n\n"
+            f"До конца: <b>{format_season_remaining(ends_at - datetime.now(timezone.utc))}</b>\n"
+            f"Ваш прогресс: <b>{points}</b> очков ({progress}% от лидера)\n"
+            f"Место в топе: <b>#{rank}</b>\n\n"
+            "Очки: +1 за активность, +5 за успешное открытие кейса."
+        )
+
+    def season_top(self) -> str:
+        self.supabase.finalize_expired_season()
+        season = self.supabase.ensure_active_season()
+        return format_season_top(self.supabase.get_season_scores(int(season["id"])))
+
+    def season_announcement(
+        self, season_id: int, winners: list[dict[str, Any]]
+    ) -> str:
+        lines = [
+            f"<b>Сезон #{season_id} завершён!</b>",
+            "",
+            "Награды уже начислены победителям:",
+            "",
+        ]
+        if not winners:
+            lines.append("В этом сезоне никто не набрал очки.")
+        else:
+            for winner in winners:
+                name = escape(
+                    str(winner.get("display_name") or f"ID {winner['user_id']}")
+                )
+                lines.append(
+                    f"<b>{winner['place']}.</b> {name} — "
+                    f"{winner['points']} очков, "
+                    f"+{winner['token_reward']} токенов и "
+                    f"+{winner['bonus_reward']} бонусов"
+                )
+        return "\n".join(lines)
+
+    def announce_season(
+        self, season_id: int, winners: list[dict[str, Any]]
+    ) -> None:
+        try:
+            self.telegram.send_message(
+                SEASON_CHANNEL_ID,
+                self.season_announcement(season_id, winners),
+                {"remove_keyboard": True},
+            )
+            self.supabase.mark_season_announced(season_id)
+            log.info("Season %s results announced", season_id)
+        except Exception:
+            log.exception("Could not announce season %s", season_id)
+
+    def retry_pending_announcements(self) -> None:
+        for season in self.supabase.get_pending_season_announcements():
+            season_id = int(season["id"])
+            rewards = self.supabase.get_season_rewards(season_id)
+            self.announce_season(season_id, rewards)
+
+    def maintain_seasons(self) -> None:
+        result = self.supabase.finalize_expired_season()
+        if result.get("finalized"):
+            self.announce_season(
+                int(result["season_id"]),
+                list(result.get("winners") or []),
+            )
+        self.retry_pending_announcements()
 
     def process_withdraw(self, chat_id: int, user_id: int, amount: int) -> None:
         withdrawn, wallet, zeno = self.supabase.withdraw(user_id, amount)
@@ -816,6 +1082,8 @@ class WalletBot:
         if user_id != ADMIN_ID and self.supabase.is_banned(user_id):
             return
 
+        self.record_season_activity(user)
+
         if user_id == ADMIN_ID and user_id in self.pending_admin and not text.startswith("/"):
             try:
                 with self.operation_lock:
@@ -864,6 +1132,14 @@ class WalletBot:
                         self.show_admin_panel(chat_id)
                     return
 
+                if command == "season":
+                    self.send(chat_id, self.season_status(user_id))
+                    return
+
+                if command == "season_top":
+                    self.send(chat_id, self.season_top())
+                    return
+
                 if command == "withdraw_menu":
                     self.send(
                         chat_id,
@@ -887,6 +1163,7 @@ class WalletBot:
                         self.telegram.send_dice(chat_id)
                     except Exception:
                         log.exception("Could not send case animation")
+                    self.record_season_activity(user, case_points=SEASON_CASE_POINTS)
                     zeno = self.supabase.get_zeno_balance(user_id)
                     if reward == 0:
                         self.send(
@@ -1089,12 +1366,28 @@ def start_health_server() -> ThreadingHTTPServer:
     return server
 
 
+def season_maintenance_loop(bot: WalletBot) -> None:
+    while bot.running:
+        try:
+            with bot.operation_lock:
+                bot.maintain_seasons()
+        except Exception:
+            log.exception("Season maintenance failed")
+        time.sleep(60)
+
+
 def main() -> None:
     token = required_env("BOT_TOKEN")
     supabase = SupabaseClient()
     telegram = TelegramApi(token)
     bot = WalletBot(telegram, supabase)
     health_server = start_health_server()
+    threading.Thread(
+        target=season_maintenance_loop,
+        args=(bot,),
+        daemon=True,
+        name="season-maintenance",
+    ).start()
 
     def shutdown(_signum: int, _frame: Any) -> None:
         bot.stop()

@@ -940,8 +940,8 @@ class WalletBot:
                 lines.append(
                     f"<b>{winner['place']}.</b> {name} — "
                     f"{points_text}"
-                    f"+{winner['token_reward']} токенов и "
-                    f"+{winner['bonus_reward']} бонусов"
+                    f"+{winner.get('bonus_reward', 0)} монет "
+                    "в основной баланс"
                 )
         return "\n".join(lines)
 

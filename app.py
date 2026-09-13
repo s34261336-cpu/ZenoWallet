@@ -237,16 +237,26 @@ class SupabaseClient:
             return value[0]
         return {}
 
-    def finalize_expired_season(self) -> dict[str, Any]:
-        return self._rpc_object(self._rpc("season_finalize_expired", {}))
+    def finalize_expired_season(self, force: bool = False) -> dict[str, Any]:
+        return self._rpc_object(
+            self._rpc("season_finalize_expired", {"p_force": force})
+        )
 
     def get_active_season(self) -> dict[str, Any] | None:
         rows = self.request(
             "seasons?"
-            "select=id,starts_at,ends_at,status"
+            "select=id,season_number,starts_at,ends_at,status"
             "&status=eq.active&order=starts_at.desc&limit=1"
         )
         return rows[0] if rows else None
+
+    def set_season_number(self, season_number: int) -> dict[str, Any]:
+        return self._rpc_object(
+            self._rpc(
+                "season_set_number",
+                {"p_season_number": season_number},
+            )
+        )
 
     def ensure_active_season(self) -> dict[str, Any]:
         self.finalize_expired_season()
@@ -306,7 +316,7 @@ class SupabaseClient:
     def get_pending_season_announcements(self) -> list[dict[str, Any]]:
         return self.request(
             "seasons?"
-            "select=id,starts_at,ends_at"
+            "select=id,season_number,starts_at,ends_at"
             "&status=eq.finished&announcement_sent_at=is.null"
             "&order=ends_at.asc&limit=10"
         )
@@ -685,10 +695,23 @@ ADMIN_KEYBOARD = {
             {"text": "Настройки кейсов", "callback_data": "admin:case_settings"},
         ],
         [
+            {"text": "Завершить сезон", "callback_data": "admin:season_finish"},
+            {"text": "Номер сезона", "callback_data": "admin:season_number"},
+        ],
+        [
             {"text": "Забанить юзера", "callback_data": "admin:ban"},
             {"text": "Разбанить", "callback_data": "admin:unban"},
         ],
         [{"text": "Закрыть панель", "callback_data": "admin:close"}],
+    ]
+}
+
+SEASON_FINISH_CONFIRM_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "Да, завершить", "callback_data": "admin:season_finish_confirm"},
+            {"text": "Отмена", "callback_data": "admin:season_finish_cancel"},
+        ]
     ]
 }
 
@@ -877,7 +900,7 @@ class WalletBot:
             str(season["ends_at"]).replace("Z", "+00:00")
         )
         return (
-            f"<b>Сезон #{season['id']}</b>\n\n"
+            f"<b>Сезон #{season['season_number']}</b>\n\n"
             f"До конца: <b>{format_season_remaining(ends_at - datetime.now(timezone.utc))}</b>\n"
             f"Ваш прогресс: <b>{points}</b> очков ({progress}% от лидера)\n"
             f"Место в топе: <b>#{rank}</b>\n\n"
@@ -890,10 +913,10 @@ class WalletBot:
         return format_season_top(self.supabase.get_season_scores(int(season["id"])))
 
     def season_announcement(
-        self, season_id: int, winners: list[dict[str, Any]]
+        self, season_number: int, winners: list[dict[str, Any]]
     ) -> str:
         lines = [
-            f"<b>Сезон #{season_id} завершён!</b>",
+            f"<b>Сезон #{season_number} завершён!</b>",
             "",
             "Награды уже начислены победителям:",
             "",
@@ -914,29 +937,31 @@ class WalletBot:
         return "\n".join(lines)
 
     def announce_season(
-        self, season_id: int, winners: list[dict[str, Any]]
+        self, season_number: int, season_id: int, winners: list[dict[str, Any]]
     ) -> None:
         try:
             self.telegram.send_message(
                 SEASON_CHANNEL_ID,
-                self.season_announcement(season_id, winners),
+                self.season_announcement(season_number, winners),
                 {"remove_keyboard": True},
             )
             self.supabase.mark_season_announced(season_id)
-            log.info("Season %s results announced", season_id)
+            log.info("Season %s results announced", season_number)
         except Exception:
             log.exception("Could not announce season %s", season_id)
 
     def retry_pending_announcements(self) -> None:
         for season in self.supabase.get_pending_season_announcements():
             season_id = int(season["id"])
+            season_number = int(season.get("season_number", season_id))
             rewards = self.supabase.get_season_rewards(season_id)
-            self.announce_season(season_id, rewards)
+            self.announce_season(season_number, season_id, rewards)
 
     def maintain_seasons(self) -> None:
         result = self.supabase.finalize_expired_season()
         if result.get("finalized"):
             self.announce_season(
+                int(result.get("season_number", result["season_id"])),
                 int(result["season_id"]),
                 list(result.get("winners") or []),
             )
@@ -1028,6 +1053,21 @@ class WalletBot:
             self.send(chat_id, format_case_settings(settings))
             return
 
+        if action == "season_number":
+            if not text.strip().isdigit():
+                self.send(chat_id, "Введите положительный номер сезона.")
+                return
+            season_number = int(text.strip())
+            if season_number < 1 or season_number > 1_000_000_000:
+                self.send(chat_id, "Номер сезона должен быть от 1 до 1 000 000 000.")
+                return
+            season = self.supabase.set_season_number(season_number)
+            self.send(
+                chat_id,
+                f"Номер текущего сезона изменён на <b>#{season['season_number']}</b>.",
+            )
+            return
+
         parts = text.strip().split()
         try:
             if action in ("grant", "take"):
@@ -1082,7 +1122,10 @@ class WalletBot:
         if user_id != ADMIN_ID and self.supabase.is_banned(user_id):
             return
 
-        self.record_season_activity(user)
+        command, args = parse_command(text)
+        command = BUTTON_ACTIONS.get(text.strip(), command)
+        if command != "case":
+            self.record_season_activity(user)
 
         if user_id == ADMIN_ID and user_id in self.pending_admin and not text.startswith("/"):
             try:
@@ -1108,8 +1151,6 @@ class WalletBot:
             )
             return
 
-        command, args = parse_command(text)
-        command = BUTTON_ACTIONS.get(text.strip(), command)
         if not command:
             return
 
@@ -1163,7 +1204,10 @@ class WalletBot:
                         self.telegram.send_dice(chat_id)
                     except Exception:
                         log.exception("Could not send case animation")
-                    self.record_season_activity(user, case_points=SEASON_CASE_POINTS)
+                    if reward > 0:
+                        self.record_season_activity(
+                            user, case_points=SEASON_CASE_POINTS
+                        )
                     zeno = self.supabase.get_zeno_balance(user_id)
                     if reward == 0:
                         self.send(
@@ -1276,6 +1320,47 @@ class WalletBot:
             if action == "case_back":
                 self.show_admin_panel(chat_id)
                 return
+            if action == "season_finish":
+                self.send(
+                    chat_id,
+                    "<b>Завершить текущий сезон?</b>\n\n"
+                    "Будут выданы награды за 1–3 места, текущие очки "
+                    "закроются и начнётся новый сезон.",
+                    SEASON_FINISH_CONFIRM_KEYBOARD,
+                )
+                return
+            if action == "season_finish_cancel":
+                self.show_admin_panel(chat_id)
+                return
+            if action == "season_finish_confirm":
+                try:
+                    with self.operation_lock:
+                        result = self.supabase.finalize_expired_season(force=True)
+                        if not result.get("finalized"):
+                            self.send(chat_id, "Активный сезон не найден.")
+                            return
+                        season_number = int(
+                            result.get("season_number", result["season_id"])
+                        )
+                        self.announce_season(
+                            season_number,
+                            int(result["season_id"]),
+                            list(result.get("winners") or []),
+                        )
+                        new_season = self.supabase.get_active_season()
+                    new_number = (
+                        new_season.get("season_number")
+                        if new_season
+                        else "следующий"
+                    )
+                    self.send(
+                        chat_id,
+                        f"Сезон <b>#{season_number}</b> завершён.\n"
+                        f"Новый сезон: <b>#{new_number}</b>.",
+                    )
+                except Exception as error:
+                    self.send_error(chat_id, error)
+                return
             prompts = {
                 "grant": "Введите Telegram ID и сумму для выдачи через пробел:",
                 "take": "Введите Telegram ID и сумму для списания через пробел:",
@@ -1287,6 +1372,7 @@ class WalletBot:
                     "Сумма должна быть ровно 100%."
                 ),
                 "case_limit": "Введите максимальное количество открытий кейсов в час (1–1000):",
+                "season_number": "Введите новый номер текущего сезона (положительное число):",
                 "ban": "Введите Telegram ID пользователя для блокировки:",
                 "unban": "Введите Telegram ID пользователя для разблокировки:",
             }

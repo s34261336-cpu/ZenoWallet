@@ -41,3 +41,8 @@ expertMode = true
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
 
+[userenv]
+
+[userenv.shared]
+WEBAPP_URL = "https://zenowallet.onrender.com/webapp/"
+

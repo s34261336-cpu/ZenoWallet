@@ -51,6 +51,7 @@ def resolve_webapp_url() -> str:
 
 
 WEBAPP_URL = resolve_webapp_url()
+WEB_ONLY = os.getenv("WEB_ONLY", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def required_env(name: str) -> str:
@@ -1980,6 +1981,11 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
+    if WEB_ONLY:
+        log.info("Zeno Wallet web-only mode started")
+        while bot.running:
+            time.sleep(3600)
+        return
     bot.run()
 
 

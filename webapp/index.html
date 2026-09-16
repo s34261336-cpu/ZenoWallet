@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b0c0f" />
+    <title>Zeno Wallet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">Z</div>
+          <div>
+            <strong>ZENO WALLET</strong>
+            <span>MINI APP</span>
+          </div>
+        </div>
+        <button class="icon-button" id="refresh-button" aria-label="Обновить">
+          ↻
+        </button>
+      </header>
+
+      <main>
+        <section class="welcome">
+          <span class="eyebrow">Добро пожаловать</span>
+          <h1>Привет, <span id="user-name">друг</span></h1>
+          <p>Зарабатывай монеты и поднимайся в рейтинге.</p>
+        </section>
+
+        <section class="wallet-card">
+          <div class="wallet-card-glow"></div>
+          <div class="wallet-heading">
+            <span>ОБЩИЙ ПРОГРЕСС</span>
+            <span class="wallet-status"><i></i> ONLINE</span>
+          </div>
+          <div class="main-balance">
+            <span>Основной баланс</span>
+            <strong id="earn-balance">—</strong>
+            <small>монет доступно к выводу</small>
+          </div>
+          <div class="wallet-divider"></div>
+          <div class="wallet-footer">
+            <div>
+              <span>В ZENO</span>
+              <strong id="zeno-balance">—</strong>
+            </div>
+            <div class="wallet-chip">ZW <span>✦</span></div>
+          </div>
+        </section>
+
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <div class="error-panel" id="error-panel"></div>
+        <div class="loading-state" id="loading-state">
+          <div class="spinner"></div>
+          <span>Синхронизация кошелька...</span>
+        </div>
+
+        <section class="view" id="home-view">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Заработок</span>
+              <h2>Твои возможности</h2>
+            </div>
+          </div>
+
+          <div class="action-grid">
+            <button class="action-card case-action" data-action="case">
+              <span class="action-icon">✦</span>
+              <span class="action-copy">
+                <strong>Открыть кейс</strong>
+                <small><b id="case-remaining">—</b> попыток в час</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+            <button class="action-card daily-action" data-action="daily">
+              <span class="action-icon">☀</span>
+              <span class="action-copy">
+                <strong>Ежедневный бонус</strong>
+                <small id="daily-status">+10 монет каждый день</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+          </div>
+
+          <button class="wide-action" data-action="withdraw">
+            <span class="wide-icon">↗</span>
+            <span>
+              <strong>Вывести в Zeno</strong>
+              <small>Перевести заработанные монеты</small>
+            </span>
+            <span class="arrow">→</span>
+          </button>
+
+          <div class="section-heading season-heading">
+            <div>
+              <span class="eyebrow">Соревнование</span>
+              <h2>Сезон <span id="season-number">#—</span></h2>
+            </div>
+            <button class="text-button" data-view="season">Весь топ →</button>
+          </div>
+
+          <section class="season-card">
+            <div class="season-card-top">
+              <div class="season-rank">
+                <span>ТВОЁ МЕСТО</span>
+                <strong id="season-rank">#—</strong>
+              </div>
+              <div class="season-points">
+                <span>ОЧКИ</span>
+                <strong id="season-points">—</strong>
+              </div>
+            </div>
+            <div class="progress-line">
+              <div class="progress-fill" id="season-progress-fill"></div>
+            </div>
+            <div class="progress-meta">
+              <span id="season-progress-text">0% от лидера</span>
+              <span id="season-time">—</span>
+            </div>
+            <div class="leader-preview" id="leader-preview"></div>
+          </section>
+        </section>
+
+        <section class="view hidden" id="season-view">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Рейтинг</span>
+              <h2>Топ сезона</h2>
+            </div>
+            <span class="season-pill" id="season-pill">#—</span>
+          </div>
+          <section class="leaderboard-card" id="leaderboard"></section>
+          <p class="microcopy">Очки: +1 за активность и +5 за успешное открытие кейса.</p>
+        </section>
+
+        <section class="view hidden" id="more-view">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Ещё</span>
+              <h2>Твой профиль</h2>
+            </div>
+          </div>
+          <section class="referral-card">
+            <div class="referral-icon">⌁</div>
+            <div>
+              <span class="eyebrow">Приглашения</span>
+              <h3>Зови друзей</h3>
+              <p>+5 монет за каждого нового пользователя после его первого запуска.</p>
+            </div>
+            <button class="copy-button" id="copy-referral">Скопировать</button>
+          </section>
+          <div class="referral-link" id="referral-link">—</div>
+          <section class="info-list">
+            <div><span>Основной баланс</span><strong>Можно выводить</strong></div>
+            <div><span>Лимит кейсов</span><strong id="case-limit">— в час</strong></div>
+            <div><span>Текущий сезон</span><strong id="season-info">—</strong></div>
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Навигация">
+        <button class="nav-item active" data-view="home">
+          <span>⌂</span><small>Главная</small>
+        </button>
+        <button class="nav-item" data-view="season">
+          <span>♛</span><small>Сезон</small>
+        </button>
+        <button class="nav-item" data-view="more">
+          <span>◌</span><small>Профиль</small>
+        </button>
+      </nav>
+    </div>
+
+    <div class="modal-backdrop hidden" id="withdraw-modal">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="withdraw-title">
+        <button class="modal-close" id="close-withdraw" aria-label="Закрыть">×</button>
+        <span class="eyebrow">Транзакция</span>
+        <h2 id="withdraw-title">Вывод в Zeno</h2>
+        <p>Выберите сумму или введите её вручную.</p>
+        <div class="amount-grid">
+          <button data-amount="10">10</button>
+          <button data-amount="50">50</button>
+          <button data-amount="100">100</button>
+          <button data-amount="200">200</button>
+        </div>
+        <form id="withdraw-form">
+          <label for="withdraw-amount">Своя сумма</label>
+          <div class="input-row">
+            <input id="withdraw-amount" type="number" min="1" step="1" placeholder="Например, 75" required />
+            <span>монет</span>
+          </div>
+          <button class="primary-button" type="submit">Перевести в Zeno <span>→</span></button>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop hidden" id="auth-modal">
+      <section class="modal auth-modal">
+        <div class="auth-mark">Z</div>
+        <h2>Откройте мини-апп<br />из Telegram</h2>
+        <p>Это приложение доступно только внутри защищённого Telegram Web App.</p>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

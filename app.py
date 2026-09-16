@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hmac
 import json
 import logging
 import os
@@ -10,10 +11,12 @@ import signal
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -24,6 +27,8 @@ logging.basicConfig(
 log = logging.getLogger("zeno-wallet")
 ADMIN_ID = 5814345235
 SEASON_CHANNEL_ID = os.getenv("SEASON_CHANNEL_ID", "-1004423195226")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip().rstrip("/")
+WEBAPP_DIR = Path(__file__).resolve().parent / "webapp"
 SEASON_ACTIVITY_POINTS = 1
 SEASON_CASE_POINTS = 5
 CASE_REWARDS = (0, 5, 10, 25, 50, 100)
@@ -527,6 +532,7 @@ class SupabaseClient:
 
 class TelegramApi:
     def __init__(self, token: str) -> None:
+        self.token = token
         self.base_url = f"https://api.telegram.org/bot{token}"
 
     def call(
@@ -585,6 +591,10 @@ class TelegramApi:
                     {
                         "command": "menu",
                         "description": "Показать меню",
+                    },
+                    {
+                        "command": "app",
+                        "description": "Открыть мини-апп",
                     },
                 ]
             },
@@ -671,6 +681,16 @@ def progress_bar(percent: int, width: int = 10) -> str:
 
 def menu_keyboard(is_admin: bool = False) -> dict[str, Any]:
     keyboard = [
+        *(
+            [[
+                {
+                    "text": "🚀 Открыть мини-апп",
+                    "web_app": {"url": WEBAPP_URL},
+                }
+            ]]
+            if WEBAPP_URL
+            else []
+        ),
         [{"text": "🎁 Открыть кейс"}, {"text": "☀️ Ежедневный бонус"}],
         [{"text": "💳 Мой баланс"}, {"text": "👥 Пригласить друзей"}],
         [{"text": "📤 Вывести монеты"}],
@@ -1238,6 +1258,29 @@ class WalletBot:
                     )
                     return
 
+                if command == "app":
+                    if not WEBAPP_URL:
+                        self.send(
+                            chat_id,
+                            "Мини-апп пока не настроен: добавьте Secret <code>WEBAPP_URL</code>.",
+                        )
+                    else:
+                        self.send(
+                            chat_id,
+                            "<b>🚀 ZENO WALLET MINI APP</b>\n\n"
+                            "Откройте приложение, чтобы управлять балансом, "
+                            "кейсами, бонусами и сезоном.",
+                            {
+                                "inline_keyboard": [[
+                                    {
+                                        "text": "Открыть мини-апп",
+                                        "web_app": {"url": WEBAPP_URL},
+                                    }
+                                ]]
+                            },
+                        )
+                    return
+
                 if command == "admin_menu":
                     if user_id == ADMIN_ID:
                         self.show_admin_panel(chat_id)
@@ -1512,6 +1555,355 @@ class WalletBot:
         self.running = False
 
 
+def validate_web_app_init_data(init_data: str, bot_token: str) -> dict[str, Any]:
+    fields = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = fields.pop("hash", "")
+    if not received_hash:
+        raise ValueError("Telegram init data has no hash")
+
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(fields.items())
+    )
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode("utf-8"),
+        sha256,
+    ).digest()
+    expected_hash = hmac.new(
+        secret_key,
+        data_check_string.encode("utf-8"),
+        sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_hash, received_hash):
+        raise ValueError("Telegram init data signature is invalid")
+
+    try:
+        auth_date = int(fields.get("auth_date", "0"))
+    except ValueError as error:
+        raise ValueError("Telegram init data auth_date is invalid") from error
+    if not auth_date or time.time() - auth_date > 86400:
+        raise ValueError("Telegram init data has expired")
+
+    try:
+        user = json.loads(fields.get("user", "{}"))
+    except json.JSONDecodeError as error:
+        raise ValueError("Telegram user data is invalid") from error
+    if not isinstance(user, dict) or not str(user.get("id", "")).isdigit():
+        raise ValueError("Telegram user is missing")
+    return user
+
+
+def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
+    user_id = int(user["id"])
+    supabase = bot.supabase
+    wallet = supabase.ensure_wallet(user_id)
+    supabase.ensure_user_state(user_id)
+    users_state = supabase.get_users_state()
+    user_state = users_state.get(str(user_id))
+    user_state = user_state if isinstance(user_state, dict) else {}
+    zeno_balance = supabase.get_zeno_balance(user_id)
+
+    settings = supabase.get_case_settings()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent_attempts: list[datetime] = []
+    for raw_timestamp in user_state.get("case_attempts", []):
+        try:
+            timestamp = datetime.fromisoformat(
+                str(raw_timestamp).replace("Z", "+00:00")
+            )
+            if timestamp > cutoff:
+                recent_attempts.append(timestamp)
+        except (TypeError, ValueError):
+            continue
+    case_remaining = max(0, settings["hourly_limit"] - len(recent_attempts))
+
+    daily_claimed_at = wallet.get("daily_claimed_at")
+    daily_next_at: datetime | None = None
+    if daily_claimed_at:
+        try:
+            daily_next_at = datetime.fromisoformat(
+                str(daily_claimed_at).replace("Z", "+00:00")
+            ) + timedelta(hours=24)
+        except ValueError:
+            daily_next_at = None
+    daily_ready = daily_next_at is None or datetime.now(timezone.utc) >= daily_next_at
+
+    season = supabase.ensure_active_season()
+    scores = supabase.get_season_scores(int(season["id"]))
+    ordered = sorted(
+        scores,
+        key=lambda row: (
+            -int(row.get("points", 0)),
+            str(row.get("updated_at", "")),
+            int(row.get("user_id", 0)),
+        ),
+    )
+    current = next(
+        (row for row in ordered if int(row.get("user_id", 0)) == user_id),
+        None,
+    )
+    points = int(current.get("points", 0)) if current else 0
+    rank = next(
+        (
+            index
+            for index, row in enumerate(ordered, 1)
+            if int(row.get("user_id", 0)) == user_id
+        ),
+        len(ordered) + 1,
+    )
+    leader_points = int(ordered[0].get("points", 0)) if ordered else 0
+    progress = (
+        100
+        if leader_points == 0 and points
+        else int(points * 100 / leader_points) if leader_points else 0
+    )
+    ends_at = datetime.fromisoformat(
+        str(season["ends_at"]).replace("Z", "+00:00")
+    )
+
+    return {
+        "ok": True,
+        "user": {
+            "id": user_id,
+            "firstName": str(user.get("first_name") or user.get("username") or "друг"),
+            "username": user.get("username"),
+        },
+        "wallet": {
+            "earnBalance": int(wallet["earn_balance"]),
+            "zenoBalance": zeno_balance,
+        },
+        "daily": {
+            "ready": daily_ready,
+            "nextAt": daily_next_at.isoformat() if daily_next_at else None,
+        },
+        "case": {
+            "remaining": case_remaining,
+            "hourlyLimit": settings["hourly_limit"],
+        },
+        "season": {
+            "number": int(season["season_number"]),
+            "endsAt": ends_at.isoformat(),
+            "points": points,
+            "rank": rank,
+            "progress": progress,
+            "top": [
+                {
+                    "place": place,
+                    "name": str(row.get("display_name") or f"ID {row['user_id']}"),
+                    "points": int(row.get("points", 0)),
+                    "isCurrent": int(row.get("user_id", 0)) == user_id,
+                }
+                for place, row in enumerate(ordered[:10], 1)
+            ],
+        },
+        "referralLink": (
+            f"https://t.me/{bot.bot_username}?start=ref_{user_id}"
+        ),
+    }
+
+
+class MiniAppHandler(BaseHTTPRequestHandler):
+    bot: WalletBot
+    supabase: SupabaseClient
+
+    def send_json(self, payload: dict[str, Any], status: int = 200) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def error_json(self, message: str, status: int = 400, code: str = "error") -> None:
+        self.send_json({"ok": False, "code": code, "error": message}, status)
+
+    def authorized_user(self) -> dict[str, Any]:
+        init_data = self.headers.get("X-Telegram-Init-Data", "")
+        return validate_web_app_init_data(init_data, self.bot.telegram.token)
+
+    def do_GET(self) -> None:
+        path = urlsplit(self.path).path
+        if path in ("/", "/healthz"):
+            self.send_json({"status": "ok", "service": "zeno-wallet"})
+            return
+        if path == "/webapp":
+            self.send_response(301)
+            self.send_header("Location", "/webapp/")
+            self.end_headers()
+            return
+        if path == "/api/state":
+            try:
+                user = self.authorized_user()
+                with self.bot.operation_lock:
+                    self.send_json(web_app_state(self.bot, user))
+            except ValueError as error:
+                self.error_json(str(error), 401, "unauthorized")
+            except Exception:
+                log.exception("Mini-app state request failed")
+                self.error_json("Не удалось загрузить данные кошелька.", 500)
+            return
+        if path.startswith("/webapp/"):
+            self.serve_static(path)
+            return
+        self.error_json("Страница не найдена.", 404, "not_found")
+
+    def do_HEAD(self) -> None:
+        path = urlsplit(self.path).path
+        if path in ("/", "/healthz"):
+            body = b'{"status": "ok", "service": "zeno-wallet"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return
+        if path.startswith("/webapp/"):
+            self.serve_static(path, head_only=True)
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self) -> None:
+        path = urlsplit(self.path).path
+        if path != "/api/action":
+            self.error_json("Страница не найдена.", 404, "not_found")
+            return
+        try:
+            user = self.authorized_user()
+            length = int(self.headers.get("Content-Length", "0"))
+            if length > 32_000:
+                raise ValueError("Запрос слишком большой")
+            raw_body = self.rfile.read(length)
+            body = json.loads(raw_body.decode("utf-8") or "{}")
+            action = body.get("action")
+            user_id = int(user["id"])
+            with self.bot.operation_lock:
+                if action == "case":
+                    allowed, reward, _wallet, remaining, next_available = (
+                        self.supabase.open_case(user_id)
+                    )
+                    if not allowed:
+                        self.send_json(
+                            {
+                                "ok": False,
+                                "code": "case_limit",
+                                "error": "Лимит открытий на этот час исчерпан.",
+                                "nextAt": next_available.isoformat()
+                                if next_available
+                                else None,
+                            },
+                            429,
+                        )
+                        return
+                    if reward and reward > 0:
+                        self.bot.record_season_activity(
+                            user,
+                            case_points=SEASON_CASE_POINTS,
+                        )
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "case",
+                        "reward": int(reward or 0),
+                        "remaining": remaining,
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "daily":
+                    claimed, _wallet, next_available = self.supabase.claim_daily(user_id)
+                    if not claimed:
+                        self.send_json(
+                            {
+                                "ok": False,
+                                "code": "daily_cooldown",
+                                "error": "Ежедневный бонус уже получен.",
+                                "nextAt": next_available.isoformat()
+                                if next_available
+                                else None,
+                            },
+                            429,
+                        )
+                        return
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {"type": "daily", "reward": 10}
+                    self.send_json(result)
+                    return
+
+                if action == "withdraw":
+                    amount = body.get("amount")
+                    if isinstance(amount, bool) or not isinstance(amount, int):
+                        raise ValueError("Сумма должна быть целым числом")
+                    if amount <= 0:
+                        raise ValueError("Сумма должна быть больше нуля")
+                    withdrawn, wallet, zeno = self.supabase.withdraw(user_id, amount)
+                    if not withdrawn:
+                        self.send_json(
+                            {
+                                "ok": False,
+                                "code": "insufficient_funds",
+                                "error": "Недостаточно средств для вывода.",
+                                "balance": int(wallet["earn_balance"]),
+                            },
+                            400,
+                        )
+                        return
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "withdraw",
+                        "amount": amount,
+                        "zenoBalance": zeno,
+                    }
+                    self.send_json(result)
+                    return
+
+                if action in ("refresh", "season"):
+                    self.send_json(web_app_state(self.bot, user))
+                    return
+                raise ValueError("Неизвестное действие")
+        except ValueError as error:
+            self.error_json(str(error), 400)
+        except Exception:
+            log.exception("Mini-app action request failed")
+            self.error_json("Не удалось выполнить операцию.", 500)
+
+    def serve_static(self, path: str, head_only: bool = False) -> None:
+        relative_path = unquote(path.removeprefix("/webapp/")) or "index.html"
+        try:
+            root = WEBAPP_DIR.resolve()
+            candidate = (root / relative_path).resolve()
+            candidate.relative_to(root)
+        except (OSError, ValueError):
+            self.error_json("Файл не найден.", 404, "not_found")
+            return
+        if not candidate.is_file():
+            self.error_json("Файл не найден.", 404, "not_found")
+            return
+
+        content_types = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".js": "application/javascript; charset=utf-8",
+            ".svg": "image/svg+xml",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".ico": "image/x-icon",
+        }
+        body = candidate.read_bytes()
+        self.send_response(200)
+        self.send_header(
+            "Content-Type",
+            content_types.get(candidate.suffix.lower(), "application/octet-stream"),
+        )
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if not head_only:
+            self.wfile.write(body)
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
+
+
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path not in ("/", "/healthz"):
@@ -1529,11 +1921,18 @@ class HealthHandler(BaseHTTPRequestHandler):
         return
 
 
-def start_health_server() -> ThreadingHTTPServer:
+def start_web_server(bot: WalletBot) -> ThreadingHTTPServer:
     port = int(os.getenv("PORT", "8080"))
-    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    handler = type(
+        "BoundMiniAppHandler",
+        (MiniAppHandler,),
+        {"bot": bot, "supabase": bot.supabase},
+    )
+    server = ThreadingHTTPServer(("0.0.0.0", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    log.info("Health server listening on port %s", port)
+    log.info("Web server listening on port %s; mini-app at /webapp/", port)
+    if not WEBAPP_URL:
+        log.warning("WEBAPP_URL is not set; Telegram mini-app button is disabled")
     return server
 
 
@@ -1552,7 +1951,7 @@ def main() -> None:
     supabase = SupabaseClient()
     telegram = TelegramApi(token)
     bot = WalletBot(telegram, supabase)
-    health_server = start_health_server()
+    web_server = start_web_server(bot)
     threading.Thread(
         target=season_maintenance_loop,
         args=(bot,),
@@ -1562,7 +1961,7 @@ def main() -> None:
 
     def shutdown(_signum: int, _frame: Any) -> None:
         bot.stop()
-        health_server.shutdown()
+        web_server.shutdown()
 
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)

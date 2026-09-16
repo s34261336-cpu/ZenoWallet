@@ -646,38 +646,51 @@ def referral_id(args: list[str]) -> int | None:
 
 
 def format_wallet(wallet: dict[str, Any], zeno_balance: int | float) -> str:
+    earn_balance = int(wallet["earn_balance"])
+    zeno_value = int(zeno_balance)
     return (
-        "<b>Ваш баланс</b>\n\n"
-        f"Заработано: <b>{int(wallet['earn_balance'])}</b> монет\n"
-        f"В Zeno: <b>{int(zeno_balance)}</b> монет"
-    )
+        "<b>💳 МОЙ КОШЕЛЁК</b>\n"
+        "<i>Все балансы в одном месте</i>\n\n"
+        "┌ <b>Основной баланс</b>\n"
+        f"└ <code>{earn_balance:,}</code> монет\n"
+        "<i>Доступно для вывода в Zeno</i>\n\n"
+        "┌ <b>Zeno</b>\n"
+        f"└ <code>{zeno_value:,}</code> монет\n"
+        "<i>Баланс в Zeno Wallet</i>"
+    ).replace(",", " ")
+
+
+def progress_bar(percent: int, width: int = 10) -> str:
+    filled = max(0, min(width, round(percent / 100 * width)))
+    return "▰" * filled + "▱" * (width - filled)
 
 
 def menu_keyboard(is_admin: bool = False) -> dict[str, Any]:
     keyboard = [
-        [{"text": "Открыть кейс"}, {"text": "Ежедневный бонус"}],
-        [{"text": "Мой баланс"}, {"text": "Пригласить друзей"}],
-        [{"text": "Вывести монеты"}],
+        [{"text": "🎁 Открыть кейс"}, {"text": "☀️ Ежедневный бонус"}],
+        [{"text": "💳 Мой баланс"}, {"text": "👥 Пригласить друзей"}],
+        [{"text": "📤 Вывести монеты"}],
+        [{"text": "🏆 Сезон"}, {"text": "📊 Топ сезона"}],
     ]
     if is_admin:
-        keyboard.append([{"text": "Админ-панель"}])
+        keyboard.append([{"text": "⚙️ Админ-панель"}])
     return {
         "keyboard": keyboard,
         "resize_keyboard": True,
         "is_persistent": True,
-        "input_field_placeholder": "Выберите действие",
+        "input_field_placeholder": "Выберите раздел",
     }
 
 WITHDRAW_KEYBOARD = {
     "inline_keyboard": [
         [
-            {"text": "10", "callback_data": "withdraw:10"},
-            {"text": "50", "callback_data": "withdraw:50"},
-            {"text": "100", "callback_data": "withdraw:100"},
+            {"text": "10 монет", "callback_data": "withdraw:10"},
+            {"text": "50 монет", "callback_data": "withdraw:50"},
+            {"text": "100 монет", "callback_data": "withdraw:100"},
         ],
         [
-            {"text": "200", "callback_data": "withdraw:200"},
-            {"text": "Ввести свою сумму", "callback_data": "withdraw:custom"},
+            {"text": "200 монет", "callback_data": "withdraw:200"},
+            {"text": "✎ Своя сумма", "callback_data": "withdraw:custom"},
         ],
     ]
 }
@@ -685,44 +698,53 @@ WITHDRAW_KEYBOARD = {
 ADMIN_KEYBOARD = {
     "inline_keyboard": [
         [
-            {"text": "Выдать валюту", "callback_data": "admin:grant"},
-            {"text": "Забрать валюту", "callback_data": "admin:take"},
+            {"text": "➕ Выдать валюту", "callback_data": "admin:grant"},
+            {"text": "➖ Забрать валюту", "callback_data": "admin:take"},
         ],
         [
-            {"text": "Баланс пользователя", "callback_data": "admin:balance"},
-            {"text": "Количество юзеров", "callback_data": "admin:users"},
+            {"text": "👤 Баланс пользователя", "callback_data": "admin:balance"},
+            {"text": "👥 Пользователи", "callback_data": "admin:users"},
         ],
         [
-            {"text": "Всего валюты", "callback_data": "admin:total"},
+            {"text": "💰 Всего валюты", "callback_data": "admin:total"},
         ],
         [
-            {"text": "Рассылка всем", "callback_data": "admin:broadcast"},
+            {"text": "📣 Рассылка всем", "callback_data": "admin:broadcast"},
         ],
         [
-            {"text": "Настройки кейсов", "callback_data": "admin:case_settings"},
+            {"text": "🎁 Настройки кейсов", "callback_data": "admin:case_settings"},
         ],
         [
-            {"text": "Сбросить → следующий", "callback_data": "admin:season_finish"},
-            {"text": "Изменить № сезона", "callback_data": "admin:season_number"},
+            {"text": "🏆 Завершить сезон", "callback_data": "admin:season_finish"},
+            {"text": "№ Изменить сезон", "callback_data": "admin:season_number"},
         ],
         [
-            {"text": "Забанить юзера", "callback_data": "admin:ban"},
-            {"text": "Разбанить", "callback_data": "admin:unban"},
+            {"text": "🔒 Заблокировать", "callback_data": "admin:ban"},
+            {"text": "🔓 Разблокировать", "callback_data": "admin:unban"},
         ],
-        [{"text": "Закрыть панель", "callback_data": "admin:close"}],
+        [{"text": "‹ Закрыть панель", "callback_data": "admin:close"}],
     ]
 }
 
 SEASON_FINISH_CONFIRM_KEYBOARD = {
     "inline_keyboard": [
         [
-            {"text": "Да, завершить", "callback_data": "admin:season_finish_confirm"},
-            {"text": "Отмена", "callback_data": "admin:season_finish_cancel"},
+            {"text": "✓ Да, завершить", "callback_data": "admin:season_finish_confirm"},
+            {"text": "× Отмена", "callback_data": "admin:season_finish_cancel"},
         ]
     ]
 }
 
 BUTTON_ACTIONS = {
+    "🎁 Открыть кейс": "case",
+    "☀️ Ежедневный бонус": "daily",
+    "💳 Мой баланс": "balance",
+    "👥 Пригласить друзей": "referral",
+    "📤 Вывести монеты": "withdraw_menu",
+    "🏆 Сезон": "season",
+    "📊 Топ сезона": "season_top",
+    "⚙️ Админ-панель": "admin_menu",
+    # Keep the previous labels valid for users with an older keyboard.
     "Открыть кейс": "case",
     "Ежедневный бонус": "daily",
     "Мой баланс": "balance",
@@ -733,9 +755,14 @@ BUTTON_ACTIONS = {
 
 
 HELP_TEXT = (
-    "<b>Zeno Wallet</b>\n\n"
-    "Зарабатывайте монеты и переводите их в Zeno.\n\n"
-    "Выберите действие в меню ниже."
+    "<b>✦ ZENO WALLET</b>\n"
+    "<i>Награды. Баланс. Zeno.</i>\n\n"
+    "<b>Что здесь можно делать</b>\n"
+    "🎁 Открывать кейсы и забирать награды\n"
+    "☀️ Получать ежедневный бонус\n"
+    "🏆 Участвовать в сезонном рейтинге\n"
+    "📤 Переводить заработанные монеты в Zeno\n\n"
+    "<i>Выберите раздел в меню ниже.</i>"
 )
 
 
@@ -783,12 +810,21 @@ def season_profile(user: dict[str, Any]) -> tuple[str | None, str]:
 
 def format_season_top(scores: list[dict[str, Any]]) -> str:
     if not scores:
-        return "<b>Топ сезона</b>\n\nПока никто не набрал очки."
-    lines = ["<b>Топ-10 сезона</b>", ""]
+        return (
+            "<b>📊 ТОП СЕЗОНА</b>\n"
+            "<i>Рейтинг обновляется после каждой активности</i>\n\n"
+            "Пока никто не набрал очки."
+        )
+    lines = [
+        "<b>📊 ТОП-10 СЕЗОНА</b>",
+        "<i>Станьте первым в рейтинге</i>",
+        "",
+    ]
     for place, score in enumerate(scores[:10], 1):
         name = escape(str(score.get("display_name") or f"ID {score['user_id']}"))
+        medal = ("🥇", "🥈", "🥉")[place - 1] if place <= 3 else f"<b>{place}.</b>"
         lines.append(
-            f"<b>{place}.</b> {name} — <b>{int(score.get('points', 0))}</b> очков"
+            f"{medal} {name}  ·  <b>{int(score.get('points', 0))}</b> очков"
         )
     return "\n".join(lines)
 
@@ -796,23 +832,23 @@ def format_season_top(scores: list[dict[str, Any]]) -> str:
 def format_case_settings(settings: dict[str, Any]) -> str:
     odds = settings["odds"]
     return (
-        "<b>Настройки кейсов</b>\n\n"
-        f"Может ничего не выпасть: <b>{odds['0']}%</b> "
-        "(самое частое по умолчанию)\n"
-        f"5 монет: <b>{odds['5']}%</b>\n"
-        f"10 монет: <b>{odds['10']}%</b>\n"
-        f"25 монет: <b>{odds['25']}%</b>\n"
-        f"50 монет: <b>{odds['50']}%</b>\n"
-        f"100 монет: <b>{odds['100']}%</b>\n\n"
-        f"Лимит: <b>{settings['hourly_limit']}</b> открытий в час на пользователя"
+        "<b>🎁 НАСТРОЙКИ КЕЙСОВ</b>\n"
+        "<i>Вероятности наград и лимит открытий</i>\n\n"
+        f"0 монет  ·  <b>{odds['0']}%</b>\n"
+        f"5 монет  ·  <b>{odds['5']}%</b>\n"
+        f"10 монет  ·  <b>{odds['10']}%</b>\n"
+        f"25 монет  ·  <b>{odds['25']}%</b>\n"
+        f"50 монет  ·  <b>{odds['50']}%</b>\n"
+        f"100 монет  ·  <b>{odds['100']}%</b>\n\n"
+        f"⏱ Лимит: <b>{settings['hourly_limit']}</b> открытий в час"
     )
 
 
 CASE_SETTINGS_KEYBOARD = {
     "inline_keyboard": [
-        [{"text": "Изменить шансы", "callback_data": "admin:case_odds"}],
-        [{"text": "Лимит кейсов в час", "callback_data": "admin:case_limit"}],
-        [{"text": "Назад", "callback_data": "admin:case_back"}],
+        [{"text": "✎ Изменить шансы", "callback_data": "admin:case_odds"}],
+        [{"text": "⏱ Лимит в час", "callback_data": "admin:case_limit"}],
+        [{"text": "‹ Назад", "callback_data": "admin:case_back"}],
     ]
 }
 
@@ -907,11 +943,13 @@ class WalletBot:
             str(season["ends_at"]).replace("Z", "+00:00")
         )
         return (
-            f"<b>Сезон #{season['season_number']}</b>\n\n"
-            f"До конца: <b>{format_season_remaining(ends_at - datetime.now(timezone.utc))}</b>\n"
-            f"Ваш прогресс: <b>{points}</b> очков ({progress}% от лидера)\n"
-            f"Место в топе: <b>#{rank}</b>\n\n"
-            "Очки: +1 за активность, +5 за успешное открытие кейса."
+            f"<b>🏆 СЕЗОН #{season['season_number']}</b>\n"
+            "<i>Соревнуйтесь, открывайте кейсы, поднимайтесь в топе</i>\n\n"
+            f"⏳ До конца  ·  <b>{format_season_remaining(ends_at - datetime.now(timezone.utc))}</b>\n"
+            f"📍 Ваше место  ·  <b>#{rank}</b>\n"
+            f"⭐ Очки  ·  <b>{points}</b>\n\n"
+            f"{progress_bar(progress)}  <b>{progress}%</b> от лидера\n\n"
+            "<i>+1 за активность  ·  +5 за успешное открытие кейса</i>"
         )
 
     def season_top(self) -> str:
@@ -923,13 +961,12 @@ class WalletBot:
         self, season_number: int, winners: list[dict[str, Any]]
     ) -> str:
         lines = [
-            f"<b>Сезон #{season_number} завершён!</b>",
-            "",
-            "Награды уже начислены победителям:",
+            f"<b>🏆 СЕЗОН #{season_number} ЗАВЕРШЁН</b>",
+            "<i>Награды уже начислены победителям</i>",
             "",
         ]
         if not winners:
-            lines.append("В этом сезоне никто не набрал очки.")
+            lines.append("В этом сезоне никто не набрал очков.")
         else:
             for winner in winners:
                 name = escape(
@@ -938,10 +975,10 @@ class WalletBot:
                 points = winner.get("points")
                 points_text = f"{points} очков, " if points is not None else ""
                 lines.append(
-                    f"<b>{winner['place']}.</b> {name} — "
+                    f"<b>{winner['place']}.</b> {name}\n"
                     f"{points_text}"
                     f"+{winner.get('bonus_reward', 0)} монет "
-                    "в основной баланс"
+                    "в основной баланс 💰"
                 )
         return "\n".join(lines)
 
@@ -980,20 +1017,23 @@ class WalletBot:
         if not withdrawn:
             self.send(
                 chat_id,
-                f"Недостаточно заработанных монет.\n\nВаш баланс: "
-                f"<b>{wallet['earn_balance']}</b> монет",
+                "<b>⚠️ Недостаточно средств</b>\n\n"
+                f"Доступно к выводу: <b>{int(wallet['earn_balance'])}</b> монет",
             )
             return
         self.send(
             chat_id,
-            f"Вывод выполнен: <b>{amount} монет</b> переведено в Zeno.\n\n"
+            "<b>✅ Вывод выполнен</b>\n\n"
+            f"<b>{amount}</b> монет переведено в Zeno.\n\n"
             f"{format_wallet(wallet, zeno or 0)}",
         )
 
     def show_admin_panel(self, chat_id: int) -> None:
         self.send(
             chat_id,
-            "<b>Админ-панель Zeno Wallet</b>\n\nВыберите нужное действие:",
+            "<b>⚙️ АДМИН-ПАНЕЛЬ</b>\n"
+            "<i>Управление балансами, кейсами и сезонами</i>\n\n"
+            "Выберите нужный раздел:",
             ADMIN_KEYBOARD,
         )
 
@@ -1015,8 +1055,9 @@ class WalletBot:
                     failed += 1
             self.send(
                 chat_id,
-                f"Рассылка завершена.\n\nДоставлено: <b>{delivered}</b>\n"
-                f"Ошибок: <b>{failed}</b>",
+                "<b>📣 РАССЫЛКА ЗАВЕРШЕНА</b>\n\n"
+                f"Доставлено  ·  <b>{delivered}</b>\n"
+                f"Ошибок  ·  <b>{failed}</b>",
             )
             return
 
@@ -1031,7 +1072,9 @@ class WalletBot:
             except (ValueError, TypeError):
                 self.send(
                     chat_id,
-                    "Формат: <code>0=55 5=15 10=12 25=8 50=6 100=4</code>",
+                    "<b>⚠️ Неверный формат</b>\n\n"
+                    "Пример:\n"
+                    "<code>0=55 5=15 10=12 25=8 50=6 100=4</code>",
                 )
                 return
             expected = {str(value) for value in CASE_REWARDS}
@@ -1042,7 +1085,8 @@ class WalletBot:
             ):
                 self.send(
                     chat_id,
-                    "Нужны все шансы от 0 до 100%, а их сумма должна быть ровно 100%.",
+                    "<b>⚠️ Проверьте вероятности</b>\n\n"
+                    "Нужны все награды от 0 до 100%, а сумма должна быть ровно 100%.",
                 )
                 return
             settings = self.supabase.update_case_settings(odds=values)
@@ -1051,11 +1095,11 @@ class WalletBot:
 
         if action == "case_limit":
             if not text.strip().isdigit():
-                self.send(chat_id, "Введите целое число открытий в час от 1 до 1000.")
+                self.send(chat_id, "⏱ Введите целое число открытий в час от 1 до 1000.")
                 return
             hourly_limit = int(text.strip())
             if hourly_limit < 1 or hourly_limit > 1000:
-                self.send(chat_id, "Лимит должен быть от 1 до 1000 кейсов в час.")
+                self.send(chat_id, "⚠️ Лимит должен быть от 1 до 1000 кейсов в час.")
                 return
             settings = self.supabase.update_case_settings(hourly_limit=hourly_limit)
             self.send(chat_id, format_case_settings(settings))
@@ -1063,7 +1107,7 @@ class WalletBot:
 
         if action == "season_number":
             if not text.strip().isdigit():
-                self.send(chat_id, "Введите положительный номер сезона.")
+                self.send(chat_id, "🏆 Введите положительный номер сезона.")
                 return
             season_number = int(text.strip())
             if season_number < 1 or season_number > 1_000_000_000:
@@ -1072,7 +1116,7 @@ class WalletBot:
             season = self.supabase.set_season_number(season_number)
             self.send(
                 chat_id,
-                f"Номер текущего сезона изменён на <b>#{season['season_number']}</b>.",
+                f"✅ Текущий сезон изменён на <b>#{season['season_number']}</b>.",
             )
             return
 
@@ -1090,8 +1134,8 @@ class WalletBot:
                 verb = "Выдано" if action == "grant" else "Забрано"
                 self.send(
                     chat_id,
-                    f"{verb}: <b>{amount}</b> монет.\n"
-                    f"Баланс пользователя: <b>{wallet['earn_balance']}</b>",
+                    f"✅ {verb}: <b>{amount}</b> монет.\n"
+                    f"Основной баланс пользователя: <b>{wallet['earn_balance']}</b>",
                 )
                 return
 
@@ -1112,12 +1156,16 @@ class WalletBot:
                     raise ValueError("Нельзя изменить статус главного администратора")
                 self.supabase.set_banned(target_id, action == "ban")
                 status = "заблокирован" if action == "ban" else "разблокирован"
-                self.send(chat_id, f"Пользователь <b>{target_id}</b> {status}.")
+                icon = "🔒" if action == "ban" else "🔓"
+                self.send(chat_id, f"{icon} Пользователь <b>{target_id}</b> {status}.")
                 return
 
             raise ValueError("Неизвестное действие")
         except Exception as error:
-            self.send(chat_id, f"Не удалось выполнить действие: <b>{escape(str(error))}</b>")
+            self.send(
+                chat_id,
+                f"⚠️ Не удалось выполнить действие:\n<b>{escape(str(error))}</b>",
+            )
 
     def handle_message(self, message: dict[str, Any]) -> None:
         user = message.get("from")
@@ -1155,7 +1203,7 @@ class WalletBot:
                 return
             self.send(
                 chat_id,
-                "Введите положительную целую сумму, например <code>100</code>.",
+                "📤 Введите положительную сумму, например <code>100</code>.",
             )
             return
 
@@ -1171,7 +1219,7 @@ class WalletBot:
                     inviter = referral_id(args)
                     if inviter and self.supabase.claim_referral(inviter, user_id):
                         message_parts.append(
-                            "\nРеферал засчитан. Пригласивший получил +5 монет."
+                            "\n✅ Реферал засчитан. Пригласивший получил +5 монет."
                         )
                     self.send(chat_id, "\n".join(message_parts))
                     return
@@ -1192,7 +1240,8 @@ class WalletBot:
                 if command == "withdraw_menu":
                     self.send(
                         chat_id,
-                        "Выберите сумму вывода или введите свою сумму:",
+                        "<b>📤 ВЫВОД В ZENO</b>\n"
+                        "<i>Выберите готовую сумму или укажите свою</i>",
                         reply_markup=WITHDRAW_KEYBOARD,
                     )
                     return
@@ -1204,7 +1253,8 @@ class WalletBot:
                     if not allowed and next_available:
                         self.send(
                             chat_id,
-                            "Лимит открытий исчерпан. Попробуйте снова через "
+                            "⏱ <b>Лимит открытий исчерпан</b>\n\n"
+                            "Попробуйте снова через "
                             f"<b>{format_duration(next_available - datetime.now(timezone.utc))}</b>.",
                         )
                         return
@@ -1220,15 +1270,17 @@ class WalletBot:
                     if reward == 0:
                         self.send(
                             chat_id,
-                            "В этот раз ничего не выпало.\n\n"
-                            f"Осталось открытий в час: <b>{remaining}</b>\n\n"
+                            "<b>🎁 КЕЙС ОТКРЫТ</b>\n"
+                            "<i>В этот раз награда не выпала</i>\n\n"
+                            f"Осталось открытий  ·  <b>{remaining}</b> в час\n\n"
                             f"{format_wallet(wallet, zeno)}",
                         )
                         return
                     self.send(
                         chat_id,
-                        f"Кейс открыт.\n\nВаша награда: <b>+{reward} монет</b>\n"
-                        f"Осталось открытий в час: <b>{remaining}</b>\n\n"
+                        "<b>🎁 КЕЙС ОТКРЫТ</b>\n"
+                        f"<i>Ваша награда  ·  +{reward} монет</i>\n\n"
+                        f"Осталось открытий  ·  <b>{remaining}</b> в час\n\n"
                         f"{format_wallet(wallet, zeno)}",
                     )
                     return
@@ -1241,14 +1293,16 @@ class WalletBot:
                         )
                         self.send(
                             chat_id,
-                            f"Ежедневный бонус уже получен. Возвращайтесь через "
+                            "☀️ <b>Бонус уже получен</b>\n\n"
+                            f"Возвращайтесь через "
                             f"<b>{wait}</b>.",
                         )
                         return
                     zeno = self.supabase.get_zeno_balance(user_id)
                     self.send(
                         chat_id,
-                        f"Ежедневный бонус начислен: <b>+10 монет</b>\n\n"
+                        "<b>☀️ ЕЖЕДНЕВНЫЙ БОНУС</b>\n"
+                        "<i>Начислено +10 монет</i>\n\n"
                         f"{format_wallet(wallet, zeno)}",
                     )
                     return
@@ -1257,10 +1311,11 @@ class WalletBot:
                     link = f"https://t.me/{self.bot_username}?start=ref_{user_id}"
                     self.send(
                         chat_id,
-                        "<b>Ваша реферальная ссылка</b>\n\n"
+                        "<b>👥 ПРИГЛАСИТЕ ДРУЗЕЙ</b>\n"
+                        "<i>Получайте +5 монет за каждого нового пользователя</i>\n\n"
+                        "Ваша ссылка:\n"
                         f"<code>{escape(link)}</code>\n\n"
-                        "Пригласите друга — вы получите +5 монет после его "
-                        "первого запуска бота.",
+                        "Награда начислится после первого запуска бота другом.",
                     )
                     return
 
@@ -1276,7 +1331,7 @@ class WalletBot:
                         self.pending_withdraw.add(user_id)
                         self.send(
                             chat_id,
-                            "Введите сумму вывода одним сообщением, например "
+                            "📤 Введите сумму вывода одним сообщением, например "
                             "<code>100</code>.",
                         )
                         return
@@ -1301,18 +1356,18 @@ class WalletBot:
                 return
             action = data.split(":", 1)[1]
             if action == "close":
-                self.send(chat_id, "Админ-панель закрыта.")
+                self.send(chat_id, "⚙️ Админ-панель закрыта.")
                 return
             if action in ("users", "total"):
                 try:
                     with self.operation_lock:
                         users, total = self.supabase.admin_stats()
                     if action == "users":
-                        self.send(chat_id, f"Всего пользователей: <b>{users}</b>")
+                        self.send(chat_id, f"👥 Пользователей в системе: <b>{users}</b>")
                     else:
                         self.send(
                             chat_id,
-                            f"Всего валюты в системе: <b>{total}</b> монет",
+                            f"💰 Всего валюты в системе: <b>{total}</b> монет",
                         )
                 except Exception as error:
                     self.send_error(chat_id, error)
@@ -1332,14 +1387,14 @@ class WalletBot:
                 try:
                     season = self.supabase.get_active_season()
                     if not season:
-                        self.send(chat_id, "Активный сезон не найден.")
+                        self.send(chat_id, "⚠️ Активный сезон не найден.")
                         return
                     current_number = int(season["season_number"])
                     self.send(
                         chat_id,
-                        f"<b>Завершить сезон #{current_number}?</b>\n\n"
-                        "Будут выданы награды за 1–3 места, очки будут сброшены, "
-                        f"и начнётся сезон <b>#{current_number + 1}</b>.",
+                        f"<b>🏆 Завершить сезон #{current_number}?</b>\n\n"
+                        "Награды будут выданы за 1–3 места, очки сброшены, "
+                        f"затем начнётся сезон <b>#{current_number + 1}</b>.",
                         SEASON_FINISH_CONFIRM_KEYBOARD,
                     )
                 except Exception as error:
@@ -1353,7 +1408,7 @@ class WalletBot:
                     with self.operation_lock:
                         result = self.supabase.finalize_expired_season(force=True)
                         if not result.get("finalized"):
-                            self.send(chat_id, "Активный сезон не найден.")
+                            self.send(chat_id, "⚠️ Активный сезон не найден.")
                             return
                         season_number = int(
                             result.get("season_number", result["season_id"])
@@ -1371,7 +1426,7 @@ class WalletBot:
                     )
                     self.send(
                         chat_id,
-                        f"Сезон <b>#{season_number}</b> завершён.\n"
+                        f"✅ Сезон <b>#{season_number}</b> завершён.\n"
                         f"Новый сезон: <b>#{new_number}</b>.",
                     )
                 except Exception as error:
@@ -1394,7 +1449,7 @@ class WalletBot:
             }
             if action in prompts:
                 self.pending_admin[ADMIN_ID] = action
-                self.send(chat_id, prompts[action])
+                self.send(chat_id, f"<b>✎ ДЕЙСТВИЕ АДМИНИСТРАТОРА</b>\n\n{prompts[action]}")
             return
 
         if not data.startswith("withdraw:"):
@@ -1404,7 +1459,7 @@ class WalletBot:
             self.pending_withdraw.add(user_id)
             self.send(
                 chat_id,
-                "Введите сумму вывода одним сообщением, например <code>100</code>.",
+                "📤 Введите сумму вывода одним сообщением, например <code>100</code>.",
             )
             return
         amount = parse_amount(value)

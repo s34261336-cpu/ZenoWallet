@@ -582,6 +582,10 @@ class TelegramApi:
                         "command": "season_top",
                         "description": "Топ-10 сезона",
                     },
+                    {
+                        "command": "menu",
+                        "description": "Показать меню",
+                    },
                 ]
             },
         )
@@ -671,6 +675,7 @@ def menu_keyboard(is_admin: bool = False) -> dict[str, Any]:
         [{"text": "💳 Мой баланс"}, {"text": "👥 Пригласить друзей"}],
         [{"text": "📤 Вывести монеты"}],
         [{"text": "🏆 Сезон"}, {"text": "📊 Топ сезона"}],
+        [{"text": "🙈 Скрыть меню"}],
     ]
     if is_admin:
         keyboard.append([{"text": "⚙️ Админ-панель"}])
@@ -744,6 +749,7 @@ BUTTON_ACTIONS = {
     "🏆 Сезон": "season",
     "📊 Топ сезона": "season_top",
     "⚙️ Админ-панель": "admin_menu",
+    "🙈 Скрыть меню": "hide_menu",
     # Keep the previous labels valid for users with an older keyboard.
     "Открыть кейс": "case",
     "Ежедневный бонус": "daily",
@@ -1222,6 +1228,23 @@ class WalletBot:
                             "\n✅ Реферал засчитан. Пригласивший получил +5 монет."
                         )
                     self.send(chat_id, "\n".join(message_parts))
+                    return
+
+                if command == "menu":
+                    self.send(
+                        chat_id,
+                        "<b>✦ МЕНЮ ZENO WALLET</b>\n\n"
+                        "Выберите нужный раздел ниже.",
+                    )
+                    return
+
+                if command == "hide_menu":
+                    self.send(
+                        chat_id,
+                        "🙈 Меню скрыто.\n\n"
+                        "Чтобы вернуть кнопки, отправьте <code>/menu</code> или <code>/start</code>.",
+                        {"remove_keyboard": True},
+                    )
                     return
 
                 if command == "admin_menu":

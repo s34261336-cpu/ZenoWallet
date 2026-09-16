@@ -925,3 +925,206 @@ label {
     right: calc(50% - 254px);
   }
 }
+
+/* Glass surface refresh */
+:root {
+  --glass: rgba(24, 27, 36, 0.68);
+  --glass-strong: rgba(31, 35, 47, 0.78);
+  --glass-line: rgba(255, 255, 255, 0.15);
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 88% 3%, rgba(149, 120, 255, 0.14), transparent 28rem),
+    radial-gradient(circle at 8% 82%, rgba(216, 255, 98, 0.08), transparent 24rem),
+    var(--bg);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+.ambient {
+  opacity: 0.28;
+}
+
+.icon-button {
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  border-color: var(--glass-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 30px rgba(0, 0, 0, 0.18);
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.icon-button:hover {
+  background: var(--glass-strong);
+  border-color: rgba(216, 255, 98, 0.4);
+  transform: translateY(-1px);
+}
+
+.wallet-card {
+  background:
+    radial-gradient(circle at 85% 10%, rgba(216, 255, 98, 0.23), transparent 30%),
+    linear-gradient(135deg, rgba(44, 56, 28, 0.9), rgba(23, 31, 27, 0.82) 52%, rgba(22, 25, 32, 0.84));
+  backdrop-filter: blur(22px) saturate(130%);
+  border-color: rgba(216, 255, 98, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 20px 70px rgba(0, 0, 0, 0.3),
+    0 0 55px rgba(216, 255, 98, 0.05);
+}
+
+.toast {
+  background: rgba(216, 255, 98, 0.92);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.action-card {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(125%);
+  border-radius: 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 34px rgba(0, 0, 0, 0.16);
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.18s;
+}
+
+.action-card:hover {
+  background: var(--glass-strong);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.case-action {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(149, 120, 255, 0.28), transparent 34%),
+    linear-gradient(145deg, rgba(47, 38, 76, 0.76), rgba(21, 23, 34, 0.72));
+  overflow: hidden;
+}
+
+.case-action::after {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.11), transparent 35%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.case-sheen {
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.2), transparent 70%);
+  height: 160%;
+  left: -95%;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: -30%;
+  transform: rotate(12deg);
+  transition: left 0.7s ease, opacity 0.3s;
+  width: 65%;
+}
+
+.case-action:hover .case-sheen,
+.case-action.working .case-sheen,
+.case-action.reward-pop .case-sheen {
+  left: 125%;
+  opacity: 1;
+}
+
+.case-action {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(149, 120, 255, 0.28), transparent 34%),
+    linear-gradient(145deg, rgba(47, 38, 76, 0.76), rgba(21, 23, 34, 0.72));
+}
+
+.daily-action {
+  background:
+    radial-gradient(circle at 90% 4%, rgba(216, 255, 98, 0.2), transparent 32%),
+    linear-gradient(145deg, rgba(45, 55, 30, 0.76), rgba(21, 28, 25, 0.72));
+}
+
+.case-action .action-icon {
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.case-action:hover .action-icon,
+.case-action.working .action-icon,
+.case-action.reward-pop .action-icon {
+  box-shadow: 0 0 24px rgba(149, 120, 255, 0.3);
+  transform: rotate(12deg) scale(1.08);
+}
+
+.case-action.working {
+  opacity: 1;
+}
+
+.case-action.working .action-copy strong {
+  color: #e5dcff;
+}
+
+.case-action.working .action-copy strong::after {
+  animation: loading-dots 1.1s steps(3, end) infinite;
+  content: "...";
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  width: 0;
+}
+
+.case-action.reward-pop {
+  animation: reward-pop 0.7s ease both;
+}
+
+@keyframes loading-dots {
+  to {
+    width: 1.2em;
+  }
+}
+
+@keyframes reward-pop {
+  35% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 0 0 5px rgba(149, 120, 255, 0.14),
+      0 22px 50px rgba(149, 120, 255, 0.22);
+    transform: translateY(-3px) scale(1.015);
+  }
+}
+
+.wide-action {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(125%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 14px 34px rgba(0, 0, 0, 0.14);
+  transition: background 0.2s, border-color 0.2s, transform 0.18s;
+}
+
+.wide-action:hover {
+  background: var(--glass-strong);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.season-card,
+.leaderboard-card,
+.referral-card,
+.info-list {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(120%);
+  border-color: var(--glass-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 34px rgba(0, 0, 0, 0.14);
+}
+
+.bottom-nav {
+  background: rgba(19, 22, 30, 0.72);
+  border-color: var(--glass-line);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(10px);
+}
+
+.modal {
+  background: rgba(28, 31, 41, 0.86);
+  backdrop-filter: blur(26px) saturate(130%);
+  border-color: var(--glass-line);
+  box-shadow: 0 -20px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}

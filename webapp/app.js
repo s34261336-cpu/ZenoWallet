@@ -1,5 +1,7 @@
 const telegram = window.Telegram?.WebApp;
 const appState = { data: null, activeView: "home" };
+const busyActions = new Set();
+const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
 
 if (telegram) {
@@ -63,20 +65,32 @@ function setLoading(loading) {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: { ...apiHeaders, ...(options.headers || {}) },
-  });
-  const payload = await response.json().catch(() => ({
-    ok: false,
-    error: "Сервер вернул некорректный ответ.",
-  }));
-  if (!response.ok || payload.ok === false) {
-    const error = new Error(payload.error || "Операция не выполнена.");
-    Object.assign(error, payload);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(path, {
+      ...options,
+      signal: options.signal || controller.signal,
+      headers: { ...apiHeaders, ...(options.headers || {}) },
+    });
+    const payload = await response.json().catch(() => ({
+      ok: false,
+      error: "Сервер вернул некорректный ответ.",
+    }));
+    if (!response.ok || payload.ok === false) {
+      const error = new Error(payload.error || "Операция не выполнена.");
+      Object.assign(error, payload);
+      throw error;
+    }
+    return payload;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Сервер отвечает слишком долго. Попробуйте ещё раз.");
+    }
     throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return payload;
 }
 
 async function loadState() {
@@ -107,6 +121,10 @@ function render() {
   $("#zeno-balance").textContent = formatNumber(wallet.zenoBalance);
   $("#case-remaining").textContent = caseData.remaining;
   $("#case-limit").textContent = `${caseData.hourlyLimit} в час`;
+  const caseButton = document.querySelector('[data-action="case"]');
+  caseButton.disabled = !busyActions.has("case") && Number(caseData.remaining) <= 0;
+  caseButton.setAttribute("aria-busy", busyActions.has("case") ? "true" : "false");
+  document.querySelector('[data-action="withdraw"]').disabled = false;
   $("#season-number").textContent = `#${season.number}`;
   $("#season-pill").textContent = `#${season.number}`;
   $("#season-info").textContent = `#${season.number}`;
@@ -156,10 +174,13 @@ function setView(viewName) {
 }
 
 async function runAction(action, body = {}) {
+  if (busyActions.has(action) || !appState.data) return;
   const buttons = document.querySelectorAll(`[data-action="${action}"]`);
+  busyActions.add(action);
   buttons.forEach((button) => {
     button.disabled = true;
     button.classList.add("working");
+    button.setAttribute("aria-busy", "true");
   });
   try {
     const result = await request("/api/action", {
@@ -170,15 +191,19 @@ async function runAction(action, body = {}) {
     render();
     const actionResult = result.lastAction;
     if (actionResult?.type === "case") {
+      const caseButton = document.querySelector('[data-action="case"]');
+      caseButton.classList.remove("reward-pop");
+      void caseButton.offsetWidth;
+      caseButton.classList.add("reward-pop");
       showToast(
         actionResult.reward > 0
-          ? `🎁 +${formatNumber(actionResult.reward)} монет`
-          : "Кейс открыт — в этот раз без награды",
+          ? `Кейс открыт · +${formatNumber(actionResult.reward)} монет`
+          : "Кейс открыт · в этот раз без награды",
       );
     } else if (actionResult?.type === "daily") {
-      showToast("☀️ +10 монет начислено");
+      showToast("+10 монет начислено");
     } else if (actionResult?.type === "withdraw") {
-      showToast(`✅ ${formatNumber(actionResult.amount)} монет переведено`);
+      showToast(`${formatNumber(actionResult.amount)} монет переведено`);
     }
   } catch (error) {
     if (error.code === "daily_cooldown" && error.nextAt) {
@@ -189,8 +214,10 @@ async function runAction(action, body = {}) {
       showToast(error.message, "danger");
     }
   } finally {
+    busyActions.delete(action);
     buttons.forEach((button) => {
       button.classList.remove("working");
+      button.setAttribute("aria-busy", "false");
     });
     render();
   }

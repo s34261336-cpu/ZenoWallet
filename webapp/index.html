@@ -79,15 +79,16 @@
           </div>
 
           <div class="action-grid">
-            <button class="action-card case-action" data-action="case">
-              <span class="action-icon">✦</span>
+            <button class="action-card case-action" data-action="case" aria-label="Открыть кейс">
+              <span class="action-icon" aria-hidden="true">✦</span>
               <span class="action-copy">
                 <strong>Открыть кейс</strong>
                 <small><b id="case-remaining">—</b> попыток в час</small>
               </span>
+              <span class="case-sheen" aria-hidden="true"></span>
               <span class="arrow">↗</span>
             </button>
-            <button class="action-card daily-action" data-action="daily">
+            <button class="action-card daily-action" data-action="daily" disabled>
               <span class="action-icon">☀</span>
               <span class="action-copy">
                 <strong>Ежедневный бонус</strong>
@@ -97,7 +98,7 @@
             </button>
           </div>
 
-          <button class="wide-action" data-action="withdraw">
+          <button class="wide-action" data-action="withdraw" disabled>
             <span class="wide-icon">↗</span>
             <span>
               <strong>Вывести в Zeno</strong>

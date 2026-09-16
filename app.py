@@ -39,21 +39,15 @@ DEFAULT_CASE_SETTINGS = {
 
 def resolve_webapp_url() -> str:
     configured_url = os.getenv("WEBAPP_URL", "").strip().rstrip("/")
-    if configured_url:
-        return configured_url
-
-    domains = [
-        value.strip().rstrip("/")
-        for value in os.getenv("REPLIT_DOMAINS", "").split(",")
-        if value.strip()
-    ]
-    if not domains:
+    if not configured_url:
         return ""
 
-    domain = domains[0]
-    if not domain.startswith(("http://", "https://")):
-        domain = f"https://{domain}"
-    return f"{domain}/webapp"
+    hostname = (urlsplit(configured_url).hostname or "").lower()
+    if hostname == "replit.dev" or hostname.endswith(".replit.dev"):
+        return ""
+    if hostname == "replit.app" or hostname.endswith(".replit.app"):
+        return ""
+    return configured_url
 
 
 WEBAPP_URL = resolve_webapp_url()

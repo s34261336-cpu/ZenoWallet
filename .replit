@@ -30,8 +30,8 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python3 app.py"
-waitForPort = 8080
+args = "PORT=8000 python3 app.py"
+waitForPort = 8000
 
 [agent]
 stack = "PNPM_WORKSPACE"

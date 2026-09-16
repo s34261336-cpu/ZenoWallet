@@ -675,14 +675,15 @@ def menu_keyboard(is_admin: bool = False) -> dict[str, Any]:
         [{"text": "💳 Мой баланс"}, {"text": "👥 Пригласить друзей"}],
         [{"text": "📤 Вывести монеты"}],
         [{"text": "🏆 Сезон"}, {"text": "📊 Топ сезона"}],
-        [{"text": "🙈 Скрыть меню"}],
     ]
     if is_admin:
         keyboard.append([{"text": "⚙️ Админ-панель"}])
     return {
         "keyboard": keyboard,
         "resize_keyboard": True,
-        "is_persistent": True,
+        # Let Telegram collapse the reply keyboard and show its native
+        # keyboard toggle in the composer instead of forcing it open.
+        "is_persistent": False,
         "input_field_placeholder": "Выберите раздел",
     }
 
@@ -749,7 +750,6 @@ BUTTON_ACTIONS = {
     "🏆 Сезон": "season",
     "📊 Топ сезона": "season_top",
     "⚙️ Админ-панель": "admin_menu",
-    "🙈 Скрыть меню": "hide_menu",
     # Keep the previous labels valid for users with an older keyboard.
     "Открыть кейс": "case",
     "Ежедневный бонус": "daily",
@@ -1235,15 +1235,6 @@ class WalletBot:
                         chat_id,
                         "<b>✦ МЕНЮ ZENO WALLET</b>\n\n"
                         "Выберите нужный раздел ниже.",
-                    )
-                    return
-
-                if command == "hide_menu":
-                    self.send(
-                        chat_id,
-                        "🙈 Меню скрыто.\n\n"
-                        "Чтобы вернуть кнопки, отправьте <code>/menu</code> или <code>/start</code>.",
-                        {"remove_keyboard": True},
                     )
                     return
 

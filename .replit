@@ -44,3 +44,8 @@ timeoutMs = 20000
 [[ports]]
 localPort = 8080
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+WEBAPP_URL = "https://bot-1788790278-6501-1ubluboga301-gmail-c.bothost.tech/webapp/"

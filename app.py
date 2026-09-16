@@ -27,7 +27,6 @@ logging.basicConfig(
 log = logging.getLogger("zeno-wallet")
 ADMIN_ID = 5814345235
 SEASON_CHANNEL_ID = os.getenv("SEASON_CHANNEL_ID", "-1004423195226")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip().rstrip("/")
 WEBAPP_DIR = Path(__file__).resolve().parent / "webapp"
 SEASON_ACTIVITY_POINTS = 1
 SEASON_CASE_POINTS = 5
@@ -36,6 +35,28 @@ DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
 }
+
+
+def resolve_webapp_url() -> str:
+    configured_url = os.getenv("WEBAPP_URL", "").strip().rstrip("/")
+    if configured_url:
+        return configured_url
+
+    domains = [
+        value.strip().rstrip("/")
+        for value in os.getenv("REPLIT_DOMAINS", "").split(",")
+        if value.strip()
+    ]
+    if not domains:
+        return ""
+
+    domain = domains[0]
+    if not domain.startswith(("http://", "https://")):
+        domain = f"https://{domain}"
+    return f"{domain}/webapp"
+
+
+WEBAPP_URL = resolve_webapp_url()
 
 
 def required_env(name: str) -> str:

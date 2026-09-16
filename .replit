@@ -41,7 +41,3 @@ expertMode = true
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
 
-[userenv]
-
-[userenv.shared]
-WEBAPP_URL = "https://bot-1788790278-6501-1ubluboga301-gmail-c.bothost.tech/webapp/"

@@ -2385,3 +2385,338 @@ label {
     min-height: 164px;
   }
 }
+
+/* Telegram glass UI */
+:root {
+  --tg-blue: #67aefb;
+  --tg-blue-strong: #3e91f6;
+  --glass-surface: rgba(35, 52, 71, 0.57);
+  --glass-surface-strong: rgba(42, 62, 83, 0.72);
+  --glass-border: rgba(226, 242, 255, 0.17);
+  --glass-highlight: rgba(255, 255, 255, 0.13);
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 4% 0%, rgba(100, 180, 255, 0.25), transparent 21rem),
+    radial-gradient(circle at 98% 8%, rgba(178, 132, 255, 0.27), transparent 22rem),
+    radial-gradient(circle at 26% 100%, rgba(94, 221, 183, 0.17), transparent 25rem),
+    linear-gradient(145deg, #111d2c 0%, #17283a 48%, #132235 100%);
+}
+
+body::before {
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.03), transparent 28%),
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03), transparent 24rem);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+
+.app-shell {
+  padding-bottom: calc(122px + var(--safe-bottom));
+}
+
+.topbar,
+.welcome,
+.wallet-card,
+.section-heading,
+.action-grid,
+.wide-action,
+.season-card,
+.leaderboard-card,
+.referral-card,
+.referral-link,
+.info-list {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-mark {
+  background: linear-gradient(145deg, #cfff78, #72d5c5);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 15px;
+  box-shadow:
+    0 0 0 5px rgba(112, 213, 197, 0.08),
+    0 12px 26px rgba(39, 162, 190, 0.2);
+}
+
+.icon-button {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  border-color: var(--glass-border);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 12px 28px rgba(5, 14, 27, 0.18);
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(103, 174, 251, 0.5);
+}
+
+.welcome {
+  padding-top: 48px;
+}
+
+.welcome .eyebrow,
+.section-heading .eyebrow {
+  color: #78c5ff;
+  letter-spacing: 0.16em;
+}
+
+.welcome h1 {
+  letter-spacing: -0.075em;
+}
+
+.welcome h1 span {
+  background: linear-gradient(105deg, #d6ff79, #79e1ca 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.welcome p {
+  color: #b0c3d2;
+}
+
+.wallet-card {
+  background:
+    linear-gradient(135deg, rgba(104, 174, 251, 0.19), transparent 38%),
+    radial-gradient(circle at 88% 8%, rgba(207, 255, 120, 0.27), transparent 28%),
+    linear-gradient(140deg, rgba(38, 77, 96, 0.78), rgba(35, 48, 78, 0.71));
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border-color: rgba(200, 235, 255, 0.25);
+  border-radius: 30px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 26px 70px rgba(4, 14, 29, 0.28),
+    0 0 55px rgba(103, 174, 251, 0.08);
+}
+
+.wallet-card::after {
+  opacity: 0.22;
+}
+
+.wallet-heading {
+  color: rgba(235, 247, 255, 0.67);
+}
+
+.wallet-status {
+  color: #cfff78;
+}
+
+.wallet-status i {
+  background: #bff66a;
+  box-shadow: 0 0 12px rgba(191, 246, 106, 0.85);
+}
+
+.main-balance strong {
+  color: #f6fbff;
+  letter-spacing: -0.08em;
+}
+
+.wallet-chip {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+}
+
+.section-heading {
+  margin-top: 40px;
+}
+
+.action-card,
+.wide-action,
+.season-card,
+.leaderboard-card,
+.referral-card,
+.info-list {
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 16px 38px rgba(5, 14, 27, 0.19);
+}
+
+.action-card {
+  border-radius: 25px;
+  min-height: 180px;
+}
+
+.action-card:hover,
+.wide-action:hover {
+  background: var(--glass-surface-strong);
+  border-color: rgba(103, 174, 251, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 20px 42px rgba(5, 14, 27, 0.25);
+  transform: translateY(-3px);
+}
+
+.case-action {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(180, 151, 255, 0.34), transparent 34%),
+    linear-gradient(145deg, rgba(79, 64, 127, 0.65), rgba(35, 52, 71, 0.57));
+}
+
+.daily-action {
+  background:
+    radial-gradient(circle at 92% 5%, rgba(207, 255, 120, 0.28), transparent 34%),
+    linear-gradient(145deg, rgba(54, 91, 80, 0.65), rgba(35, 55, 71, 0.57));
+}
+
+.case-action .action-icon {
+  background: rgba(180, 151, 255, 0.18);
+  border-color: rgba(205, 188, 255, 0.25);
+}
+
+.daily-action .action-icon {
+  background: rgba(207, 255, 120, 0.16);
+  border-color: rgba(207, 255, 120, 0.23);
+}
+
+.wide-action {
+  background: var(--glass-surface);
+  border-radius: 22px;
+  min-height: 78px;
+}
+
+.text-button {
+  color: var(--tg-blue);
+}
+
+.season-card,
+.leaderboard-card,
+.referral-card,
+.info-list {
+  background: var(--glass-surface);
+  border-radius: 27px;
+}
+
+.season-card {
+  padding: 21px;
+}
+
+.season-pill {
+  background: rgba(103, 174, 251, 0.14);
+  border: 1px solid rgba(103, 174, 251, 0.2);
+  color: #8bc8ff;
+}
+
+.progress-line {
+  background: rgba(226, 242, 255, 0.11);
+  border: 1px solid rgba(226, 242, 255, 0.06);
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, #ad8dff, var(--tg-blue), #cfff78);
+}
+
+.leader-row.current {
+  background: linear-gradient(90deg, rgba(207, 255, 120, 0.12), rgba(103, 174, 251, 0.07));
+}
+
+.referral-link,
+.input-row {
+  background: rgba(9, 20, 34, 0.36);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: var(--glass-border);
+}
+
+.bottom-nav {
+  background: rgba(18, 33, 50, 0.62);
+  backdrop-filter: blur(28px) saturate(165%);
+  -webkit-backdrop-filter: blur(28px) saturate(165%);
+  border: 1px solid rgba(226, 242, 255, 0.19);
+  border-radius: 34px;
+  bottom: calc(15px + var(--safe-bottom));
+  box-shadow:
+    0 22px 52px rgba(3, 10, 20, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.17);
+  gap: 6px;
+  padding: 7px;
+}
+
+.nav-item {
+  border-radius: 27px;
+  color: #9aafbf;
+  min-height: 53px;
+  padding: 8px 6px;
+  transition: background 0.22s, color 0.22s, transform 0.22s;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #eaf5f6;
+  transform: translateY(-1px);
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(207, 255, 120, 0.23), rgba(103, 174, 251, 0.15));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  color: #d4ff84;
+}
+
+.nav-item span {
+  font-size: 21px;
+}
+
+.nav-item small {
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.modal-backdrop {
+  background: rgba(4, 12, 24, 0.66);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.modal {
+  background: rgba(30, 48, 67, 0.82);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border-color: rgba(226, 242, 255, 0.2);
+  border-radius: 31px;
+}
+
+.modal-close {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.amount-grid button {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(226, 242, 255, 0.13);
+  border-radius: 15px;
+}
+
+.amount-grid button:hover {
+  background: rgba(103, 174, 251, 0.14);
+  border-color: rgba(103, 174, 251, 0.45);
+}
+
+.input-row {
+  border-radius: 16px;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #d3ff76, #86dbc1);
+  border-radius: 17px;
+}
+
+@media (max-width: 520px) {
+  .bottom-nav {
+    left: 13px;
+    right: 13px;
+  }
+}

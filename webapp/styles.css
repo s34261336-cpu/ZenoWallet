@@ -1128,3 +1128,404 @@ body {
   border-color: var(--glass-line);
   box-shadow: 0 -20px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
+
+/* Neo wallet direction */
+:root {
+  --bg: #080b12;
+  --panel: rgba(17, 22, 33, 0.72);
+  --panel-soft: rgba(25, 31, 45, 0.78);
+  --text: #f7f8fb;
+  --muted: #8f99ad;
+  --line: rgba(255, 255, 255, 0.1);
+  --lime: #dcff72;
+  --lime-dark: #9acb3d;
+  --violet: #a78bfa;
+  --cyan: #70e5ff;
+  --orange: #ffb86b;
+  --radius: 26px;
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(112, 229, 255, 0.1), transparent 22rem),
+    radial-gradient(circle at 102% 22%, rgba(167, 139, 250, 0.16), transparent 25rem),
+    radial-gradient(circle at -10% 86%, rgba(220, 255, 114, 0.09), transparent 24rem),
+    linear-gradient(180deg, #080b12 0%, #0b0f18 60%, #080b12 100%);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.ambient-one {
+  background: var(--violet);
+  filter: blur(96px);
+  opacity: 0.18;
+  right: -90px;
+  top: -100px;
+}
+
+.ambient-two {
+  background: var(--cyan);
+  filter: blur(110px);
+  opacity: 0.1;
+}
+
+.app-shell {
+  max-width: 600px;
+  padding: 18px 18px calc(108px + var(--safe-bottom));
+}
+
+.topbar {
+  min-height: 44px;
+}
+
+.brand-lockup {
+  gap: 11px;
+}
+
+.brand-mark {
+  background: linear-gradient(145deg, var(--lime) 0%, #b6ee55 48%, #78c969 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 14px;
+  box-shadow: 0 0 0 5px rgba(220, 255, 114, 0.06), 0 10px 28px rgba(170, 220, 80, 0.16);
+  height: 40px;
+  width: 40px;
+}
+
+.brand-lockup strong {
+  letter-spacing: 0.12em;
+}
+
+.brand-lockup span {
+  color: var(--cyan);
+  letter-spacing: 0.18em;
+}
+
+.icon-button {
+  background: rgba(20, 27, 40, 0.76);
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 26px rgba(0, 0, 0, 0.24);
+}
+
+.welcome {
+  padding: 48px 3px 25px;
+}
+
+.welcome .eyebrow {
+  color: var(--cyan);
+}
+
+.welcome h1 {
+  font-size: clamp(33px, 8vw, 44px);
+  letter-spacing: -0.065em;
+}
+
+.welcome h1 span {
+  color: var(--lime);
+}
+
+.welcome p {
+  color: #aab4c6;
+  font-size: 14px;
+}
+
+.wallet-card {
+  background:
+    linear-gradient(135deg, rgba(51, 70, 39, 0.98), rgba(27, 40, 37, 0.95) 44%, rgba(18, 27, 39, 0.98)),
+    radial-gradient(circle at 90% 10%, rgba(220, 255, 114, 0.32), transparent 34%);
+  border-color: rgba(220, 255, 114, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 24px 80px rgba(0, 0, 0, 0.34),
+    0 0 60px rgba(220, 255, 114, 0.07);
+  min-height: 230px;
+  padding: 22px;
+}
+
+.wallet-card::after {
+  background:
+    linear-gradient(120deg, transparent 24%, rgba(255, 255, 255, 0.08) 42%, transparent 58%),
+    radial-gradient(circle, rgba(220, 255, 114, 0.2) 0 1px, transparent 1.5px);
+  background-size: 100% 100%, 15px 15px;
+  content: "";
+  inset: 0;
+  opacity: 0.32;
+  pointer-events: none;
+  position: absolute;
+}
+
+.wallet-card-glow {
+  border-color: rgba(220, 255, 114, 0.2);
+  right: -145px;
+  top: -175px;
+}
+
+.wallet-heading,
+.main-balance,
+.wallet-footer {
+  z-index: 1;
+}
+
+.wallet-status {
+  color: var(--lime);
+  letter-spacing: 0.12em;
+}
+
+.main-balance {
+  padding: 34px 0 23px;
+}
+
+.main-balance strong {
+  color: #fbffea;
+  font-size: clamp(40px, 11vw, 57px);
+  text-shadow: 0 0 30px rgba(220, 255, 114, 0.1);
+}
+
+.wallet-footer strong {
+  color: #e7f0d0;
+}
+
+.wallet-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.section-heading {
+  margin: 36px 0 16px;
+}
+
+.section-heading .eyebrow {
+  color: var(--cyan);
+}
+
+.section-heading h2 {
+  font-size: 23px;
+}
+
+.action-grid {
+  gap: 12px;
+}
+
+.action-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  min-height: 178px;
+  padding: 17px;
+}
+
+.action-card::before,
+.wide-action::before,
+.season-card::before,
+.referral-card::before {
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.1), transparent 34%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.action-card:hover,
+.wide-action:hover {
+  border-color: rgba(112, 229, 255, 0.38);
+  transform: translateY(-2px);
+}
+
+.case-action {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(167, 139, 250, 0.35), transparent 34%),
+    linear-gradient(145deg, rgba(54, 43, 91, 0.9), rgba(19, 24, 38, 0.84));
+}
+
+.daily-action {
+  background:
+    radial-gradient(circle at 92% 5%, rgba(220, 255, 114, 0.22), transparent 34%),
+    linear-gradient(145deg, rgba(43, 62, 42, 0.9), rgba(18, 29, 34, 0.84));
+}
+
+.daily-action:disabled {
+  opacity: 0.72;
+}
+
+.action-icon {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.action-copy strong {
+  font-size: 15px;
+}
+
+.wide-action {
+  border-color: rgba(255, 255, 255, 0.12);
+  margin-top: 12px;
+  min-height: 73px;
+  padding: 15px 16px;
+}
+
+.wide-action strong {
+  font-size: 14px;
+}
+
+.text-button {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.season-card,
+.leaderboard-card,
+.referral-card,
+.info-list {
+  background: rgba(17, 23, 35, 0.72);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 42px rgba(0, 0, 0, 0.2);
+}
+
+.season-card,
+.referral-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-line {
+  background: rgba(255, 255, 255, 0.1);
+  height: 9px;
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, var(--violet), var(--cyan) 55%, var(--lime));
+  box-shadow: 0 0 18px rgba(112, 229, 255, 0.3);
+}
+
+.leader-preview {
+  position: relative;
+}
+
+.leader-avatar {
+  background: linear-gradient(145deg, rgba(220, 255, 114, 0.24), rgba(112, 229, 255, 0.13));
+  border: 1px solid rgba(220, 255, 114, 0.2);
+}
+
+.season-pill {
+  background: rgba(112, 229, 255, 0.1);
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.leader-row.current {
+  background: linear-gradient(90deg, rgba(220, 255, 114, 0.1), rgba(112, 229, 255, 0.04));
+}
+
+.leader-score {
+  color: var(--lime);
+}
+
+.referral-card {
+  gap: 14px;
+}
+
+.referral-icon {
+  background: linear-gradient(145deg, rgba(167, 139, 250, 0.24), rgba(112, 229, 255, 0.1));
+  border: 1px solid rgba(167, 139, 250, 0.24);
+}
+
+.copy-button,
+.primary-button {
+  background: linear-gradient(135deg, var(--lime), #b8ed58);
+  box-shadow: 0 10px 22px rgba(184, 237, 88, 0.14);
+}
+
+.referral-link,
+.input-row {
+  background: rgba(7, 11, 18, 0.68);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.bottom-nav {
+  background: rgba(13, 18, 29, 0.82);
+  border-color: rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.nav-item {
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.nav-item:hover {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(220, 255, 114, 0.17), rgba(112, 229, 255, 0.08));
+  color: var(--lime);
+}
+
+.modal-backdrop {
+  background: rgba(3, 6, 12, 0.78);
+}
+
+.modal {
+  background: rgba(17, 23, 35, 0.9);
+  border-radius: 28px;
+  box-shadow: 0 -24px 90px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.modal h2 {
+  font-size: 28px;
+}
+
+.amount-grid button {
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.2s, border-color 0.2s, transform 0.18s;
+}
+
+.amount-grid button:hover {
+  border-color: rgba(112, 229, 255, 0.42);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 420px) {
+  .app-shell {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .welcome {
+    padding-top: 40px;
+  }
+
+  .action-card {
+    min-height: 165px;
+    padding: 15px;
+  }
+
+  .bottom-nav {
+    left: 14px;
+    right: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

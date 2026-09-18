@@ -1923,3 +1923,465 @@ label {
 .auth-modal p {
   color: #718287;
 }
+
+/* Twilight product palette */
+:root {
+  color-scheme: dark;
+  --bg: #101a28;
+  --panel: rgba(25, 39, 55, 0.82);
+  --panel-soft: rgba(31, 48, 66, 0.9);
+  --text: #f2f6ef;
+  --muted: #9eafbd;
+  --line: rgba(226, 241, 235, 0.12);
+  --lime: #c9ef69;
+  --lime-dark: #8fb93e;
+  --violet: #aa98ff;
+  --cyan: #79dce4;
+  --orange: #ff9b73;
+  --radius: 24px;
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 5% -5%, rgba(121, 220, 228, 0.18), transparent 20rem),
+    radial-gradient(circle at 103% 8%, rgba(170, 152, 255, 0.2), transparent 23rem),
+    radial-gradient(circle at 38% 108%, rgba(201, 239, 105, 0.11), transparent 26rem),
+    linear-gradient(180deg, #101a28 0%, #132133 52%, #101a28 100%);
+}
+
+body {
+  color: var(--text);
+}
+
+.ambient-one {
+  background: var(--violet);
+  opacity: 0.17;
+}
+
+.ambient-two {
+  background: var(--lime);
+  opacity: 0.1;
+}
+
+.app-shell {
+  max-width: 640px;
+  padding-top: 20px;
+}
+
+.topbar {
+  margin: 0 2px;
+}
+
+.brand-mark {
+  background: linear-gradient(145deg, #dbff7c, #93cf55 62%, #70c5a0);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 0 5px rgba(201, 239, 105, 0.08),
+    0 10px 28px rgba(113, 176, 91, 0.18);
+}
+
+.brand-lockup strong {
+  color: #eef7ef;
+}
+
+.brand-lockup span {
+  color: var(--cyan);
+}
+
+.icon-button {
+  background: rgba(31, 48, 66, 0.72);
+  border-color: rgba(226, 241, 235, 0.16);
+  color: #e9f3ed;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px rgba(4, 11, 20, 0.24);
+}
+
+.icon-button:hover {
+  background: rgba(43, 64, 84, 0.9);
+  border-color: rgba(121, 220, 228, 0.42);
+}
+
+.welcome {
+  padding: 44px 5px 24px;
+}
+
+.welcome .eyebrow,
+.section-heading .eyebrow {
+  color: var(--cyan);
+}
+
+.welcome h1 {
+  color: #f5f8f2;
+  font-size: clamp(34px, 8vw, 46px);
+}
+
+.welcome h1 span {
+  color: var(--lime);
+}
+
+.welcome p {
+  color: #a8b8c4;
+}
+
+.wallet-card {
+  background:
+    radial-gradient(circle at 88% 5%, rgba(201, 239, 105, 0.29), transparent 28%),
+    radial-gradient(circle at 7% 108%, rgba(121, 220, 228, 0.2), transparent 34%),
+    linear-gradient(140deg, #263d43 0%, #1d3544 48%, #24294b 100%);
+  border-color: rgba(201, 239, 105, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    0 26px 80px rgba(4, 13, 24, 0.36),
+    0 0 62px rgba(121, 220, 228, 0.06);
+  min-height: 236px;
+  padding: 23px 24px 19px;
+}
+
+.wallet-card::after {
+  background:
+    linear-gradient(120deg, transparent 24%, rgba(255, 255, 255, 0.09) 42%, transparent 58%),
+    radial-gradient(circle, rgba(201, 239, 105, 0.18) 0 1px, transparent 1.5px);
+}
+
+.wallet-heading {
+  color: rgba(240, 249, 237, 0.64);
+}
+
+.wallet-status {
+  color: var(--lime);
+}
+
+.wallet-status i {
+  background: var(--lime);
+  box-shadow: 0 0 10px rgba(201, 239, 105, 0.8);
+}
+
+.main-balance {
+  padding: 36px 0 24px;
+}
+
+.main-balance span,
+.main-balance small,
+.wallet-footer span {
+  color: rgba(233, 246, 239, 0.62);
+}
+
+.main-balance strong {
+  color: #f7ffe9;
+  font-size: clamp(42px, 11vw, 60px);
+  text-shadow: 0 0 30px rgba(201, 239, 105, 0.12);
+}
+
+.wallet-divider {
+  background: rgba(232, 246, 235, 0.14);
+}
+
+.wallet-footer strong {
+  color: #e6f6e4;
+}
+
+.wallet-chip {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(237, 248, 237, 0.72);
+}
+
+.wallet-chip span {
+  color: var(--lime);
+}
+
+.section-heading {
+  margin: 34px 0 15px;
+}
+
+.section-heading h2 {
+  color: #f1f7f1;
+}
+
+.action-grid {
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+}
+
+.action-card {
+  background: rgba(25, 39, 55, 0.78);
+  border-color: rgba(226, 241, 235, 0.13);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 36px rgba(4, 13, 24, 0.2);
+  min-height: 174px;
+}
+
+.action-card::before,
+.wide-action::before,
+.season-card::before,
+.referral-card::before {
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.1), transparent 34%);
+}
+
+.action-card:hover,
+.wide-action:hover {
+  background: rgba(34, 53, 71, 0.92);
+  border-color: rgba(121, 220, 228, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 20px 44px rgba(4, 13, 24, 0.28);
+  transform: translateY(-2px);
+}
+
+.case-action {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(170, 152, 255, 0.34), transparent 36%),
+    linear-gradient(145deg, rgba(53, 48, 91, 0.92), rgba(26, 38, 55, 0.88));
+}
+
+.daily-action {
+  background:
+    radial-gradient(circle at 92% 5%, rgba(201, 239, 105, 0.24), transparent 35%),
+    linear-gradient(145deg, rgba(48, 72, 62, 0.92), rgba(25, 47, 58, 0.88));
+}
+
+.daily-action:disabled {
+  opacity: 0.68;
+}
+
+.case-action .action-icon {
+  background: rgba(170, 152, 255, 0.18);
+  border-color: rgba(170, 152, 255, 0.2);
+  color: var(--violet);
+}
+
+.daily-action .action-icon {
+  background: rgba(201, 239, 105, 0.16);
+  border-color: rgba(201, 239, 105, 0.18);
+  color: var(--lime);
+}
+
+.action-copy strong,
+.wide-action strong {
+  color: #f0f6f0;
+}
+
+.action-copy small,
+.wide-action small {
+  color: #a1b1bd;
+}
+
+.action-copy small b {
+  color: #e3f2d5;
+}
+
+.arrow {
+  color: #a5b7c1;
+}
+
+.wide-action {
+  background: rgba(25, 39, 55, 0.78);
+  border-color: rgba(226, 241, 235, 0.13);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 16px 36px rgba(4, 13, 24, 0.18);
+  min-height: 76px;
+}
+
+.wide-icon {
+  background: rgba(255, 155, 115, 0.15);
+  color: var(--orange);
+}
+
+.text-button {
+  color: var(--cyan);
+}
+
+.season-heading {
+  margin-top: 38px;
+}
+
+.season-card,
+.leaderboard-card,
+.referral-card,
+.info-list {
+  background: rgba(25, 39, 55, 0.78);
+  border-color: rgba(226, 241, 235, 0.13);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 18px 40px rgba(4, 13, 24, 0.2);
+}
+
+.season-card {
+  padding: 20px;
+}
+
+.season-rank strong,
+.season-points strong {
+  color: #f0f7eb;
+}
+
+.progress-line {
+  background: rgba(226, 241, 235, 0.1);
+  height: 9px;
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, var(--violet), var(--cyan) 56%, var(--lime));
+  box-shadow: 0 0 18px rgba(121, 220, 228, 0.32);
+}
+
+.progress-meta,
+.leader-preview span,
+.microcopy,
+.info-list span {
+  color: #97aab6;
+}
+
+.leader-avatar {
+  background: linear-gradient(145deg, rgba(201, 239, 105, 0.22), rgba(121, 220, 228, 0.12));
+  border-color: rgba(201, 239, 105, 0.22);
+  color: var(--lime);
+}
+
+.season-pill {
+  background: rgba(121, 220, 228, 0.12);
+  color: var(--cyan);
+}
+
+.leader-row {
+  border-bottom-color: rgba(226, 241, 235, 0.1);
+}
+
+.leader-row.current {
+  background: linear-gradient(90deg, rgba(201, 239, 105, 0.11), rgba(121, 220, 228, 0.05));
+}
+
+.leader-place,
+.leader-name {
+  color: #d9e6e4;
+}
+
+.leader-score {
+  color: var(--lime);
+}
+
+.referral-icon {
+  background: linear-gradient(145deg, rgba(170, 152, 255, 0.2), rgba(121, 220, 228, 0.1));
+  border-color: rgba(170, 152, 255, 0.22);
+}
+
+.referral-card h3 {
+  color: #f0f6f0;
+}
+
+.referral-card p {
+  color: #9dafbb;
+}
+
+.copy-button,
+.primary-button {
+  background: linear-gradient(135deg, var(--lime), #a9db50);
+  color: #20351e;
+  box-shadow: 0 10px 22px rgba(143, 185, 62, 0.17);
+}
+
+.referral-link,
+.input-row {
+  background: rgba(13, 24, 37, 0.66);
+  border-color: rgba(226, 241, 235, 0.13);
+  color: #9dafbb;
+}
+
+.info-list div {
+  border-bottom-color: rgba(226, 241, 235, 0.1);
+}
+
+.info-list strong {
+  color: #e0ece7;
+}
+
+.bottom-nav {
+  background: rgba(18, 31, 46, 0.86);
+  border-color: rgba(226, 241, 235, 0.15);
+  box-shadow:
+    0 20px 48px rgba(4, 13, 24, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.nav-item {
+  color: #91a5b2;
+}
+
+.nav-item:hover {
+  color: #ecf5ed;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(201, 239, 105, 0.18), rgba(121, 220, 228, 0.1));
+  color: var(--lime);
+}
+
+.modal-backdrop {
+  background: rgba(5, 13, 23, 0.72);
+}
+
+.modal {
+  background: rgba(28, 44, 61, 0.96);
+  border-color: rgba(226, 241, 235, 0.15);
+  box-shadow:
+    0 -24px 90px rgba(4, 13, 24, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.modal h2 {
+  color: #f1f7f1;
+}
+
+.modal > p,
+label {
+  color: #9dafbb;
+}
+
+.modal-close {
+  background: rgba(226, 241, 235, 0.1);
+  color: #a8bac4;
+}
+
+.amount-grid button {
+  background: rgba(226, 241, 235, 0.08);
+  border-color: rgba(226, 241, 235, 0.12);
+  color: #e1eee8;
+}
+
+.amount-grid button.selected,
+.amount-grid button:active {
+  background: rgba(201, 239, 105, 0.15);
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.input-row input {
+  color: #eff7ef;
+}
+
+.input-row span {
+  color: #9dafbb;
+}
+
+.auth-modal p {
+  color: #9dafbb;
+}
+
+@media (max-width: 420px) {
+  .wallet-card {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .action-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .action-card {
+    min-height: 164px;
+  }
+}

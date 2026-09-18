@@ -1529,3 +1529,397 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Bright daytime palette */
+:root {
+  color-scheme: light;
+  --bg: #f4f7ed;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-soft: rgba(255, 255, 255, 0.94);
+  --text: #172b35;
+  --muted: #687982;
+  --line: rgba(23, 58, 62, 0.11);
+  --lime: #a8d83f;
+  --lime-dark: #6f9b1d;
+  --violet: #7959e8;
+  --cyan: #079aaa;
+  --orange: #ef795d;
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 8% 8%, rgba(255, 196, 127, 0.45), transparent 19rem),
+    radial-gradient(circle at 92% 8%, rgba(179, 157, 255, 0.38), transparent 22rem),
+    radial-gradient(circle at 50% 95%, rgba(157, 232, 191, 0.45), transparent 27rem),
+    #f4f7ed;
+}
+
+body {
+  color: var(--text);
+}
+
+.ambient-one {
+  background: #ae8cff;
+  opacity: 0.2;
+}
+
+.ambient-two {
+  background: #71d7a2;
+  opacity: 0.16;
+}
+
+.brand-mark {
+  background: linear-gradient(145deg, #caff63, #8dcc3d);
+  color: #18302c;
+  box-shadow: 0 0 0 5px rgba(168, 216, 63, 0.14), 0 10px 28px rgba(105, 157, 45, 0.2);
+}
+
+.brand-lockup strong {
+  color: #1c3840;
+}
+
+.brand-lockup span {
+  color: var(--violet);
+}
+
+.icon-button {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(23, 58, 62, 0.12);
+  color: var(--text);
+  box-shadow: 0 10px 26px rgba(44, 79, 70, 0.1);
+}
+
+.icon-button:hover {
+  background: #ffffff;
+  border-color: rgba(121, 89, 232, 0.35);
+}
+
+.welcome .eyebrow,
+.section-heading .eyebrow {
+  color: var(--violet);
+}
+
+.welcome p {
+  color: #6a7d82;
+}
+
+.wallet-card {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(255, 255, 255, 0.78), transparent 25%),
+    linear-gradient(135deg, #d8f6a7 0%, #d9f4dc 47%, #e7ddff 100%);
+  border-color: rgba(69, 135, 83, 0.23);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 24px 70px rgba(72, 111, 80, 0.18),
+    0 0 60px rgba(168, 216, 63, 0.1);
+}
+
+.wallet-card::after {
+  background:
+    linear-gradient(120deg, transparent 24%, rgba(255, 255, 255, 0.38) 42%, transparent 58%),
+    radial-gradient(circle, rgba(73, 143, 109, 0.18) 0 1px, transparent 1.5px);
+}
+
+.wallet-heading {
+  color: rgba(25, 67, 67, 0.66);
+}
+
+.wallet-status {
+  color: #3f8e54;
+}
+
+.wallet-status i {
+  background: #4eaf68;
+  box-shadow: 0 0 10px rgba(78, 175, 104, 0.7);
+}
+
+.main-balance span,
+.main-balance small,
+.wallet-footer span {
+  color: rgba(27, 65, 67, 0.64);
+}
+
+.main-balance strong {
+  color: #173f3f;
+  text-shadow: 0 0 28px rgba(255, 255, 255, 0.48);
+}
+
+.wallet-divider {
+  background: rgba(28, 87, 78, 0.14);
+}
+
+.wallet-footer strong {
+  color: #1d5551;
+}
+
+.wallet-chip {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(29, 85, 81, 0.16);
+  color: #336563;
+}
+
+.wallet-chip span {
+  color: #6e9d22;
+}
+
+.loading-state {
+  color: #73858a;
+}
+
+.spinner {
+  border-color: rgba(23, 58, 62, 0.12);
+  border-right-color: var(--violet);
+}
+
+.toast {
+  background: #caff63;
+  color: #20351e;
+  box-shadow: 0 16px 40px rgba(64, 100, 47, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.error-panel {
+  background: rgba(239, 121, 93, 0.12);
+  border-color: rgba(239, 121, 93, 0.28);
+  color: #a94e3c;
+}
+
+.action-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(23, 58, 62, 0.1);
+  box-shadow: 0 16px 34px rgba(59, 91, 81, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.action-card:hover,
+.wide-action:hover {
+  background: #ffffff;
+  border-color: rgba(7, 154, 170, 0.3);
+  box-shadow: 0 20px 42px rgba(59, 91, 81, 0.14), inset 0 1px 0 #ffffff;
+}
+
+.action-card::before,
+.wide-action::before,
+.season-card::before,
+.referral-card::before {
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.52), transparent 34%);
+}
+
+.case-action {
+  background:
+    radial-gradient(circle at 15% 12%, rgba(167, 145, 255, 0.34), transparent 34%),
+    linear-gradient(145deg, #efe9ff, #ffffff 76%);
+}
+
+.daily-action {
+  background:
+    radial-gradient(circle at 92% 5%, rgba(205, 241, 102, 0.55), transparent 34%),
+    linear-gradient(145deg, #eefbd4, #ffffff 78%);
+}
+
+.daily-action:disabled {
+  opacity: 0.84;
+}
+
+.case-action .action-icon {
+  background: rgba(121, 89, 232, 0.14);
+  color: var(--violet);
+}
+
+.daily-action .action-icon {
+  background: rgba(168, 216, 63, 0.22);
+  color: #6e9d22;
+}
+
+.action-copy strong,
+.wide-action strong {
+  color: #1b3840;
+}
+
+.action-copy small,
+.wide-action small {
+  color: #718287;
+}
+
+.action-copy small b {
+  color: #2d6465;
+}
+
+.arrow {
+  color: #738b8d;
+}
+
+.wide-action {
+  background: rgba(255, 255, 255, 0.74);
+  border-color: rgba(23, 58, 62, 0.1);
+  box-shadow: 0 16px 34px rgba(59, 91, 81, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.wide-icon {
+  background: rgba(239, 121, 93, 0.14);
+  color: var(--orange);
+}
+
+.text-button {
+  color: var(--cyan);
+}
+
+.season-card,
+.leaderboard-card,
+.referral-card,
+.info-list {
+  background: rgba(255, 255, 255, 0.76);
+  border-color: rgba(23, 58, 62, 0.1);
+  box-shadow: 0 18px 42px rgba(59, 91, 81, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.season-rank strong,
+.season-points strong {
+  color: #1c4e53;
+}
+
+.progress-line {
+  background: rgba(23, 58, 62, 0.1);
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, var(--violet), var(--cyan) 55%, var(--lime-dark));
+  box-shadow: 0 0 18px rgba(7, 154, 170, 0.24);
+}
+
+.progress-meta,
+.leader-preview span,
+.microcopy,
+.info-list span {
+  color: #718287;
+}
+
+.leader-avatar {
+  background: linear-gradient(145deg, rgba(168, 216, 63, 0.27), rgba(7, 154, 170, 0.12));
+  border-color: rgba(83, 148, 92, 0.2);
+  color: #588c3a;
+}
+
+.season-pill {
+  background: rgba(7, 154, 170, 0.1);
+  color: #087c8a;
+}
+
+.leader-row.current {
+  background: linear-gradient(90deg, rgba(168, 216, 63, 0.16), rgba(7, 154, 170, 0.05));
+}
+
+.leader-row {
+  border-bottom-color: rgba(23, 58, 62, 0.08);
+}
+
+.leader-place,
+.leader-name {
+  color: #37535b;
+}
+
+.leader-score {
+  color: #6a9826;
+}
+
+.referral-icon {
+  background: linear-gradient(145deg, rgba(167, 145, 255, 0.2), rgba(7, 154, 170, 0.1));
+  border-color: rgba(121, 89, 232, 0.18);
+}
+
+.referral-card h3 {
+  color: #244550;
+}
+
+.referral-card p {
+  color: #718287;
+}
+
+.copy-button,
+.primary-button {
+  background: linear-gradient(135deg, #caff63, #9fda3b);
+  color: #25421d;
+  box-shadow: 0 10px 22px rgba(107, 157, 39, 0.16);
+}
+
+.referral-link,
+.input-row {
+  background: rgba(247, 250, 243, 0.86);
+  border-color: rgba(23, 58, 62, 0.12);
+  color: #718287;
+}
+
+.info-list div {
+  border-bottom-color: rgba(23, 58, 62, 0.08);
+}
+
+.info-list strong {
+  color: #315963;
+}
+
+.bottom-nav {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(23, 58, 62, 0.12);
+  box-shadow: 0 20px 48px rgba(59, 91, 81, 0.18), inset 0 1px 0 #ffffff;
+}
+
+.nav-item {
+  color: #7b8d90;
+}
+
+.nav-item:hover {
+  color: #315963;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(168, 216, 63, 0.26), rgba(7, 154, 170, 0.1));
+  color: #527f23;
+}
+
+.modal-backdrop {
+  background: rgba(35, 55, 53, 0.35);
+}
+
+.modal {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(23, 58, 62, 0.12);
+  box-shadow: 0 -24px 90px rgba(46, 75, 64, 0.2), inset 0 1px 0 #ffffff;
+}
+
+.modal h2 {
+  color: #1b3e49;
+}
+
+.modal > p,
+label {
+  color: #718287;
+}
+
+.modal-close {
+  background: rgba(23, 58, 62, 0.08);
+  color: #6d8084;
+}
+
+.amount-grid button {
+  background: #f3f7ef;
+  border-color: rgba(23, 58, 62, 0.1);
+  color: #315963;
+}
+
+.amount-grid button.selected,
+.amount-grid button:active {
+  background: rgba(168, 216, 63, 0.18);
+  border-color: var(--lime-dark);
+  color: #557c22;
+}
+
+.input-row input {
+  color: #1b3e49;
+}
+
+.input-row span {
+  color: #718287;
+}
+
+.auth-modal p {
+  color: #718287;
+}

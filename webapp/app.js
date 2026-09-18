@@ -39,6 +39,74 @@ function formatRemaining(isoDate) {
   return `${Math.max(1, minutes)} мин.`;
 }
 
+function getInitials(name) {
+  const words = String(name || "ZW")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase() || "ZW";
+}
+
+function setAvatars(user, progress) {
+  const telegramUser = telegram?.initDataUnsafe?.user;
+  const photoUrl = telegramUser?.photo_url || "";
+  const initials = getInitials(user?.firstName);
+  document.querySelectorAll(".avatar-ring").forEach((avatar) => {
+    avatar.style.setProperty("--ring-progress", `${Math.max(0, Math.min(100, progress))}%`);
+    avatar.classList.toggle("has-photo", Boolean(photoUrl));
+    avatar.style.setProperty(
+      "--avatar-image",
+      photoUrl ? `url("${photoUrl.replaceAll('"', "%22")}")` : "none",
+    );
+    avatar.innerHTML = photoUrl ? "" : `<span>${escapeHtml(initials)}</span>`;
+  });
+}
+
+function getLevelProgress(points) {
+  const safePoints = Math.max(0, Number(points || 0));
+  const level = Math.floor(safePoints / 100) + 1;
+  const current = safePoints % 100;
+  return { level, current, percent: current };
+}
+
+function getSeasonTimeProgress(season) {
+  const end = new Date(season.endsAt);
+  const start = new Date(season.startsAt || Date.now());
+  const total = Math.max(1, end.getTime() - start.getTime());
+  const remaining = Math.max(0, end.getTime() - Date.now());
+  return {
+    daysLeft: Math.ceil(remaining / (24 * 60 * 60 * 1000)),
+    percent: Math.max(0, Math.min(100, (remaining / total) * 100)),
+  };
+}
+
+function renderHomeLeaders(top) {
+  const container = $("#home-leaders");
+  const leaders = (top || []).slice(0, 3);
+  const current = (top || []).find((row) => row.isCurrent);
+  const rows = current && !leaders.some((row) => row.isCurrent) ? [...leaders, current] : leaders;
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="leader-empty">Пока никто не набрал очков</div>';
+    return;
+  }
+
+  container.innerHTML = rows
+    .map(
+      (row) => `
+        <div class="home-leader-row ${row.isCurrent ? "current" : ""}">
+          <span class="home-leader-place">${row.place}.</span>
+          <span class="home-leader-name">${escapeHtml(row.name)}${row.isCurrent ? " · ты" : ""}</span>
+          <strong>${formatNumber(row.points)}</strong>
+        </div>`,
+    )
+    .join("");
+}
+
 function showToast(message, tone = "success") {
   const toast = $("#toast");
   toast.textContent = message;
@@ -130,23 +198,27 @@ function render() {
   $("#season-info").textContent = `#${season.number}`;
   $("#season-rank").textContent = `#${season.rank}`;
   $("#season-points").textContent = formatNumber(season.points);
-  $("#season-progress-fill").style.width = `${Math.max(0, Math.min(100, season.progress))}%`;
   $("#season-progress-text").textContent = `${season.progress}% от лидера`;
   $("#season-time").textContent = `ещё ${formatRemaining(season.endsAt)}`;
+  const seasonTime = getSeasonTimeProgress(season);
+  $("#season-days-left").textContent = `${seasonTime.daysLeft} дн.`;
+  $("#season-days-fill").style.width = `${seasonTime.percent}%`;
   $("#referral-link").textContent = data.referralLink;
+  const level = getLevelProgress(season.points);
+  $("#profile-level").textContent = level.level;
+  $("#level-progress-fill").style.width = `${level.percent}%`;
+  $("#level-progress-text").textContent = `${level.current} / 100 XP`;
+  $("#profile-points").textContent = formatNumber(season.points);
+  $("#profile-rank").textContent = `#${season.rank}`;
+  $("#profile-balance").textContent = formatNumber(wallet.earnBalance);
+  setAvatars(user, level.percent);
+  renderHomeLeaders(season.top);
 
   const dailyButton = document.querySelector('[data-action="daily"]');
   dailyButton.disabled = !daily.ready;
   $("#daily-status").textContent = daily.ready
     ? "+10 монет каждый день"
     : `снова через ${formatRemaining(daily.nextAt)}`;
-
-  const leader = season.top[0];
-  $("#leader-preview").innerHTML = leader
-    ? `<div class="leader-avatar">♛</div><div><span>Лидер сезона</span><strong>${escapeHtml(
-        leader.name,
-      )} · ${formatNumber(leader.points)} очков</strong></div>`
-    : `<span>Пока никто не набрал очков</span>`;
 
   $("#leaderboard").innerHTML = season.top.length
     ? season.top
@@ -223,6 +295,17 @@ async function runAction(action, body = {}) {
   }
 }
 
+async function copyReferral() {
+  if (!appState.data?.referralLink) return;
+  try {
+    await navigator.clipboard.writeText(appState.data.referralLink);
+    showToast("Ссылка скопирована");
+    setView("more");
+  } catch {
+    showToast("Не удалось скопировать ссылку", "danger");
+  }
+}
+
 function openWithdraw() {
   $("#withdraw-modal").classList.remove("hidden");
   $("#withdraw-amount").focus();
@@ -243,6 +326,9 @@ document.querySelectorAll(".nav-item, [data-view]").forEach((button) => {
 document.querySelector('[data-action="case"]').addEventListener("click", () => runAction("case"));
 document.querySelector('[data-action="daily"]').addEventListener("click", () => runAction("daily"));
 document.querySelector('[data-action="withdraw"]').addEventListener("click", openWithdraw);
+document.querySelectorAll('[data-action="friends"]').forEach((button) => {
+  button.addEventListener("click", copyReferral);
+});
 $("#refresh-button").addEventListener("click", loadState);
 $("#close-withdraw").addEventListener("click", closeWithdraw);
 $("#withdraw-modal").addEventListener("click", (event) => {
@@ -268,15 +354,7 @@ $("#withdraw-form").addEventListener("submit", async (event) => {
   await runAction("withdraw", { amount });
 });
 
-$("#copy-referral").addEventListener("click", async () => {
-  if (!appState.data?.referralLink) return;
-  try {
-    await navigator.clipboard.writeText(appState.data.referralLink);
-    showToast("Ссылка скопирована");
-  } catch {
-    showToast("Не удалось скопировать ссылку", "danger");
-  }
-});
+$("#copy-referral").addEventListener("click", copyReferral);
 
 telegram?.BackButton?.onClick(closeWithdraw);
 loadState();

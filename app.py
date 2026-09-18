@@ -1698,6 +1698,7 @@ def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
         },
         "season": {
             "number": int(season["season_number"]),
+            "startsAt": str(season["starts_at"]),
             "endsAt": ends_at.isoformat(),
             "points": points,
             "rank": rank,

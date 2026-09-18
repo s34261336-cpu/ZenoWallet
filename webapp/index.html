@@ -36,10 +36,15 @@
       </header>
 
       <main>
-        <section class="welcome">
-          <span class="eyebrow">Добро пожаловать</span>
-          <h1>Привет, <span id="user-name">друг</span></h1>
-          <p>Зарабатывай монеты и поднимайся в рейтинге.</p>
+        <section class="home-intro">
+          <div class="profile-avatar avatar-ring" id="home-avatar" aria-hidden="true">
+            <span>ZW</span>
+          </div>
+          <div class="welcome">
+            <span class="eyebrow">Добро пожаловать</span>
+            <h1>Привет, <span id="user-name">друг</span></h1>
+            <p>Зарабатывай монеты и поднимайся в рейтинге.</p>
+          </div>
         </section>
 
         <section class="wallet-card">
@@ -71,69 +76,75 @@
         </div>
 
         <section class="view" id="home-view">
-          <div class="section-heading">
+          <div class="section-heading compact-heading">
             <div>
-              <span class="eyebrow">Заработок</span>
-              <h2>Твои возможности</h2>
+              <span class="eyebrow">Быстрый доступ</span>
+              <h2>Действия</h2>
             </div>
           </div>
 
-          <div class="action-grid">
-            <button class="action-card case-action" data-action="case" aria-label="Открыть кейс">
-              <span class="action-icon" aria-hidden="true">🎁</span>
-              <span class="action-copy">
-                <strong>Открыть кейс</strong>
-                <small><b id="case-remaining">—</b> попыток в час</small>
-              </span>
-              <span class="case-sheen" aria-hidden="true"></span>
-              <span class="arrow">↗</span>
+          <div class="quick-actions">
+            <button class="quick-action quick-case" data-action="case" aria-label="Открыть кейс">
+              <span class="quick-icon">✦</span>
+              <strong>Кейс</strong>
+              <small><b id="case-remaining">—</b> в час</small>
             </button>
-            <button class="action-card daily-action" data-action="daily" disabled>
-              <span class="action-icon" aria-hidden="true">📅</span>
-              <span class="action-copy">
-                <strong>Ежедневный бонус</strong>
-                <small id="daily-status">+10 монет каждый день</small>
-              </span>
-              <span class="arrow">↗</span>
+            <button class="quick-action quick-bonus" data-action="daily" disabled aria-label="Получить бонус">
+              <span class="quick-icon">+</span>
+              <strong>Бонус</strong>
+              <small id="daily-status">+10 каждый день</small>
+            </button>
+            <button class="quick-action quick-friends" data-action="friends" aria-label="Пригласить друзей">
+              <span class="quick-icon">↗</span>
+              <strong>Друзья</strong>
+              <small>+5 за друга</small>
             </button>
           </div>
-
-          <button class="wide-action" data-action="withdraw" disabled>
-            <span class="wide-icon">↗</span>
-            <span>
-              <strong>Вывести в Zeno</strong>
-              <small>Перевести заработанные монеты</small>
-            </span>
-            <span class="arrow">→</span>
-          </button>
 
           <div class="section-heading season-heading">
             <div>
               <span class="eyebrow">Соревнование</span>
-              <h2>Сезон <span id="season-number">#—</span></h2>
+              <h2>Топ сезона <span id="season-number">#—</span></h2>
             </div>
             <button class="text-button" data-view="season">Весь топ →</button>
           </div>
 
-          <section class="season-card">
-            <div class="season-card-top">
-              <div class="season-rank">
-                <span>ТВОЁ МЕСТО</span>
-                <strong id="season-rank">#—</strong>
-              </div>
-              <div class="season-points">
-                <span>ОЧКИ</span>
-                <strong id="season-points">—</strong>
-              </div>
+          <section class="home-leaderboard" id="home-leaders">
+            <div class="leader-empty">Загрузка топа...</div>
+          </section>
+
+          <div class="section-heading capabilities-heading">
+            <div>
+              <span class="eyebrow">Твой путь</span>
+              <h2>Твои возможности</h2>
             </div>
-            <div class="progress-line">
-              <div class="progress-fill" id="season-progress-fill"></div>
-            </div>
-            <div class="progress-meta">
-              <span id="season-progress-text">0% от лидера</span>
-              <span id="season-time">—</span>
-            </div>
-            <div class="leader-preview" id="leader-preview"></div>
+          </div>
+
+          <section class="capability-grid">
+            <button class="capability-card capability-season" data-view="season">
+              <span class="capability-icon">♛</span>
+              <span>
+                <strong>Поднимайся в топе</strong>
+                <small>Очки за активность и кейсы</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+            <button class="capability-card capability-withdraw" data-action="withdraw" disabled>
+              <span class="capability-icon">↗</span>
+              <span>
+                <strong>Вывести в Zeno</strong>
+                <small>Перевести заработанные монеты</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+            <button class="capability-card capability-referral" data-action="friends">
+              <span class="capability-icon">◎</span>
+              <span>
+                <strong>Пригласи друзей</strong>
+                <small>Получай +5 монет за каждого</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
           </section>
         </section>
 
@@ -145,6 +156,32 @@
             </div>
             <span class="season-pill" id="season-pill">#—</span>
           </div>
+          <section class="season-progress-card">
+            <div class="season-progress-heading">
+              <div>
+                <span class="eyebrow">До конца сезона</span>
+                <strong id="season-days-left">—</strong>
+              </div>
+              <span class="season-time" id="season-time">—</span>
+            </div>
+            <div class="progress-line">
+              <div class="progress-fill season-days-fill" id="season-days-fill"></div>
+            </div>
+            <div class="progress-meta">
+              <span id="season-progress-text">0% от лидера</span>
+              <span>Сезон <span id="season-info">—</span></span>
+            </div>
+          </section>
+          <section class="season-your-place">
+            <div>
+              <span class="eyebrow">Твоё место</span>
+              <strong id="season-rank">#—</strong>
+            </div>
+            <div>
+              <span class="eyebrow">Очки</span>
+              <strong id="season-points">—</strong>
+            </div>
+          </section>
           <section class="leaderboard-card" id="leaderboard"></section>
           <p class="microcopy">Очки: +1 за активность и +5 за успешное открытие кейса.</p>
         </section>
@@ -156,8 +193,26 @@
               <h2>Твой профиль</h2>
             </div>
           </div>
+          <section class="profile-hero">
+            <div class="profile-avatar avatar-ring" id="profile-avatar" aria-hidden="true">
+              <span>ZW</span>
+            </div>
+            <div class="profile-identity">
+              <span class="eyebrow">Твой уровень</span>
+              <h3>Уровень <strong id="profile-level">1</strong></h3>
+              <div class="level-progress">
+                <div class="progress-fill" id="level-progress-fill"></div>
+              </div>
+              <small id="level-progress-text">0 / 100 XP</small>
+            </div>
+          </section>
+          <section class="profile-stats">
+            <div><span>Очки сезона</span><strong id="profile-points">—</strong></div>
+            <div><span>Место</span><strong id="profile-rank">#—</strong></div>
+            <div><span>Баланс</span><strong id="profile-balance">—</strong></div>
+          </section>
           <section class="referral-card">
-            <div class="referral-icon" aria-hidden="true">👥</div>
+            <div class="referral-icon" aria-hidden="true">◎</div>
             <div>
               <span class="eyebrow">Приглашения</span>
               <h3>Зови друзей</h3>
@@ -169,7 +224,6 @@
           <section class="info-list">
             <div><span>Основной баланс</span><strong>Можно выводить</strong></div>
             <div><span>Лимит кейсов</span><strong id="case-limit">— в час</strong></div>
-            <div><span>Текущий сезон</span><strong id="season-info">—</strong></div>
           </section>
         </section>
       </main>

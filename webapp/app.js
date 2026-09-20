@@ -323,6 +323,13 @@ document.querySelectorAll(".nav-item, [data-view]").forEach((button) => {
   });
 });
 
+document.querySelectorAll(".nav-item[data-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setView("home");
+    runAction(button.dataset.action);
+  });
+});
+
 document.querySelector('[data-action="case"]').addEventListener("click", () => runAction("case"));
 document.querySelector('[data-action="daily"]').addEventListener("click", () => runAction("daily"));
 document.querySelector('[data-action="withdraw"]').addEventListener("click", openWithdraw);

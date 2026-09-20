@@ -1892,7 +1892,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
             self.send_header("Location", "/webapp/")
             self.end_headers()
             return
-        if path == "/api/state":
+        if path in ("/api/state", "/wallet-api/state", "/webapp/api/state"):
             try:
                 user = self.authorized_user()
                 with self.bot.operation_lock:
@@ -1925,7 +1925,11 @@ class MiniAppHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path != "/api/action":
+        if path not in (
+            "/api/action",
+            "/wallet-api/action",
+            "/webapp/api/action",
+        ):
             self.error_json("Страница не найдена.", 404, "not_found")
             return
         try:

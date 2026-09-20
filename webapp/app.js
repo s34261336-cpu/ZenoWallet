@@ -1,7 +1,12 @@
 const telegram = window.Telegram?.WebApp;
 const appState = { data: null, activeView: "home" };
 const busyActions = new Set();
-const crashRuntime = { gameId: null, timer: null, settling: false };
+const crashRuntime = {
+  gameId: null,
+  frame: null,
+  settleTimer: null,
+  settling: false,
+};
 let selectedCrashBet = "10";
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
@@ -120,10 +125,14 @@ function getCrashMultiplier(startedAt) {
 }
 
 function stopCrashAnimation() {
-  if (crashRuntime.timer !== null) {
-    window.clearInterval(crashRuntime.timer);
+  if (crashRuntime.frame !== null) {
+    window.cancelAnimationFrame(crashRuntime.frame);
   }
-  crashRuntime.timer = null;
+  if (crashRuntime.settleTimer !== null) {
+    window.clearTimeout(crashRuntime.settleTimer);
+  }
+  crashRuntime.frame = null;
+  crashRuntime.settleTimer = null;
   crashRuntime.gameId = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
@@ -143,24 +152,25 @@ function updateCrashVisual(multiplier, crashAt) {
 }
 
 function startCrashAnimation(active) {
-  if (crashRuntime.gameId === active.id && crashRuntime.timer !== null) return;
+  if (crashRuntime.gameId === active.id && crashRuntime.frame !== null) return;
   stopCrashAnimation();
   crashRuntime.gameId = active.id;
 
   const tick = () => {
     if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) {
+      crashRuntime.frame = null;
       return false;
     }
     const multiplier = getCrashMultiplier(active.startedAt);
     updateCrashVisual(Math.min(multiplier, active.crashAt), active.crashAt);
     if (multiplier >= active.crashAt) {
-      window.clearInterval(crashRuntime.timer);
-      crashRuntime.timer = null;
+      crashRuntime.frame = null;
       $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;
       $("#crash-stage").classList.add("crashed");
       if (!crashRuntime.settling) {
         crashRuntime.settling = true;
-        window.setTimeout(() => {
+        crashRuntime.settleTimer = window.setTimeout(() => {
+          crashRuntime.settleTimer = null;
           runAction("crash_settle", { gameId: active.id }).finally(() => {
             crashRuntime.settling = false;
           });
@@ -171,9 +181,12 @@ function startCrashAnimation(active) {
     return true;
   };
 
-  if (tick()) {
-    crashRuntime.timer = window.setInterval(tick, 100);
-  }
+  const animate = () => {
+    if (tick()) {
+      crashRuntime.frame = window.requestAnimationFrame(animate);
+    }
+  };
+  animate();
 }
 
 function renderCrashHistory(history) {
@@ -309,7 +322,7 @@ async function loadState() {
   clearError();
   setLoading(true);
   try {
-    appState.data = await request("/api/state");
+    appState.data = await request("/webapp/api/state");
     render();
   } catch (error) {
     showError(error.message);
@@ -396,7 +409,7 @@ async function runAction(action, body = {}) {
     button.setAttribute("aria-busy", "true");
   });
   try {
-    const result = await request("/api/action", {
+    const result = await request("/webapp/api/action", {
       method: "POST",
       body: JSON.stringify({ action, ...body }),
     });

@@ -2167,9 +2167,9 @@ body::before {
 .crash-stage {
   --crash-accent: var(--cyan);
   background:
-    radial-gradient(circle at 76% 14%, rgba(117, 232, 255, 0.26), transparent 20%),
-    radial-gradient(circle at 15% 82%, rgba(255, 119, 203, 0.22), transparent 28%),
-    linear-gradient(135deg, #111942 0%, #0b102b 54%, #070916 100%);
+    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--crash-accent) 19%, transparent), transparent 36%),
+    radial-gradient(circle at 82% 12%, rgba(117, 232, 255, 0.17), transparent 22%),
+    linear-gradient(145deg, #11182f 0%, #090e20 56%, #050711 100%);
   border-bottom: 1px solid rgba(162, 182, 255, 0.16);
   height: 250px;
   overflow: hidden;
@@ -2212,11 +2212,13 @@ body::before {
   color: #8e99c1;
   font-size: 10px;
   font-weight: 800;
-  left: 20px;
+  left: 50%;
   letter-spacing: 0.15em;
   position: absolute;
   text-transform: uppercase;
+  transform: translateX(-50%);
   top: 20px;
+  white-space: nowrap;
 }
 
 .crash-stage.running .crash-status {
@@ -2230,13 +2232,19 @@ body::before {
 .crash-multiplier {
   color: #f6f7ff;
   font-family: "Manrope", sans-serif;
-  font-size: clamp(44px, 14vw, 66px);
-  left: 20px;
+  font-size: clamp(54px, 17vw, 82px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  left: 50%;
   letter-spacing: -0.08em;
   line-height: 1;
   position: absolute;
+  text-align: center;
   text-shadow: 0 0 30px rgba(117, 232, 255, 0.25);
-  top: 53px;
+  top: 44px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 1;
 }
 
 .crash-stage.running .crash-multiplier {
@@ -2262,31 +2270,39 @@ body::before {
 }
 
 .crash-trajectory {
-  height: 150px;
-  left: 20px;
+  height: 154px;
+  left: 22px;
   overflow: visible;
   pointer-events: none;
   position: absolute;
-  right: 20px;
-  bottom: 16px;
+  right: 22px;
+  bottom: 10px;
   width: calc(100% - 40px);
 }
 
 .crash-trajectory path {
   fill: none;
   stroke-linecap: round;
-  stroke-width: 1.35;
+  stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
 
+.crash-trajectory-glow {
+  filter: blur(4px);
+  opacity: 0.72;
+  stroke: var(--crash-accent);
+  stroke-width: 7;
+}
+
 .crash-trajectory-track {
-  stroke: rgba(117, 232, 255, 0.16);
-  stroke-dasharray: 2 3;
+  stroke: rgba(160, 180, 255, 0.2);
+  stroke-dasharray: 0.012 0.018;
 }
 
 .crash-trajectory-progress {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--crash-accent) 70%, transparent));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--crash-accent) 82%, transparent));
   stroke: var(--crash-accent);
+  stroke-width: 2.2;
   transition: stroke 140ms ease;
 }
 
@@ -2316,22 +2332,114 @@ body::before {
 }
 
 .crash-rocket {
-  filter: drop-shadow(0 0 11px color-mix(in srgb, var(--crash-accent) 78%, transparent));
-  font-size: 34px;
+  filter: drop-shadow(0 0 15px color-mix(in srgb, var(--crash-accent) 78%, transparent));
+  height: 44px;
   left: 0;
+  pointer-events: none;
   position: absolute;
   top: 0;
-  transform: translate(-50%, -50%) rotate(-32deg);
-  transform-origin: center center;
-  transition: filter 140ms ease;
+  width: 44px;
   will-change: transform;
   backface-visibility: hidden;
   z-index: 2;
 }
 
+.crash-rocket-token {
+  align-items: center;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.82), transparent 12%),
+    radial-gradient(circle at 40% 36%, color-mix(in srgb, var(--crash-accent) 78%, white), var(--crash-accent) 56%, color-mix(in srgb, var(--crash-accent) 58%, #081022));
+  border: 2px solid color-mix(in srgb, var(--crash-accent) 70%, white);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--crash-accent) 12%, transparent),
+    0 0 20px color-mix(in srgb, var(--crash-accent) 76%, transparent),
+    inset 0 1px 2px rgba(255, 255, 255, 0.68),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.2);
+  color: #f8ffff;
+  display: grid;
+  font-size: 21px;
+  font-weight: 900;
+  height: 40px;
+  place-items: center;
+  position: relative;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  width: 40px;
+  animation: crash-token-pulse 860ms ease-in-out infinite;
+}
+
+.crash-rocket-trail {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--crash-accent) 5%, transparent) 18%,
+    color-mix(in srgb, var(--crash-accent) 65%, transparent) 72%,
+    var(--crash-accent) 100%
+  );
+  border-radius: 999px;
+  filter: blur(2px);
+  height: 10px;
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%) rotate(var(--flight-angle, -25deg));
+  transform-origin: 100% 50%;
+  width: 104px;
+  animation: crash-trail-pulse 620ms ease-in-out infinite;
+}
+
+.crash-rocket::after {
+  background: var(--crash-accent);
+  border-radius: 50%;
+  box-shadow:
+    -18px 7px 0 -1px color-mix(in srgb, var(--crash-accent) 80%, transparent),
+    -31px -6px 0 -2px color-mix(in srgb, var(--crash-accent) 62%, transparent),
+    -46px 10px 0 -2px color-mix(in srgb, var(--crash-accent) 48%, transparent),
+    -61px -3px 0 -3px color-mix(in srgb, var(--crash-accent) 36%, transparent);
+  content: "";
+  height: 4px;
+  left: -4px;
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  animation: crash-particle-flicker 500ms steps(2, end) infinite;
+}
+
+@keyframes crash-token-pulse {
+  0%, 100% {
+    transform: scale(0.96);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes crash-trail-pulse {
+  0%, 100% {
+    opacity: 0.58;
+  }
+  50% {
+    opacity: 0.96;
+  }
+}
+
+@keyframes crash-particle-flicker {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translate(-2px, 2px) scale(0.72);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(3px, -2px) scale(1.12);
+  }
+}
+
 .crash-stage.crashed .crash-rocket {
-  filter: grayscale(0.2) drop-shadow(0 0 16px rgba(255, 119, 203, 0.9));
-  transform: translate(-50%, -50%) rotate(-32deg) scale(1.08);
+  filter: grayscale(0.15) drop-shadow(0 0 18px rgba(255, 119, 203, 0.95));
+}
+
+.crash-stage.crashed .crash-rocket-token {
+  --crash-accent: var(--pink);
 }
 
 .crash-star {

@@ -238,7 +238,13 @@
               <div class="crash-orbit orbit-two"></div>
               <svg class="crash-trajectory" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path
+                  class="crash-trajectory-glow"
+                  pathLength="1"
+                  d="M 0 94 C 24 100, 62 84, 100 8"
+                ></path>
+                <path
                   class="crash-trajectory-track"
+                  pathLength="1"
                   d="M 0 94 C 24 100, 62 84, 100 8"
                 ></path>
                 <path
@@ -254,7 +260,10 @@
                 <span class="crash-star star-one"></span>
                 <span class="crash-star star-two"></span>
                 <span class="crash-star star-three"></span>
-                <span class="crash-rocket" id="crash-rocket" aria-hidden="true">🚀</span>
+                <span class="crash-rocket" id="crash-rocket" aria-hidden="true">
+                  <span class="crash-rocket-trail"></span>
+                  <span class="crash-rocket-token">₽</span>
+                </span>
               </div>
             </div>
 

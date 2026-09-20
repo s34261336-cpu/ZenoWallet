@@ -9,6 +9,9 @@ const crashRuntime = {
   settleTimer: null,
   startedAtMs: null,
   startedPerfMs: null,
+  bounds: null,
+  phase: null,
+  displayMultiplier: null,
   settling: false,
 };
 let selectedCrashBet = "10";
@@ -166,6 +169,35 @@ function getCrashTrajectoryPoint(progress) {
   };
 }
 
+function getCrashTrajectoryAngle(progress) {
+  const t = Math.max(0, Math.min(1, progress));
+  const inverseT = 1 - t;
+  const dx =
+    3 * inverseT * inverseT * 24 +
+    6 * inverseT * t * (62 - 24) +
+    3 * t * t * (100 - 62);
+  const dy =
+    3 * inverseT * inverseT * (100 - 94) +
+    6 * inverseT * t * (84 - 100) +
+    3 * t * t * (8 - 84);
+  return (Math.atan2(dy, dx) * 180) / Math.PI;
+}
+
+function getCrashFlightBounds() {
+  const flightLine = $(".crash-flight-line");
+  if (!flightLine) return { width: 1, height: 150 };
+  if (!crashRuntime.bounds || crashRuntime.bounds.width < 10) {
+    const bounds = flightLine.getBoundingClientRect();
+    if (bounds.width >= 10 && bounds.height >= 10) {
+      crashRuntime.bounds = { width: bounds.width, height: bounds.height };
+    }
+  }
+  return crashRuntime.bounds || {
+    width: flightLine.clientWidth || 1,
+    height: flightLine.clientHeight || 150,
+  };
+}
+
 function stopCrashAnimation() {
   if (crashRuntime.frame !== null) {
     if (typeof window.cancelAnimationFrame === "function") {
@@ -182,9 +214,19 @@ function stopCrashAnimation() {
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
   crashRuntime.startedPerfMs = null;
+  crashRuntime.bounds = null;
+  crashRuntime.phase = null;
+  crashRuntime.displayMultiplier = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
   $("#crash-stage")?.classList.remove("phase-low", "phase-mid", "phase-high");
+  document.querySelectorAll(".crash-trajectory-progress, .crash-trajectory-glow").forEach((path) => {
+    path.style.strokeDasharray = "1";
+    path.style.strokeDashoffset = "1";
+  });
+  const rocket = $("#crash-rocket");
+  rocket?.style.removeProperty("transform");
+  rocket?.style.removeProperty("--flight-angle");
 }
 
 function updateCrashVisual(multiplier, crashAt) {
@@ -192,28 +234,38 @@ function updateCrashVisual(multiplier, crashAt) {
   const rocket = $("#crash-rocket");
   const flightLine = $(".crash-flight-line");
   const trajectory = $("#crash-trajectory-progress");
+  const trajectoryGlow = $(".crash-trajectory-glow");
   const travelProgress = getCrashTravelProgress(multiplier, crashAt);
-  $("#crash-multiplier").textContent = formatMultiplier(multiplier);
-  $("#crash-cashout-value").textContent = formatMultiplier(multiplier);
+  const displayMultiplier = formatMultiplier(multiplier);
+  const multiplierElement = $("#crash-multiplier");
+  const cashoutElement = $("#crash-cashout-value");
+  if (crashRuntime.displayMultiplier !== displayMultiplier) {
+    if (multiplierElement) multiplierElement.textContent = displayMultiplier;
+    if (cashoutElement) cashoutElement.textContent = displayMultiplier;
+    crashRuntime.displayMultiplier = displayMultiplier;
+  }
   const phase =
     multiplier >= 3.5
       ? "high"
       : multiplier >= 1.7
         ? "mid"
         : "low";
-  stage?.classList.remove("phase-low", "phase-mid", "phase-high");
-  stage?.classList.add(`phase-${phase}`);
-  if (trajectory) {
-    trajectory.style.strokeDasharray = "1";
-    trajectory.style.strokeDashoffset = `${1 - travelProgress}`;
+  if (crashRuntime.phase !== phase) {
+    stage?.classList.remove("phase-low", "phase-mid", "phase-high");
+    stage?.classList.add(`phase-${phase}`);
+    crashRuntime.phase = phase;
+  }
+  for (const path of [trajectoryGlow, trajectory].filter(Boolean)) {
+    path.style.strokeDasharray = "1";
+    path.style.strokeDashoffset = `${1 - travelProgress}`;
   }
   if (rocket && flightLine) {
-    const width = flightLine.clientWidth || stage?.clientWidth || 1;
-    const height = flightLine.clientHeight || 150;
+    const { width, height } = getCrashFlightBounds();
     const point = getCrashTrajectoryPoint(travelProgress);
     const left = (point.x / 100) * width;
     const top = (point.y / 100) * height;
-    rocket.style.transform = `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%) rotate(-32deg)`;
+    rocket.style.setProperty("--flight-angle", `${getCrashTrajectoryAngle(travelProgress)}deg`);
+    rocket.style.transform = `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%)`;
   }
   stage?.classList.add("running");
 }
@@ -656,4 +708,7 @@ $("#withdraw-form").addEventListener("submit", async (event) => {
 $("#copy-referral").addEventListener("click", copyReferral);
 
 telegram?.BackButton?.onClick(closeWithdraw);
+window.addEventListener("resize", () => {
+  crashRuntime.bounds = null;
+});
 loadState();

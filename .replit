@@ -9,6 +9,18 @@ deploymentTarget = "autoscale"
 args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
+[[ports]]
+localPort = 8000
+externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 3000
+
+[[ports]]
+localPort = 8081
+externalPort = 3001
+
 [workflows]
 runButton = "Project"
 

@@ -1,11 +1,15 @@
 const telegram = window.Telegram?.WebApp;
 const appState = { data: null, activeView: "home" };
 const busyActions = new Set();
+let serverClockOffsetMs = 0;
+let hasServerClock = false;
 const crashRuntime = {
   gameId: null,
   frame: null,
   settleTimer: null,
   startedAtMs: null,
+  startedPerfMs: null,
+  trajectoryLength: null,
   settling: false,
 };
 let selectedCrashBet = "10";
@@ -124,6 +128,22 @@ function getCrashMultiplier(startedAt) {
   return Number((1 + 0.42 * elapsed + 0.045 * elapsed * elapsed).toFixed(2));
 }
 
+function getTimingNow() {
+  return typeof window.performance?.now === "function" ? window.performance.now() : Date.now();
+}
+
+function syncServerClock(serverNow, requestStartedAt, requestFinishedAt) {
+  const serverNowMs = Date.parse(String(serverNow || ""));
+  if (!Number.isFinite(serverNowMs)) return;
+  const roundTripMs = Math.max(0, requestFinishedAt - requestStartedAt);
+  const estimatedClientAtServerMs = Date.now() - roundTripMs / 2;
+  const sampleOffsetMs = serverNowMs - estimatedClientAtServerMs;
+  serverClockOffsetMs = hasServerClock
+    ? serverClockOffsetMs * 0.8 + sampleOffsetMs * 0.2
+    : sampleOffsetMs;
+  hasServerClock = true;
+}
+
 function getCrashTravelProgress(multiplier) {
   const growth = Math.max(0, Number(multiplier || 1) - 1);
   return Math.max(0, Math.min(1, 1 - Math.exp(-0.85 * growth)));
@@ -144,12 +164,14 @@ function stopCrashAnimation() {
   crashRuntime.settleTimer = null;
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
+  crashRuntime.startedPerfMs = null;
+  crashRuntime.trajectoryLength = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
   $("#crash-stage")?.classList.remove("phase-low", "phase-mid", "phase-high");
 }
 
-function updateCrashVisual(multiplier, crashAt) {
+function updateCrashVisual(multiplier) {
   const stage = $("#crash-stage");
   const rocket = $("#crash-rocket");
   const flightLine = $(".crash-flight-line");
@@ -158,7 +180,7 @@ function updateCrashVisual(multiplier, crashAt) {
   $("#crash-multiplier").textContent = formatMultiplier(multiplier);
   $("#crash-cashout-value").textContent = formatMultiplier(multiplier);
   const phase =
-    multiplier >= Math.max(3.5, crashAt * 0.72)
+    multiplier >= 3.5
       ? "high"
       : multiplier >= 1.7
         ? "mid"
@@ -166,7 +188,8 @@ function updateCrashVisual(multiplier, crashAt) {
   stage?.classList.remove("phase-low", "phase-mid", "phase-high");
   stage?.classList.add(`phase-${phase}`);
   if (trajectory) {
-    const length = trajectory.getTotalLength();
+    crashRuntime.trajectoryLength ??= trajectory.getTotalLength();
+    const length = crashRuntime.trajectoryLength;
     trajectory.style.strokeDasharray = `${length}`;
     trajectory.style.strokeDashoffset = `${length * (1 - travelProgress)}`;
   }
@@ -197,10 +220,13 @@ function updateCrashVisual(multiplier, crashAt) {
 
 function getCrashElapsedSeconds(startedAt) {
   const parsedStartedAt = Date.parse(String(startedAt || ""));
+  if (crashRuntime.startedPerfMs !== null) {
+    return Math.max(0, (getTimingNow() - crashRuntime.startedPerfMs) / 1000);
+  }
   const startedAtMs = Number.isFinite(parsedStartedAt)
     ? parsedStartedAt
-    : crashRuntime.startedAtMs ?? Date.now();
-  return Math.max(0, (Date.now() - startedAtMs) / 1000);
+    : crashRuntime.startedAtMs ?? Date.now() + serverClockOffsetMs;
+  return Math.max(0, (Date.now() + serverClockOffsetMs - startedAtMs) / 1000);
 }
 
 function startCrashAnimation(active) {
@@ -208,7 +234,13 @@ function startCrashAnimation(active) {
   stopCrashAnimation();
   crashRuntime.gameId = active.id;
   const parsedStartedAt = Date.parse(String(active.startedAt || ""));
-  crashRuntime.startedAtMs = Number.isFinite(parsedStartedAt) ? parsedStartedAt : Date.now();
+  crashRuntime.startedAtMs = Number.isFinite(parsedStartedAt)
+    ? parsedStartedAt
+    : Date.now() + serverClockOffsetMs;
+  const initialElapsedMs = Number.isFinite(parsedStartedAt)
+    ? Math.max(0, Date.now() + serverClockOffsetMs - parsedStartedAt)
+    : 0;
+  crashRuntime.startedPerfMs = getTimingNow() - initialElapsedMs;
 
   const tick = () => {
     if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) {
@@ -216,7 +248,7 @@ function startCrashAnimation(active) {
       return false;
     }
     const multiplier = getCrashMultiplier(active.startedAt);
-    updateCrashVisual(Math.min(multiplier, active.crashAt), active.crashAt);
+    updateCrashVisual(Math.min(multiplier, active.crashAt));
     if (multiplier >= active.crashAt) {
       crashRuntime.frame = null;
       $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;
@@ -345,6 +377,7 @@ function setLoading(loading) {
 async function request(path, options = {}) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const requestStartedAt = getTimingNow();
   try {
     const response = await fetch(path, {
       ...options,
@@ -360,6 +393,7 @@ async function request(path, options = {}) {
       Object.assign(error, payload);
       throw error;
     }
+    syncServerClock(payload.serverNow, requestStartedAt, getTimingNow());
     return payload;
   } catch (error) {
     if (error.name === "AbortError") {

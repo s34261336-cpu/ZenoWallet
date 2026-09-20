@@ -1803,6 +1803,7 @@ def web_app_state(
 
     return {
         "ok": True,
+        "serverNow": datetime.now(timezone.utc).isoformat(),
         "user": {
             "id": user_id,
             "firstName": str(user.get("first_name") or user.get("username") or "друг"),

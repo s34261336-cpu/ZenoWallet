@@ -124,6 +124,11 @@ function getCrashMultiplier(startedAt) {
   return Number((1 + 0.42 * elapsed + 0.045 * elapsed * elapsed).toFixed(2));
 }
 
+function getCrashTravelProgress(multiplier) {
+  const growth = Math.max(0, Number(multiplier || 1) - 1);
+  return Math.max(0, Math.min(1, 1 - Math.exp(-0.85 * growth)));
+}
+
 function stopCrashAnimation() {
   if (crashRuntime.frame !== null) {
     if (typeof window.cancelAnimationFrame === "function") {
@@ -141,25 +146,51 @@ function stopCrashAnimation() {
   crashRuntime.startedAtMs = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
+  $("#crash-stage")?.classList.remove("phase-low", "phase-mid", "phase-high");
 }
 
 function updateCrashVisual(multiplier, crashAt) {
   const stage = $("#crash-stage");
   const rocket = $("#crash-rocket");
   const flightLine = $(".crash-flight-line");
-  const progress = Math.max(
-    0,
-    Math.min(100, ((multiplier - 1) / Math.max(0.5, crashAt - 1)) * 100),
-  );
+  const trajectory = $("#crash-trajectory-progress");
+  const travelProgress = getCrashTravelProgress(multiplier);
   $("#crash-multiplier").textContent = formatMultiplier(multiplier);
   $("#crash-cashout-value").textContent = formatMultiplier(multiplier);
+  const phase =
+    multiplier >= Math.max(3.5, crashAt * 0.72)
+      ? "high"
+      : multiplier >= 1.7
+        ? "mid"
+        : "low";
+  stage?.classList.remove("phase-low", "phase-mid", "phase-high");
+  stage?.classList.add(`phase-${phase}`);
+  if (trajectory) {
+    const length = trajectory.getTotalLength();
+    trajectory.style.strokeDasharray = `${length}`;
+    trajectory.style.strokeDashoffset = `${length * (1 - travelProgress)}`;
+  }
   if (rocket && flightLine) {
-    const progressRatio = progress / 100;
-    const flightWidth = flightLine.clientWidth || stage?.clientWidth || 1;
-    const left = flightWidth * progressRatio;
-    const top = 110 - 72 * progressRatio;
-    rocket.style.left = `${left}px`;
-    rocket.style.top = `${top}px`;
+    const width = flightLine.clientWidth || stage?.clientWidth || 1;
+    const height = flightLine.clientHeight || 150;
+    const t = travelProgress;
+    const controlX = width * 0.55;
+    const controlY = height * 0.84;
+    const endX = width * 0.98;
+    const endY = height * 0.08;
+    const startX = 0;
+    const startY = height * 0.82;
+    const left =
+      (1 - t) * (1 - t) * startX +
+      2 * (1 - t) * t * controlX +
+      t * t * endX;
+    const top =
+      (1 - t) * (1 - t) * startY +
+      2 * (1 - t) * t * controlY +
+      t * t * endY;
+    rocket.style.left = "0px";
+    rocket.style.top = "0px";
+    rocket.style.transform = `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%) rotate(-32deg)`;
   }
   stage?.classList.add("running");
 }

@@ -2320,10 +2320,11 @@ body::before {
   font-size: 34px;
   left: 0;
   position: absolute;
-  top: 110px;
+  top: 0;
   transform: translate(-50%, -50%) rotate(-32deg);
   transition: filter 140ms ease;
-  will-change: left, top, transform;
+  will-change: transform;
+  backface-visibility: hidden;
   z-index: 2;
 }
 

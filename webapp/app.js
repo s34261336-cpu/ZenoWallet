@@ -197,22 +197,25 @@ function updateCrashVisual(multiplier) {
     const width = flightLine.clientWidth || stage?.clientWidth || 1;
     const height = flightLine.clientHeight || 150;
     const t = travelProgress;
-    const controlX = width * 0.55;
-    const controlY = height * 0.84;
-    const endX = width * 0.98;
-    const endY = height * 0.08;
-    const startX = 0;
-    const startY = height * 0.82;
-    const left =
-      (1 - t) * (1 - t) * startX +
-      2 * (1 - t) * t * controlX +
-      t * t * endX;
-    const top =
-      (1 - t) * (1 - t) * startY +
-      2 * (1 - t) * t * controlY +
-      t * t * endY;
-    rocket.style.left = "0px";
-    rocket.style.top = "0px";
+    const inverseT = 1 - t;
+    const point =
+      trajectory &&
+      Number.isFinite(crashRuntime.trajectoryLength) &&
+      typeof trajectory.getPointAtLength === "function"
+        ? trajectory.getPointAtLength(crashRuntime.trajectoryLength * t)
+        : {
+            x:
+              3 * inverseT * inverseT * t * 24 +
+              3 * inverseT * t * t * 62 +
+              t * t * t * 100,
+            y:
+              inverseT * inverseT * inverseT * 94 +
+              3 * inverseT * inverseT * t * 100 +
+              3 * inverseT * t * t * 84 +
+              t * t * t * 8,
+          };
+    const left = (point.x / 100) * width;
+    const top = (point.y / 100) * height;
     rocket.style.transform = `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%) rotate(-32deg)`;
   }
   stage?.classList.add("running");

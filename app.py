@@ -30,6 +30,9 @@ SEASON_CHANNEL_ID = os.getenv("SEASON_CHANNEL_ID", "-1004423195226")
 WEBAPP_DIR = Path(__file__).resolve().parent / "webapp"
 SEASON_ACTIVITY_POINTS = 1
 SEASON_CASE_POINTS = 5
+CRASH_START_COUNTDOWN_SECONDS = 3
+CRASH_MULTIPLIER_LINEAR = 0.07
+CRASH_MULTIPLIER_QUADRATIC = 0.025
 CASE_REWARDS = (0, 5, 10, 25, 50, 100)
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
@@ -70,6 +73,16 @@ def choose_crash_point() -> float:
     lower_bound, upper_bound, _ = CRASH_POINT_BANDS[-1]
     return round(
         CRASH_RANDOM.uniform(lower_bound + 0.005, upper_bound - 0.005),
+        2,
+    )
+
+
+def crash_multiplier_for_elapsed(elapsed: float) -> float:
+    safe_elapsed = max(0.0, float(elapsed))
+    return round(
+        1.0
+        + (CRASH_MULTIPLIER_LINEAR * safe_elapsed)
+        + (CRASH_MULTIPLIER_QUADRATIC * safe_elapsed * safe_elapsed),
         2,
     )
 
@@ -643,10 +656,7 @@ class SupabaseClient:
             str(active["started_at"]).replace("Z", "+00:00")
         )
         elapsed = max(0.0, (datetime.now(timezone.utc) - started_at).total_seconds())
-        current_multiplier = round(
-            1.0 + (0.42 * elapsed) + (0.045 * elapsed * elapsed),
-            2,
-        )
+        current_multiplier = crash_multiplier_for_elapsed(elapsed)
         if current_multiplier >= float(active["crash_at"]):
             self.settle_crash_game(user_id, int(active["id"]))
             return None
@@ -2069,6 +2079,9 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                             400,
                         )
                         return
+                    # Keep the pre-launch countdown outside the database round:
+                    # the active game's started_at is created only after 3–2–1.
+                    time.sleep(CRASH_START_COUNTDOWN_SECONDS)
                     started = self.supabase.start_crash_game(user_id, bet)
                     # Do not rebuild the complete wallet/season state here. That
                     # request performs several Supabase round trips and can

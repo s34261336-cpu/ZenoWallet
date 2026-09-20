@@ -7,6 +7,7 @@ const crashRuntime = {
   gameId: null,
   frame: null,
   settleTimer: null,
+  countdownTimer: null,
   startedAtMs: null,
   startedPerfMs: null,
   bounds: null,
@@ -15,6 +16,7 @@ const crashRuntime = {
   settling: false,
 };
 let selectedCrashBet = "10";
+const CRASH_START_COUNTDOWN_MS = 3000;
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
 
@@ -127,7 +129,7 @@ function formatMultiplier(value) {
 
 function getCrashMultiplier(startedAt) {
   const elapsed = getCrashElapsedSeconds(startedAt);
-  return 1 + 0.42 * elapsed + 0.045 * elapsed * elapsed;
+  return 1 + 0.07 * elapsed + 0.025 * elapsed * elapsed;
 }
 
 function getTimingNow() {
@@ -209,8 +211,12 @@ function stopCrashAnimation() {
   if (crashRuntime.settleTimer !== null) {
     window.clearTimeout(crashRuntime.settleTimer);
   }
+  if (crashRuntime.countdownTimer !== null) {
+    window.clearTimeout(crashRuntime.countdownTimer);
+  }
   crashRuntime.frame = null;
   crashRuntime.settleTimer = null;
+  crashRuntime.countdownTimer = null;
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
   crashRuntime.startedPerfMs = null;
@@ -219,7 +225,7 @@ function stopCrashAnimation() {
   crashRuntime.displayMultiplier = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
-  $("#crash-stage")?.classList.remove("phase-low", "phase-mid", "phase-high");
+  $("#crash-stage")?.classList.remove("launching", "phase-low", "phase-mid", "phase-high");
   document.querySelectorAll(".crash-trajectory-progress, .crash-trajectory-glow").forEach((path) => {
     path.style.strokeDasharray = "1";
     path.style.strokeDashoffset = "1";
@@ -227,6 +233,35 @@ function stopCrashAnimation() {
   const rocket = $("#crash-rocket");
   rocket?.style.removeProperty("transform");
   rocket?.style.removeProperty("--flight-angle");
+}
+
+function startCrashCountdown() {
+  const stage = $("#crash-stage");
+  const status = $("#crash-status");
+  const multiplier = $("#crash-multiplier");
+  const countdownStartedAt = Date.now();
+  const countdownEndAt = countdownStartedAt + CRASH_START_COUNTDOWN_MS;
+
+  if (crashRuntime.countdownTimer !== null) {
+    window.clearTimeout(crashRuntime.countdownTimer);
+  }
+  stage?.classList.add("launching");
+  stage?.classList.remove("running", "crashed");
+
+  const tick = () => {
+    const remainingMs = Math.max(0, countdownEndAt - Date.now());
+    if (remainingMs <= 0) {
+      crashRuntime.countdownTimer = null;
+      stage?.classList.remove("launching");
+      return;
+    }
+    const remaining = Math.ceil(remainingMs / 1000);
+    if (status) status.textContent = `Приём ставок · ${remaining}`;
+    if (multiplier) multiplier.textContent = String(remaining);
+    crashRuntime.countdownTimer = window.setTimeout(tick, 80);
+  };
+
+  tick();
 }
 
 function updateCrashVisual(multiplier, crashAt) {
@@ -319,7 +354,7 @@ function startCrashAnimation(active) {
           runAction("crash_settle", { gameId: active.id }).finally(() => {
             crashRuntime.settling = false;
           });
-        }, 120);
+        }, 650);
       }
       return false;
     }
@@ -565,6 +600,13 @@ async function runAction(action, body = {}) {
       method: "POST",
       body: JSON.stringify({ action, ...body }),
     });
+    if (action === "crash_start") {
+      if (crashRuntime.countdownTimer !== null) {
+        window.clearTimeout(crashRuntime.countdownTimer);
+        crashRuntime.countdownTimer = null;
+      }
+      $("#crash-stage")?.classList.remove("launching");
+    }
     const actionResult = result.lastAction;
     if (action === "crash_start" && actionResult?.type === "crash_start") {
       appState.data = {
@@ -696,6 +738,7 @@ document.querySelectorAll("[data-crash-bet]").forEach((button) => {
 
 $("#crash-start").addEventListener("click", () => {
   const bet = selectedCrashBet === "all" ? "all" : Number.parseInt(selectedCrashBet, 10);
+  startCrashCountdown();
   runAction("crash_start", { bet });
 });
 

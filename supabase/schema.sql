@@ -179,7 +179,9 @@ begin
     0,
     extract(epoch from (clock_timestamp() - p_started_at))
   );
-  return round((1 + (0.42 * v_elapsed) + (0.045 * v_elapsed * v_elapsed))::numeric, 2);
+  -- Matches the client animation: about 1.08x, 1.26x, 1.47x...
+  -- at one-second intervals after the 3–2–1 pre-launch countdown.
+  return round((1 + (0.07 * v_elapsed) + (0.025 * v_elapsed * v_elapsed))::numeric, 2);
 end;
 $$;
 

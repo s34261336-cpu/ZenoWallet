@@ -2225,6 +2225,16 @@ body::before {
   color: var(--crash-accent);
 }
 
+.crash-stage.launching .crash-status {
+  color: var(--crash-accent);
+}
+
+.crash-stage.launching .crash-multiplier {
+  color: var(--crash-accent);
+  font-size: clamp(54px, 17vw, 82px);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--crash-accent) 55%, transparent);
+}
+
 .crash-stage.crashed .crash-status {
   color: var(--pink);
 }

@@ -1,7 +1,7 @@
 const telegram = window.Telegram?.WebApp;
 const appState = { data: null, activeView: "home" };
 const busyActions = new Set();
-const crashRuntime = { gameId: null, frame: null, settling: false };
+const crashRuntime = { gameId: null, timer: null, settling: false };
 let selectedCrashBet = "10";
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
@@ -116,14 +116,14 @@ function formatMultiplier(value) {
 function getCrashMultiplier(startedAt) {
   const started = new Date(startedAt).getTime();
   const elapsed = Math.max(0, (Date.now() - started) / 1000);
-  return 1 + 0.42 * elapsed + 0.045 * elapsed * elapsed;
+  return Number((1 + 0.42 * elapsed + 0.045 * elapsed * elapsed).toFixed(2));
 }
 
 function stopCrashAnimation() {
-  if (crashRuntime.frame !== null) {
-    cancelAnimationFrame(crashRuntime.frame);
+  if (crashRuntime.timer !== null) {
+    window.clearInterval(crashRuntime.timer);
   }
-  crashRuntime.frame = null;
+  crashRuntime.timer = null;
   crashRuntime.gameId = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
@@ -143,16 +143,19 @@ function updateCrashVisual(multiplier, crashAt) {
 }
 
 function startCrashAnimation(active) {
-  if (crashRuntime.gameId === active.id && crashRuntime.frame !== null) return;
+  if (crashRuntime.gameId === active.id && crashRuntime.timer !== null) return;
   stopCrashAnimation();
   crashRuntime.gameId = active.id;
 
   const tick = () => {
-    if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) return;
+    if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) {
+      return false;
+    }
     const multiplier = getCrashMultiplier(active.startedAt);
-    updateCrashVisual(multiplier, active.crashAt);
+    updateCrashVisual(Math.min(multiplier, active.crashAt), active.crashAt);
     if (multiplier >= active.crashAt) {
-      crashRuntime.frame = null;
+      window.clearInterval(crashRuntime.timer);
+      crashRuntime.timer = null;
       $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;
       $("#crash-stage").classList.add("crashed");
       if (!crashRuntime.settling) {
@@ -163,12 +166,14 @@ function startCrashAnimation(active) {
           });
         }, 120);
       }
-      return;
+      return false;
     }
-    crashRuntime.frame = requestAnimationFrame(tick);
+    return true;
   };
 
-  crashRuntime.frame = requestAnimationFrame(tick);
+  if (tick()) {
+    crashRuntime.timer = window.setInterval(tick, 100);
+  }
 }
 
 function renderCrashHistory(history) {
@@ -188,7 +193,7 @@ function renderCrashHistory(history) {
         <div class="crash-history-row ${won ? "win" : "loss"}">
           <span class="crash-history-result"><i></i>${won ? "Забрал" : "Срыв"}</span>
           <strong>${formatMultiplier(game.multiplier)}</strong>
-          <span class="crash-history-bet">${formatNumber(game.bet)} → ${won ? `+${formatNumber(game.payout)}` : "−0"}</span>
+          <span class="crash-history-bet">${formatNumber(game.bet)} → ${won ? `+${formatNumber(game.payout)}` : `−${formatNumber(game.bet)}`}</span>
           <time>${time}</time>
         </div>`;
     })
@@ -374,8 +379,9 @@ function setView(viewName) {
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("hidden", view.id !== `${viewName}-view`);
   });
+  const navView = viewName === "rocket" ? "games" : viewName;
   document.querySelectorAll(".nav-item").forEach((item) => {
-    item.classList.toggle("active", item.dataset.view === viewName);
+    item.classList.toggle("active", item.dataset.view === navView);
   });
   if (telegram?.HapticFeedback) telegram.HapticFeedback.selectionChanged();
 }

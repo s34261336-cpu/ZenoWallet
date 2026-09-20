@@ -35,6 +35,33 @@ DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
 }
+# The requested percentages add up to 101%, so they are treated as relative
+# weights and normalized by the total weight. This preserves their intended
+# order and makes every round deterministic in its probability space.
+CRASH_POINT_WEIGHTS = (
+    (1.2, 4000),
+    (1.5, 2500),
+    (2.0, 1500),
+    (3.0, 1000),
+    (5.0, 600),
+    (10.0, 300),
+    (20.0, 100),
+    (50.0, 50),
+    (100.0, 30),
+    (500.0, 20),
+)
+CRASH_POINT_WEIGHT_TOTAL = sum(weight for _, weight in CRASH_POINT_WEIGHTS)
+CRASH_RANDOM = random.SystemRandom()
+
+
+def choose_crash_point() -> float:
+    roll = CRASH_RANDOM.randrange(CRASH_POINT_WEIGHT_TOTAL)
+    cursor = 0
+    for crash_point, weight in CRASH_POINT_WEIGHTS:
+        cursor += weight
+        if roll < cursor:
+            return crash_point
+    return CRASH_POINT_WEIGHTS[-1][0]
 
 
 def resolve_webapp_url() -> str:
@@ -566,7 +593,7 @@ class SupabaseClient:
     def start_crash_game(self, user_id: int, bet: int) -> dict[str, Any]:
         if bet <= 0:
             raise ValueError("Ставка должна быть больше нуля")
-        crash_at = round(1.5 + (random.random() ** 2.7) * 8.5, 2)
+        crash_at = choose_crash_point()
         return self._rpc_object(
             self._rpc(
                 "crash_start",

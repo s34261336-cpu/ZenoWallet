@@ -31,7 +31,7 @@ create table if not exists public.games (
     check (result in ('active', 'won', 'lost')),
   created_at timestamptz not null default now(),
   started_at timestamptz not null default now(),
-  crash_at numeric(10, 2) not null check (crash_at >= 1.5 and crash_at <= 10),
+  crash_at numeric(10, 2) not null check (crash_at >= 1.2 and crash_at <= 500),
   payout bigint not null default 0 check (payout >= 0),
   settled_at timestamptz
 );
@@ -41,6 +41,24 @@ alter table public.games
   add column if not exists crash_at numeric(10, 2),
   add column if not exists payout bigint not null default 0,
   add column if not exists settled_at timestamptz;
+
+-- Upgrade the first crash-game migration from the old 1.5x–10x range.
+alter table public.games drop constraint if exists games_crash_at_check;
+alter table public.games drop constraint if exists games_crash_at_range_check;
+do $$
+begin
+  if not exists (
+    select 1
+      from pg_constraint
+     where conrelid = 'public.games'::regclass
+       and conname = 'games_crash_at_range_check'
+  ) then
+    alter table public.games
+      add constraint games_crash_at_range_check
+      check (crash_at >= 1.2 and crash_at <= 500);
+  end if;
+end;
+$$;
 
 create index if not exists games_user_history_idx
   on public.games (user_id, game_name, created_at desc);
@@ -182,7 +200,7 @@ begin
   if p_bet is null or p_bet <= 0 then
     raise exception 'Ставка должна быть больше нуля';
   end if;
-  if p_crash_at is null or p_crash_at < 1.5 or p_crash_at > 10 then
+  if p_crash_at is null or p_crash_at < 1.2 or p_crash_at > 500 then
     raise exception 'Некорректная точка краша';
   end if;
 

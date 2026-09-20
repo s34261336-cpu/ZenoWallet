@@ -2002,6 +2002,125 @@ body::before {
   }
 }
 
+/* Games directory */
+.games-intro {
+  color: #aeb5d2;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: -10px 2px 16px;
+}
+
+.game-launch-card {
+  align-items: center;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(117, 232, 255, 0.24), transparent 30%),
+    linear-gradient(135deg, rgba(32, 27, 76, 0.94), rgba(10, 14, 37, 0.92));
+  border: 1px solid rgba(162, 182, 255, 0.25);
+  border-radius: 24px;
+  box-shadow:
+    0 20px 45px rgba(2, 4, 18, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  display: flex;
+  gap: 13px;
+  padding: 18px;
+  text-align: left;
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  width: 100%;
+}
+
+.game-launch-card:hover {
+  border-color: rgba(117, 232, 255, 0.62);
+  box-shadow:
+    0 22px 48px rgba(2, 4, 18, 0.42),
+    0 0 26px rgba(117, 232, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.game-launch-icon {
+  align-items: center;
+  background: linear-gradient(145deg, rgba(117, 232, 255, 0.2), rgba(141, 107, 255, 0.24));
+  border: 1px solid rgba(117, 232, 255, 0.3);
+  border-radius: 17px;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 27px;
+  height: 58px;
+  justify-content: center;
+  width: 58px;
+}
+
+.game-launch-copy {
+  display: block;
+  min-width: 0;
+}
+
+.game-launch-copy strong {
+  display: block;
+  font-family: "Manrope", sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.05em;
+  margin: 3px 0 5px;
+}
+
+.game-launch-copy small {
+  color: #aeb5d2;
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.game-launch-arrow {
+  color: var(--cyan);
+  font-size: 22px;
+  margin-left: auto;
+  padding-top: 4px;
+}
+
+.game-odds-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(213, 220, 255, 0.1);
+  border-radius: 16px;
+  color: #929bbe;
+  display: flex;
+  font-size: 10px;
+  justify-content: space-between;
+  margin-top: 11px;
+  padding: 13px 14px;
+}
+
+.game-odds-card strong {
+  color: #f0f2ff;
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.game-odds-card > span {
+  color: var(--pink);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.back-link {
+  background: transparent;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 700;
+  margin: -4px 0 12px;
+  padding: 4px 0;
+}
+
+.back-link:hover {
+  color: #f0f2ff;
+}
+
+.rocket-heading {
+  margin-bottom: 10px;
+}
+
 /* Rocket crash game */
 .crash-title-mark {
   color: var(--cyan);

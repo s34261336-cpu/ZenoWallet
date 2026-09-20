@@ -45,3 +45,4 @@ timeoutMs = 20000
 
 [userenv.shared]
 WEBAPP_URL = "https://zenowallet.onrender.com/webapp/"
+SUPABASE_URL = "https://eruwnkcjwrykrjadvjuc.supabase.co"

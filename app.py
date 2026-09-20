@@ -2070,13 +2070,34 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                         )
                         return
                     started = self.supabase.start_crash_game(user_id, bet)
-                    result = web_app_state(self.bot, user, resolve_crash=False)
-                    result["lastAction"] = {
-                        "type": "crash_start",
-                        "gameId": int(started["gameId"]),
-                        "bet": bet,
-                    }
-                    self.send_json(result)
+                    # Do not rebuild the complete wallet/season state here. That
+                    # request performs several Supabase round trips and can
+                    # make a short crash round expire before the client even
+                    # receives its start response. The client merges this
+                    # authoritative, minimal response into its current state.
+                    started_at = str(started["startedAt"])
+                    crash_at = float(started["crashAt"])
+                    self.send_json(
+                        {
+                            "ok": True,
+                            "serverNow": datetime.now(timezone.utc).isoformat(),
+                            "wallet": {
+                                "earnBalance": int(started.get("balance", balance - bet)),
+                            },
+                            "lastAction": {
+                                "type": "crash_start",
+                                "gameId": int(started["gameId"]),
+                                "bet": bet,
+                                "balance": int(started.get("balance", balance - bet)),
+                                "active": {
+                                    "id": int(started["gameId"]),
+                                    "bet": bet,
+                                    "startedAt": started_at,
+                                    "crashAt": crash_at,
+                                },
+                            },
+                        }
+                    )
                     return
 
                 if action == "crash_cashout":

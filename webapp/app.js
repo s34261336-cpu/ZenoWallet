@@ -264,8 +264,10 @@ function updateCrashVisual(multiplier, crashAt) {
     const point = getCrashTrajectoryPoint(travelProgress);
     const left = (point.x / 100) * width;
     const top = (point.y / 100) * height;
-    rocket.style.setProperty("--flight-angle", `${getCrashTrajectoryAngle(travelProgress)}deg`);
-    rocket.style.transform = `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%)`;
+    const flightAngle = getCrashTrajectoryAngle(travelProgress);
+    rocket.style.setProperty("--flight-angle", `${flightAngle}deg`);
+    rocket.style.transform =
+      `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%) rotate(${flightAngle}deg)`;
   }
   stage?.classList.add("running");
 }
@@ -402,7 +404,8 @@ function renderCrash(data) {
   $("#crash-status").textContent = "Ракета в полёте";
   $("#crash-hint").textContent = "Забери ставку сейчас — следующий тик может стать крашем.";
   $("#crash-start").disabled = true;
-  $("#crash-cashout").disabled = busyActions.has("crash_cashout");
+  $("#crash-cashout").disabled =
+    busyActions.has("crash_cashout") || crashRuntime.settling;
   startCrashAnimation(active);
 }
 
@@ -562,9 +565,30 @@ async function runAction(action, body = {}) {
       method: "POST",
       body: JSON.stringify({ action, ...body }),
     });
-    appState.data = result;
-    render();
     const actionResult = result.lastAction;
+    if (action === "crash_start" && actionResult?.type === "crash_start") {
+      appState.data = {
+        ...appState.data,
+        wallet: {
+          ...appState.data.wallet,
+          earnBalance: Number(
+            result.wallet?.earnBalance ??
+              actionResult.balance ??
+              Math.max(
+                0,
+                Number(appState.data.wallet.earnBalance) - Number(actionResult.bet),
+              ),
+          ),
+        },
+        crash: {
+          ...appState.data.crash,
+          active: actionResult.active,
+        },
+      };
+    } else {
+      appState.data = result;
+    }
+    render();
     if (actionResult?.type === "case") {
       const caseButton = document.querySelector('[data-action="case"]');
       caseButton.classList.remove("reward-pop");

@@ -2333,39 +2333,89 @@ body::before {
 
 .crash-rocket {
   filter: drop-shadow(0 0 15px color-mix(in srgb, var(--crash-accent) 78%, transparent));
-  height: 44px;
+  height: 58px;
   left: 0;
   pointer-events: none;
   position: absolute;
   top: 0;
-  width: 44px;
+  width: 78px;
   will-change: transform;
   backface-visibility: hidden;
   z-index: 2;
 }
 
-.crash-rocket-token {
-  align-items: center;
+.crash-rocket-body {
   background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.82), transparent 12%),
-    radial-gradient(circle at 40% 36%, color-mix(in srgb, var(--crash-accent) 78%, white), var(--crash-accent) 56%, color-mix(in srgb, var(--crash-accent) 58%, #081022));
-  border: 2px solid color-mix(in srgb, var(--crash-accent) 70%, white);
-  border-radius: 50%;
+    linear-gradient(160deg, rgba(255, 255, 255, 0.42), transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--crash-accent) 94%, white), var(--crash-accent) 58%, color-mix(in srgb, var(--crash-accent) 62%, #081022));
+  border: 2px solid color-mix(in srgb, var(--crash-accent) 72%, white);
+  border-radius: 50% 58% 58% 50%;
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--crash-accent) 12%, transparent),
     0 0 20px color-mix(in srgb, var(--crash-accent) 76%, transparent),
     inset 0 1px 2px rgba(255, 255, 255, 0.68),
     inset 0 -4px 8px rgba(0, 0, 0, 0.2);
   color: #f8ffff;
   display: grid;
-  font-size: 21px;
+  font-size: 17px;
   font-weight: 900;
-  height: 40px;
+  height: 30px;
+  left: 17px;
   place-items: center;
-  position: relative;
+  position: absolute;
+  top: 14px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  width: 40px;
-  animation: crash-token-pulse 860ms ease-in-out infinite;
+  width: 48px;
+}
+
+.crash-rocket-body::after {
+  border-bottom: 15px solid transparent;
+  border-left: 19px solid color-mix(in srgb, var(--crash-accent) 85%, white);
+  border-top: 15px solid transparent;
+  content: "";
+  height: 0;
+  position: absolute;
+  right: -18px;
+  top: -2px;
+  width: 0;
+}
+
+.crash-rocket-mark {
+  position: relative;
+  z-index: 1;
+}
+
+.crash-rocket-window {
+  background: rgba(7, 16, 38, 0.64);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  height: 9px;
+  left: 8px;
+  position: absolute;
+  top: 5px;
+  width: 9px;
+  z-index: 1;
+}
+
+.crash-rocket-fin {
+  background: color-mix(in srgb, var(--crash-accent) 72%, #081022);
+  border: 1px solid color-mix(in srgb, var(--crash-accent) 66%, white);
+  height: 13px;
+  position: absolute;
+  width: 22px;
+}
+
+.crash-rocket-fin-top {
+  border-radius: 4px 12px 2px 2px;
+  left: 25px;
+  top: 4px;
+  transform: skewX(-24deg);
+}
+
+.crash-rocket-fin-bottom {
+  border-radius: 2px 2px 12px 4px;
+  bottom: 4px;
+  left: 25px;
+  transform: skewX(24deg);
 }
 
 .crash-rocket-trail {
@@ -2380,38 +2430,28 @@ body::before {
   filter: blur(2px);
   height: 10px;
   position: absolute;
-  right: 22px;
+  right: 57px;
   top: 50%;
-  transform: translateY(-50%) rotate(var(--flight-angle, -25deg));
+  transform: translateY(-50%);
   transform-origin: 100% 50%;
-  width: 104px;
+  width: 76px;
   animation: crash-trail-pulse 620ms ease-in-out infinite;
 }
 
-.crash-rocket::after {
-  background: var(--crash-accent);
+.crash-rocket-trail::after {
+  background: #fff2a6;
   border-radius: 50%;
   box-shadow:
-    -18px 7px 0 -1px color-mix(in srgb, var(--crash-accent) 80%, transparent),
-    -31px -6px 0 -2px color-mix(in srgb, var(--crash-accent) 62%, transparent),
-    -46px 10px 0 -2px color-mix(in srgb, var(--crash-accent) 48%, transparent),
-    -61px -3px 0 -3px color-mix(in srgb, var(--crash-accent) 36%, transparent);
+    -16px 7px 0 -1px color-mix(in srgb, #fff2a6 78%, transparent),
+    -30px -5px 0 -2px color-mix(in srgb, var(--crash-accent) 68%, transparent),
+    -44px 8px 0 -3px color-mix(in srgb, var(--crash-accent) 46%, transparent);
   content: "";
-  height: 4px;
+  height: 7px;
   left: -4px;
   position: absolute;
   top: 50%;
-  width: 4px;
+  width: 7px;
   animation: crash-particle-flicker 500ms steps(2, end) infinite;
-}
-
-@keyframes crash-token-pulse {
-  0%, 100% {
-    transform: scale(0.96);
-  }
-  50% {
-    transform: scale(1.04);
-  }
 }
 
 @keyframes crash-trail-pulse {
@@ -2438,8 +2478,9 @@ body::before {
   filter: grayscale(0.15) drop-shadow(0 0 18px rgba(255, 119, 203, 0.95));
 }
 
-.crash-stage.crashed .crash-rocket-token {
-  --crash-accent: var(--pink);
+.crash-stage.crashed .crash-rocket-body,
+.crash-stage.crashed .crash-rocket-fin {
+  filter: grayscale(0.75);
 }
 
 .crash-star {

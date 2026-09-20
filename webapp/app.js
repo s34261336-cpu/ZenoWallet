@@ -1,6 +1,8 @@
 const telegram = window.Telegram?.WebApp;
 const appState = { data: null, activeView: "home" };
 const busyActions = new Set();
+const crashRuntime = { gameId: null, frame: null, settling: false };
+let selectedCrashBet = "10";
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
 
@@ -105,6 +107,125 @@ function renderHomeLeaders(top) {
         </div>`,
     )
     .join("");
+}
+
+function formatMultiplier(value) {
+  return `${Number(value || 1).toFixed(2)}x`;
+}
+
+function getCrashMultiplier(startedAt) {
+  const started = new Date(startedAt).getTime();
+  const elapsed = Math.max(0, (Date.now() - started) / 1000);
+  return 1 + 0.42 * elapsed + 0.045 * elapsed * elapsed;
+}
+
+function stopCrashAnimation() {
+  if (crashRuntime.frame !== null) {
+    cancelAnimationFrame(crashRuntime.frame);
+  }
+  crashRuntime.frame = null;
+  crashRuntime.gameId = null;
+  crashRuntime.settling = false;
+  $("#crash-stage")?.classList.remove("running", "crashed");
+}
+
+function updateCrashVisual(multiplier, crashAt) {
+  const stage = $("#crash-stage");
+  const rocket = $("#crash-rocket");
+  const progress = Math.max(
+    0,
+    Math.min(100, ((multiplier - 1) / Math.max(0.5, crashAt - 1)) * 100),
+  );
+  $("#crash-multiplier").textContent = formatMultiplier(multiplier);
+  $("#crash-cashout-value").textContent = formatMultiplier(multiplier);
+  rocket?.style.setProperty("--flight-progress", `${progress}%`);
+  stage?.classList.add("running");
+}
+
+function startCrashAnimation(active) {
+  if (crashRuntime.gameId === active.id && crashRuntime.frame !== null) return;
+  stopCrashAnimation();
+  crashRuntime.gameId = active.id;
+
+  const tick = () => {
+    if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) return;
+    const multiplier = getCrashMultiplier(active.startedAt);
+    updateCrashVisual(multiplier, active.crashAt);
+    if (multiplier >= active.crashAt) {
+      crashRuntime.frame = null;
+      $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;
+      $("#crash-stage").classList.add("crashed");
+      if (!crashRuntime.settling) {
+        crashRuntime.settling = true;
+        window.setTimeout(() => {
+          runAction("crash_settle", { gameId: active.id }).finally(() => {
+            crashRuntime.settling = false;
+          });
+        }, 120);
+      }
+      return;
+    }
+    crashRuntime.frame = requestAnimationFrame(tick);
+  };
+
+  crashRuntime.frame = requestAnimationFrame(tick);
+}
+
+function renderCrashHistory(history) {
+  const container = $("#crash-history");
+  if (!history?.length) {
+    container.innerHTML = '<div class="crash-history-empty">Раундов пока нет</div>';
+    return;
+  }
+  container.innerHTML = history
+    .map((game) => {
+      const won = game.result === "won";
+      const time = new Date(game.createdAt).toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `
+        <div class="crash-history-row ${won ? "win" : "loss"}">
+          <span class="crash-history-result"><i></i>${won ? "Забрал" : "Срыв"}</span>
+          <strong>${formatMultiplier(game.multiplier)}</strong>
+          <span class="crash-history-bet">${formatNumber(game.bet)} → ${won ? `+${formatNumber(game.payout)}` : "−0"}</span>
+          <time>${time}</time>
+        </div>`;
+    })
+    .join("");
+}
+
+function renderCrash(data) {
+  const crash = data.crash || { active: null, history: [] };
+  const active = crash.active;
+  $("#crash-balance").textContent = formatNumber(data.wallet.earnBalance);
+  renderCrashHistory(crash.history);
+
+  document.querySelectorAll("[data-crash-bet]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.crashBet === selectedCrashBet);
+    button.disabled = Boolean(active);
+  });
+
+  if (!active) {
+    stopCrashAnimation();
+    $("#crash-status").textContent = "Готов к старту";
+    $("#crash-multiplier").textContent = "1.00x";
+    $("#crash-cashout-value").textContent = "1.00x";
+    $("#crash-hint").textContent = "Выбери ставку и запусти раунд.";
+    $("#crash-start").disabled = busyActions.has("crash_start");
+    $("#crash-cashout").disabled = true;
+    $("#crash-selected-bet").textContent =
+      selectedCrashBet === "all" ? "Весь баланс" : `${formatNumber(selectedCrashBet)} монет`;
+    return;
+  }
+
+  selectedCrashBet = String(active.bet);
+  $("#crash-selected-bet").textContent = `${formatNumber(active.bet)} монет`;
+  $("#crash-status").textContent = "Ракета в полёте";
+  $("#crash-hint").textContent = "Забери ставку сейчас — следующий тик может стать крашем.";
+  $("#crash-start").disabled = true;
+  $("#crash-cashout").disabled = busyActions.has("crash_cashout");
+  startCrashAnimation(active);
 }
 
 function showToast(message, tone = "success") {
@@ -213,6 +334,7 @@ function render() {
   $("#profile-balance").textContent = formatNumber(wallet.earnBalance);
   setAvatars(user, level.percent);
   renderHomeLeaders(season.top);
+  renderCrash(data);
 
   const dailyButton = document.querySelector('[data-action="daily"]');
   dailyButton.disabled = !daily.ready;
@@ -276,6 +398,22 @@ async function runAction(action, body = {}) {
       showToast("+10 монет начислено");
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
+    } else if (
+      actionResult?.type === "crash_cashout" ||
+      actionResult?.type === "crash_settle"
+    ) {
+      if (actionResult.result === "won") {
+        showToast(
+          `Забрано ${formatNumber(actionResult.payout)} монет на ${formatMultiplier(actionResult.multiplier)}`,
+        );
+        telegram?.HapticFeedback?.notificationOccurred("success");
+      } else {
+        showToast(
+          `Ракета улетела на ${formatMultiplier(actionResult.multiplier)} · ставка сгорела`,
+          "danger",
+        );
+        telegram?.HapticFeedback?.notificationOccurred("error");
+      }
     }
   } catch (error) {
     if (error.code === "daily_cooldown" && error.nextAt) {
@@ -336,6 +474,31 @@ document.querySelector('[data-action="withdraw"]').addEventListener("click", ope
 document.querySelectorAll('[data-action="friends"]').forEach((button) => {
   button.addEventListener("click", copyReferral);
 });
+
+document.querySelectorAll("[data-crash-bet]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
+    selectedCrashBet = button.dataset.crashBet;
+    document.querySelectorAll("[data-crash-bet]").forEach((item) => {
+      item.classList.toggle("selected", item === button);
+    });
+    $("#crash-selected-bet").textContent =
+      selectedCrashBet === "all"
+        ? "Весь баланс"
+        : `${formatNumber(selectedCrashBet)} монет`;
+  });
+});
+
+$("#crash-start").addEventListener("click", () => {
+  const bet = selectedCrashBet === "all" ? "all" : Number.parseInt(selectedCrashBet, 10);
+  runAction("crash_start", { bet });
+});
+
+$("#crash-cashout").addEventListener("click", () => {
+  const gameId = appState.data?.crash?.active?.id;
+  if (gameId) runAction("crash_cashout", { gameId });
+});
+
 $("#refresh-button").addEventListener("click", loadState);
 $("#close-withdraw").addEventListener("click", closeWithdraw);
 $("#withdraw-modal").addEventListener("click", (event) => {

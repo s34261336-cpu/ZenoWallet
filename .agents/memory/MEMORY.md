@@ -1,3 +1,4 @@
 - [Persisted case settings](case-settings.md) — keep odds, limits, and usage state shared through Supabase across both bot runtimes.
 - [Imported app preview](imported-app-preview.md) — root workflows need an explicit `[[ports]]` mapping for Replit preview routing.
 - [Telegram mini-app hosting](telegram-mini-app-hosting.md) — use only an explicit working external HTTPS URL; never fall back to Replit domains.
+- [Crash game settlement](crash-game-settlement.md) — keep bet deduction and payout inside Supabase RPC; the browser only animates and requests settlement.

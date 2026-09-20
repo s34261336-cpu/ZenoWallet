@@ -545,6 +545,76 @@ class SupabaseClient:
                 log.exception("Could not roll back bot_state after wallet failure")
             raise
 
+    def get_active_crash_game(self, user_id: int) -> dict[str, Any] | None:
+        rows = self.request(
+            "games?"
+            "select=id,user_id,game_name,bet,multiplier,result,created_at,"
+            "started_at,crash_at,payout"
+            f"&user_id=eq.{user_id}&game_name=eq.rocket&result=eq.active"
+            "&order=created_at.desc&limit=1"
+        )
+        return rows[0] if rows else None
+
+    def get_crash_history(self, user_id: int) -> list[dict[str, Any]]:
+        return self.request(
+            "games?"
+            "select=id,bet,multiplier,result,created_at,payout"
+            f"&user_id=eq.{user_id}&game_name=eq.rocket&result=in.(won,lost)"
+            "&order=created_at.desc&limit=10"
+        )
+
+    def start_crash_game(self, user_id: int, bet: int) -> dict[str, Any]:
+        if bet <= 0:
+            raise ValueError("Ставка должна быть больше нуля")
+        crash_at = round(1.5 + (random.random() ** 2.7) * 8.5, 2)
+        return self._rpc_object(
+            self._rpc(
+                "crash_start",
+                {
+                    "p_user_id": user_id,
+                    "p_bet": bet,
+                    "p_crash_at": crash_at,
+                },
+            )
+        )
+
+    def cashout_crash_game(self, user_id: int, game_id: int) -> dict[str, Any]:
+        if game_id <= 0:
+            raise ValueError("Некорректный раунд")
+        return self._rpc_object(
+            self._rpc(
+                "crash_cashout",
+                {"p_user_id": user_id, "p_game_id": game_id},
+            )
+        )
+
+    def settle_crash_game(self, user_id: int, game_id: int) -> dict[str, Any]:
+        if game_id <= 0:
+            raise ValueError("Некорректный раунд")
+        return self._rpc_object(
+            self._rpc(
+                "crash_settle_loss",
+                {"p_user_id": user_id, "p_game_id": game_id},
+            )
+        )
+
+    def resolve_active_crash_game(self, user_id: int) -> dict[str, Any] | None:
+        active = self.get_active_crash_game(user_id)
+        if not active:
+            return None
+        started_at = datetime.fromisoformat(
+            str(active["started_at"]).replace("Z", "+00:00")
+        )
+        elapsed = max(0.0, (datetime.now(timezone.utc) - started_at).total_seconds())
+        current_multiplier = round(
+            1.0 + (0.42 * elapsed) + (0.045 * elapsed * elapsed),
+            2,
+        )
+        if current_multiplier >= float(active["crash_at"]):
+            self.settle_crash_game(user_id, int(active["id"]))
+            return None
+        return active
+
 
 class TelegramApi:
     def __init__(self, token: str) -> None:
@@ -911,7 +981,9 @@ class WalletBot:
         if (
             "Could not find the table 'public.wallet'" in error_text
             or "Could not find the table 'public.seasons'" in error_text
+            or "Could not find the table 'public.games'" in error_text
             or "Could not find the function public.season_" in error_text
+            or "Could not find the function public.crash_" in error_text
         ):
             message = (
                 "Хранилище кошелька ещё не настроено.\n\n"
@@ -1614,6 +1686,8 @@ def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
     supabase = bot.supabase
     wallet = supabase.ensure_wallet(user_id)
     supabase.ensure_user_state(user_id)
+    active_crash_game = supabase.resolve_active_crash_game(user_id)
+    crash_history = supabase.get_crash_history(user_id)
     users_state = supabase.get_users_state()
     user_state = users_state.get(str(user_id))
     user_state = user_state if isinstance(user_state, dict) else {}
@@ -1695,6 +1769,33 @@ def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
         "case": {
             "remaining": case_remaining,
             "hourlyLimit": settings["hourly_limit"],
+        },
+        "crash": {
+            "active": (
+                {
+                    "id": int(active_crash_game["id"]),
+                    "bet": int(active_crash_game["bet"]),
+                    "startedAt": str(active_crash_game["started_at"]),
+                    "crashAt": float(active_crash_game["crash_at"]),
+                }
+                if active_crash_game
+                else None
+            ),
+            "history": [
+                {
+                    "id": int(row["id"]),
+                    "bet": int(row["bet"]),
+                    "multiplier": (
+                        float(row["multiplier"])
+                        if row.get("multiplier") is not None
+                        else None
+                    ),
+                    "result": str(row["result"]),
+                    "payout": int(row.get("payout") or 0),
+                    "createdAt": str(row["created_at"]),
+                }
+                for row in crash_history
+            ],
         },
         "season": {
             "number": int(season["season_number"]),
@@ -1869,6 +1970,77 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                         "type": "withdraw",
                         "amount": amount,
                         "zenoBalance": zeno,
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "crash_start":
+                    raw_bet = body.get("bet")
+                    active_game = self.supabase.resolve_active_crash_game(user_id)
+                    if active_game:
+                        raise ValueError("Сначала заверши текущий раунд.")
+                    wallet = self.supabase.ensure_wallet(user_id)
+                    balance = int(wallet["earn_balance"])
+                    if raw_bet == "all":
+                        bet = balance
+                    elif (
+                        isinstance(raw_bet, bool)
+                        or not isinstance(raw_bet, int)
+                    ):
+                        raise ValueError("Ставка должна быть целым числом")
+                    else:
+                        bet = raw_bet
+                    if bet <= 0:
+                        raise ValueError("Недостаточно монет для ставки")
+                    if bet > balance:
+                        self.send_json(
+                            {
+                                "ok": False,
+                                "code": "insufficient_funds",
+                                "error": "Недостаточно монет для этой ставки.",
+                                "balance": balance,
+                            },
+                            400,
+                        )
+                        return
+                    started = self.supabase.start_crash_game(user_id, bet)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "crash_start",
+                        "gameId": int(started["gameId"]),
+                        "bet": bet,
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "crash_cashout":
+                    game_id = body.get("gameId")
+                    if isinstance(game_id, bool) or not isinstance(game_id, int):
+                        raise ValueError("Некорректный раунд")
+                    settled = self.supabase.cashout_crash_game(user_id, game_id)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "crash_cashout",
+                        "result": str(settled.get("result")),
+                        "multiplier": float(settled.get("multiplier") or 0),
+                        "payout": int(settled.get("payout") or 0),
+                        "bet": int(settled.get("bet") or 0),
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "crash_settle":
+                    game_id = body.get("gameId")
+                    if isinstance(game_id, bool) or not isinstance(game_id, int):
+                        raise ValueError("Некорректный раунд")
+                    settled = self.supabase.settle_crash_game(user_id, game_id)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "crash_settle",
+                        "result": str(settled.get("result")),
+                        "multiplier": float(settled.get("multiplier") or 0),
+                        "payout": int(settled.get("payout") or 0),
+                        "bet": int(settled.get("bet") or 0),
                     }
                     self.send_json(result)
                     return

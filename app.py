@@ -1713,14 +1713,23 @@ def is_crash_schema_error(error: Exception) -> bool:
     return "public.games" in error_text or "public.crash_" in error_text
 
 
-def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
+def web_app_state(
+    bot: WalletBot,
+    user: dict[str, Any],
+    *,
+    resolve_crash: bool = True,
+) -> dict[str, Any]:
     user_id = int(user["id"])
     supabase = bot.supabase
     wallet = supabase.ensure_wallet(user_id)
     supabase.ensure_user_state(user_id)
     crash_available = True
     try:
-        active_crash_game = supabase.resolve_active_crash_game(user_id)
+        active_crash_game = (
+            supabase.resolve_active_crash_game(user_id)
+            if resolve_crash
+            else supabase.get_active_crash_game(user_id)
+        )
         crash_history = supabase.get_crash_history(user_id)
     except RuntimeError as error:
         if not is_crash_schema_error(error):
@@ -2050,7 +2059,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                         )
                         return
                     started = self.supabase.start_crash_game(user_id, bet)
-                    result = web_app_state(self.bot, user)
+                    result = web_app_state(self.bot, user, resolve_crash=False)
                     result["lastAction"] = {
                         "type": "crash_start",
                         "gameId": int(started["gameId"]),

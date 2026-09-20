@@ -2283,11 +2283,12 @@ body::before {
 .crash-rocket {
   filter: drop-shadow(0 0 11px rgba(117, 232, 255, 0.7));
   font-size: 34px;
-  left: var(--flight-progress, 0%);
+  left: 0;
   position: absolute;
-  top: calc(110px - (var(--flight-progress, 0%) * 0.72));
+  top: 110px;
   transform: translate(-50%, -50%) rotate(-32deg);
   transition: left 80ms linear, top 80ms linear, filter 180ms ease;
+  will-change: left, top, transform;
   z-index: 2;
 }
 

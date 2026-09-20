@@ -5,6 +5,7 @@ const crashRuntime = {
   gameId: null,
   frame: null,
   settleTimer: null,
+  startedAtMs: null,
   settling: false,
 };
 let selectedCrashBet = "10";
@@ -119,14 +120,17 @@ function formatMultiplier(value) {
 }
 
 function getCrashMultiplier(startedAt) {
-  const started = new Date(startedAt).getTime();
-  const elapsed = Math.max(0, (Date.now() - started) / 1000);
+  const elapsed = getCrashElapsedSeconds(startedAt);
   return Number((1 + 0.42 * elapsed + 0.045 * elapsed * elapsed).toFixed(2));
 }
 
 function stopCrashAnimation() {
   if (crashRuntime.frame !== null) {
-    window.cancelAnimationFrame(crashRuntime.frame);
+    if (typeof window.cancelAnimationFrame === "function") {
+      window.cancelAnimationFrame(crashRuntime.frame);
+    } else {
+      window.clearTimeout(crashRuntime.frame);
+    }
   }
   if (crashRuntime.settleTimer !== null) {
     window.clearTimeout(crashRuntime.settleTimer);
@@ -134,6 +138,7 @@ function stopCrashAnimation() {
   crashRuntime.frame = null;
   crashRuntime.settleTimer = null;
   crashRuntime.gameId = null;
+  crashRuntime.startedAtMs = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
 }
@@ -141,20 +146,38 @@ function stopCrashAnimation() {
 function updateCrashVisual(multiplier, crashAt) {
   const stage = $("#crash-stage");
   const rocket = $("#crash-rocket");
+  const flightLine = $(".crash-flight-line");
   const progress = Math.max(
     0,
     Math.min(100, ((multiplier - 1) / Math.max(0.5, crashAt - 1)) * 100),
   );
   $("#crash-multiplier").textContent = formatMultiplier(multiplier);
   $("#crash-cashout-value").textContent = formatMultiplier(multiplier);
-  rocket?.style.setProperty("--flight-progress", `${progress}%`);
+  if (rocket && flightLine) {
+    const progressRatio = progress / 100;
+    const flightWidth = flightLine.clientWidth || stage?.clientWidth || 1;
+    const left = flightWidth * progressRatio;
+    const top = 110 - 72 * progressRatio;
+    rocket.style.left = `${left}px`;
+    rocket.style.top = `${top}px`;
+  }
   stage?.classList.add("running");
+}
+
+function getCrashElapsedSeconds(startedAt) {
+  const parsedStartedAt = Date.parse(String(startedAt || ""));
+  const startedAtMs = Number.isFinite(parsedStartedAt)
+    ? parsedStartedAt
+    : crashRuntime.startedAtMs ?? Date.now();
+  return Math.max(0, (Date.now() - startedAtMs) / 1000);
 }
 
 function startCrashAnimation(active) {
   if (crashRuntime.gameId === active.id && crashRuntime.frame !== null) return;
   stopCrashAnimation();
   crashRuntime.gameId = active.id;
+  const parsedStartedAt = Date.parse(String(active.startedAt || ""));
+  crashRuntime.startedAtMs = Number.isFinite(parsedStartedAt) ? parsedStartedAt : Date.now();
 
   const tick = () => {
     if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) {
@@ -183,7 +206,11 @@ function startCrashAnimation(active) {
 
   const animate = () => {
     if (tick()) {
-      crashRuntime.frame = window.requestAnimationFrame(animate);
+      if (typeof window.requestAnimationFrame === "function") {
+        crashRuntime.frame = window.requestAnimationFrame(animate);
+      } else {
+        crashRuntime.frame = window.setTimeout(animate, 16);
+      }
     }
   };
   animate();

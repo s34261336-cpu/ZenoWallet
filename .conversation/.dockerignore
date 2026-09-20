@@ -1,0 +1,8 @@
+.git
+.agents
+.local
+artifacts
+attached_assets
+__pycache__
+*.pyc
+*.log

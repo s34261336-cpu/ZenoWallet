@@ -318,6 +318,18 @@ function getCrashElapsedSeconds(startedAt) {
   return Math.max(0, (Date.now() + serverClockOffsetMs - startedAtMs) / 1000);
 }
 
+async function settleCrashRound(gameId) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await runAction("crash_settle", { gameId });
+    if (appState.data?.crash?.active?.id !== gameId) return;
+    if (attempt < 2) {
+      await new Promise((resolve) => window.setTimeout(resolve, 700));
+    }
+    await loadState();
+    if (appState.data?.crash?.active?.id !== gameId) return;
+  }
+}
+
 function startCrashAnimation(active) {
   if (
     crashRuntime.gameId === active.id &&
@@ -351,7 +363,7 @@ function startCrashAnimation(active) {
         crashRuntime.settling = true;
         crashRuntime.settleTimer = window.setTimeout(() => {
           crashRuntime.settleTimer = null;
-          runAction("crash_settle", { gameId: active.id }).finally(() => {
+          settleCrashRound(active.id).finally(() => {
             crashRuntime.settling = false;
           });
         }, 650);

@@ -36,32 +36,42 @@ DEFAULT_CASE_SETTINGS = {
     "hourly_limit": 5,
 }
 # The requested percentages add up to 101%, so they are treated as relative
-# weights and normalized by the total weight. This preserves their intended
-# order and makes every round deterministic in its probability space.
-CRASH_POINT_WEIGHTS = (
-    (1.2, 4000),
-    (1.5, 2500),
-    (2.0, 1500),
-    (3.0, 1000),
-    (5.0, 600),
-    (10.0, 300),
-    (20.0, 100),
-    (50.0, 50),
-    (100.0, 30),
-    (500.0, 20),
+# weights and normalized by the total weight. Each weight selects a range,
+# rather than one fixed crash point, so rounds can end at values such as 1.37x
+# or 4.21x while preserving the intended probability curve.
+CRASH_POINT_BANDS = (
+    (1.2, 1.5, 4000),
+    (1.5, 2.0, 2500),
+    (2.0, 3.0, 1500),
+    (3.0, 5.0, 1000),
+    (5.0, 10.0, 600),
+    (10.0, 20.0, 300),
+    (20.0, 50.0, 100),
+    (50.0, 100.0, 50),
+    # The old 100x and 500x points share the final 100x–500x tail.
+    (100.0, 500.0, 30 + 20),
 )
-CRASH_POINT_WEIGHT_TOTAL = sum(weight for _, weight in CRASH_POINT_WEIGHTS)
+CRASH_POINT_WEIGHT_TOTAL = sum(weight for _, _, weight in CRASH_POINT_BANDS)
 CRASH_RANDOM = random.SystemRandom()
 
 
 def choose_crash_point() -> float:
     roll = CRASH_RANDOM.randrange(CRASH_POINT_WEIGHT_TOTAL)
     cursor = 0
-    for crash_point, weight in CRASH_POINT_WEIGHTS:
+    for lower_bound, upper_bound, weight in CRASH_POINT_BANDS:
         cursor += weight
         if roll < cursor:
-            return crash_point
-    return CRASH_POINT_WEIGHTS[-1][0]
+            # Keep two visible decimal places while excluding exact band
+            # boundaries. Supabase stores crash_at as numeric(10, 2).
+            return round(
+                CRASH_RANDOM.uniform(lower_bound + 0.005, upper_bound - 0.005),
+                2,
+            )
+    lower_bound, upper_bound, _ = CRASH_POINT_BANDS[-1]
+    return round(
+        CRASH_RANDOM.uniform(lower_bound + 0.005, upper_bound - 0.005),
+        2,
+    )
 
 
 def resolve_webapp_url() -> str:

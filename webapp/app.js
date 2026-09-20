@@ -9,7 +9,6 @@ const crashRuntime = {
   settleTimer: null,
   startedAtMs: null,
   startedPerfMs: null,
-  trajectoryLength: null,
   settling: false,
 };
 let selectedCrashBet = "10";
@@ -125,7 +124,7 @@ function formatMultiplier(value) {
 
 function getCrashMultiplier(startedAt) {
   const elapsed = getCrashElapsedSeconds(startedAt);
-  return Number((1 + 0.42 * elapsed + 0.045 * elapsed * elapsed).toFixed(2));
+  return 1 + 0.42 * elapsed + 0.045 * elapsed * elapsed;
 }
 
 function getTimingNow() {
@@ -144,9 +143,27 @@ function syncServerClock(serverNow, requestStartedAt, requestFinishedAt) {
   hasServerClock = true;
 }
 
-function getCrashTravelProgress(multiplier) {
-  const growth = Math.max(0, Number(multiplier || 1) - 1);
-  return Math.max(0, Math.min(1, 1 - Math.exp(-0.85 * growth)));
+function getCrashTravelProgress(multiplier, crashAt) {
+  const current = Math.max(1, Number(multiplier || 1));
+  const target = Math.max(1.01, Number(crashAt || 1.01));
+  const progress = Math.log(current) / Math.log(target);
+  return Math.max(0, Math.min(1, progress));
+}
+
+function getCrashTrajectoryPoint(progress) {
+  const t = Math.max(0, Math.min(1, progress));
+  const inverseT = 1 - t;
+  return {
+    x:
+      3 * inverseT * inverseT * t * 24 +
+      3 * inverseT * t * t * 62 +
+      t * t * t * 100,
+    y:
+      inverseT * inverseT * inverseT * 94 +
+      3 * inverseT * inverseT * t * 100 +
+      3 * inverseT * t * t * 84 +
+      t * t * t * 8,
+  };
 }
 
 function stopCrashAnimation() {
@@ -165,18 +182,17 @@ function stopCrashAnimation() {
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
   crashRuntime.startedPerfMs = null;
-  crashRuntime.trajectoryLength = null;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
   $("#crash-stage")?.classList.remove("phase-low", "phase-mid", "phase-high");
 }
 
-function updateCrashVisual(multiplier) {
+function updateCrashVisual(multiplier, crashAt) {
   const stage = $("#crash-stage");
   const rocket = $("#crash-rocket");
   const flightLine = $(".crash-flight-line");
   const trajectory = $("#crash-trajectory-progress");
-  const travelProgress = getCrashTravelProgress(multiplier);
+  const travelProgress = getCrashTravelProgress(multiplier, crashAt);
   $("#crash-multiplier").textContent = formatMultiplier(multiplier);
   $("#crash-cashout-value").textContent = formatMultiplier(multiplier);
   const phase =
@@ -188,32 +204,13 @@ function updateCrashVisual(multiplier) {
   stage?.classList.remove("phase-low", "phase-mid", "phase-high");
   stage?.classList.add(`phase-${phase}`);
   if (trajectory) {
-    crashRuntime.trajectoryLength ??= trajectory.getTotalLength();
-    const length = crashRuntime.trajectoryLength;
-    trajectory.style.strokeDasharray = `${length}`;
-    trajectory.style.strokeDashoffset = `${length * (1 - travelProgress)}`;
+    trajectory.style.strokeDasharray = "1";
+    trajectory.style.strokeDashoffset = `${1 - travelProgress}`;
   }
   if (rocket && flightLine) {
     const width = flightLine.clientWidth || stage?.clientWidth || 1;
     const height = flightLine.clientHeight || 150;
-    const t = travelProgress;
-    const inverseT = 1 - t;
-    const point =
-      trajectory &&
-      Number.isFinite(crashRuntime.trajectoryLength) &&
-      typeof trajectory.getPointAtLength === "function"
-        ? trajectory.getPointAtLength(crashRuntime.trajectoryLength * t)
-        : {
-            x:
-              3 * inverseT * inverseT * t * 24 +
-              3 * inverseT * t * t * 62 +
-              t * t * t * 100,
-            y:
-              inverseT * inverseT * inverseT * 94 +
-              3 * inverseT * inverseT * t * 100 +
-              3 * inverseT * t * t * 84 +
-              t * t * t * 8,
-          };
+    const point = getCrashTrajectoryPoint(travelProgress);
     const left = (point.x / 100) * width;
     const top = (point.y / 100) * height;
     rocket.style.transform = `translate3d(${left}px, ${top}px, 0) translate(-50%, -50%) rotate(-32deg)`;
@@ -233,7 +230,12 @@ function getCrashElapsedSeconds(startedAt) {
 }
 
 function startCrashAnimation(active) {
-  if (crashRuntime.gameId === active.id && crashRuntime.frame !== null) return;
+  if (
+    crashRuntime.gameId === active.id &&
+    (crashRuntime.frame !== null || crashRuntime.settling)
+  ) {
+    return;
+  }
   stopCrashAnimation();
   crashRuntime.gameId = active.id;
   const parsedStartedAt = Date.parse(String(active.startedAt || ""));
@@ -251,7 +253,7 @@ function startCrashAnimation(active) {
       return false;
     }
     const multiplier = getCrashMultiplier(active.startedAt);
-    updateCrashVisual(Math.min(multiplier, active.crashAt));
+    updateCrashVisual(Math.min(multiplier, active.crashAt), active.crashAt);
     if (multiplier >= active.crashAt) {
       crashRuntime.frame = null;
       $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;

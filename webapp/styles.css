@@ -2322,6 +2322,7 @@ body::before {
   position: absolute;
   top: 0;
   transform: translate(-50%, -50%) rotate(-32deg);
+  transform-origin: center center;
   transition: filter 140ms ease;
   will-change: transform;
   backface-visibility: hidden;

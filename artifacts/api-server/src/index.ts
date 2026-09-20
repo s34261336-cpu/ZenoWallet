@@ -1,6 +1,5 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { startTelegramBot } from "./lib/telegram-bot";
 
 const rawPort = process.env["PORT"];
 
@@ -23,5 +22,5 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  startTelegramBot();
+  logger.info("Legacy Telegram polling is disabled; use the ZenoWallet bot workflow");
 });

@@ -2,3 +2,4 @@
 - [Imported app preview](imported-app-preview.md) — root workflows need an explicit `[[ports]]` mapping for Replit preview routing.
 - [Telegram mini-app hosting](telegram-mini-app-hosting.md) — use only an explicit working external HTTPS URL; never fall back to Replit domains.
 - [Crash game settlement](crash-game-settlement.md) — keep bet deduction and payout inside Supabase RPC; the browser only animates and requests settlement.
+- [Single Telegram poller](single-telegram-poller.md) — only the ZenoWallet bot workflow may call Telegram getUpdates; legacy artifact polling stays disabled.

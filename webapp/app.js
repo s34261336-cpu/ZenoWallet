@@ -201,6 +201,19 @@ function renderCrash(data) {
   $("#crash-balance").textContent = formatNumber(data.wallet.earnBalance);
   renderCrashHistory(crash.history);
 
+  if (crash.available === false) {
+    stopCrashAnimation();
+    document.querySelectorAll("[data-crash-bet]").forEach((button) => {
+      button.disabled = true;
+    });
+    $("#crash-status").textContent = "Игра не настроена";
+    $("#crash-multiplier").textContent = "—";
+    $("#crash-start").disabled = true;
+    $("#crash-cashout").disabled = true;
+    $("#crash-hint").textContent = "Администратору нужно выполнить supabase/schema.sql в Supabase.";
+    return;
+  }
+
   document.querySelectorAll("[data-crash-bet]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.crashBet === selectedCrashBet);
     button.disabled = Boolean(active);

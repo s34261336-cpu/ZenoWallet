@@ -1681,13 +1681,27 @@ def validate_web_app_init_data(init_data: str, bot_token: str) -> dict[str, Any]
     return user
 
 
+def is_crash_schema_error(error: Exception) -> bool:
+    error_text = str(error).lower()
+    return "public.games" in error_text or "public.crash_" in error_text
+
+
 def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
     user_id = int(user["id"])
     supabase = bot.supabase
     wallet = supabase.ensure_wallet(user_id)
     supabase.ensure_user_state(user_id)
-    active_crash_game = supabase.resolve_active_crash_game(user_id)
-    crash_history = supabase.get_crash_history(user_id)
+    crash_available = True
+    try:
+        active_crash_game = supabase.resolve_active_crash_game(user_id)
+        crash_history = supabase.get_crash_history(user_id)
+    except RuntimeError as error:
+        if not is_crash_schema_error(error):
+            raise
+        log.warning("Crash game schema is not ready; keeping wallet available")
+        crash_available = False
+        active_crash_game = None
+        crash_history = []
     users_state = supabase.get_users_state()
     user_state = users_state.get(str(user_id))
     user_state = user_state if isinstance(user_state, dict) else {}
@@ -1771,6 +1785,7 @@ def web_app_state(bot: WalletBot, user: dict[str, Any]) -> dict[str, Any]:
             "hourlyLimit": settings["hourly_limit"],
         },
         "crash": {
+            "available": crash_available,
             "active": (
                 {
                     "id": int(active_crash_game["id"]),
@@ -2051,6 +2066,16 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                 raise ValueError("Неизвестное действие")
         except ValueError as error:
             self.error_json(str(error), 400)
+        except RuntimeError as error:
+            if action and str(action).startswith("crash_") and is_crash_schema_error(error):
+                self.error_json(
+                    "Ракетка пока не настроена. Выполните supabase/schema.sql в Supabase.",
+                    503,
+                    "crash_setup_required",
+                )
+                return
+            log.exception("Mini-app action request failed")
+            self.error_json("Не удалось выполнить операцию.", 500)
         except Exception:
             log.exception("Mini-app action request failed")
             self.error_json("Не удалось выполнить операцию.", 500)

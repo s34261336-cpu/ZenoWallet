@@ -2169,11 +2169,22 @@ body::before {
   background:
     radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--crash-accent) 19%, transparent), transparent 36%),
     radial-gradient(circle at 82% 12%, rgba(117, 232, 255, 0.17), transparent 22%),
-    linear-gradient(145deg, #11182f 0%, #090e20 56%, #050711 100%);
+    linear-gradient(145deg, #18274a 0%, #0d1732 56%, #070b1b 100%);
   border-bottom: 1px solid rgba(162, 182, 255, 0.16);
   height: 250px;
   overflow: hidden;
   position: relative;
+}
+
+.crash-stage::before {
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.12), transparent 24%),
+    radial-gradient(circle at 48% 42%, rgba(255, 255, 255, 0.08), transparent 28%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
 }
 
 .crash-grid {
@@ -2255,6 +2266,64 @@ body::before {
   transform: translateX(-50%);
   white-space: nowrap;
   z-index: 1;
+}
+
+.crash-result-banner {
+  align-items: center;
+  backdrop-filter: blur(16px) saturate(155%);
+  -webkit-backdrop-filter: blur(16px) saturate(155%);
+  background: linear-gradient(135deg, rgba(29, 22, 60, 0.78), rgba(14, 20, 48, 0.68));
+  border: 1px solid rgba(255, 119, 203, 0.46);
+  border-radius: 18px;
+  bottom: 17px;
+  box-shadow:
+    0 12px 28px rgba(2, 4, 18, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 24px rgba(255, 119, 203, 0.12);
+  display: flex;
+  flex-direction: column;
+  left: 50%;
+  max-width: calc(100% - 32px);
+  padding: 9px 16px 10px;
+  position: absolute;
+  text-align: center;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.crash-result-banner.hidden {
+  display: none;
+}
+
+.crash-result-kicker {
+  color: rgba(239, 232, 255, 0.68);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.crash-result-banner strong {
+  color: #ff8dce;
+  font-family: "Manrope", sans-serif;
+  font-size: 17px;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.crash-result-detail {
+  color: #f1d9eb;
+  font-size: 10px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.crash-stage.outcome-won .crash-result-banner {
+  border-color: rgba(189, 245, 103, 0.52);
+}
+
+.crash-stage.outcome-won .crash-result-banner strong {
+  color: var(--lime);
 }
 
 .crash-stage.running .crash-multiplier {
@@ -2357,14 +2426,18 @@ body::before {
 
 .crash-rocket-body {
   background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.42), transparent 32%),
-    linear-gradient(180deg, color-mix(in srgb, var(--crash-accent) 94%, white), var(--crash-accent) 58%, color-mix(in srgb, var(--crash-accent) 62%, #081022));
-  border: 2px solid color-mix(in srgb, var(--crash-accent) 72%, white);
+    linear-gradient(118deg, rgba(255, 255, 255, 0.7) 0 11%, rgba(255, 255, 255, 0.08) 22%, transparent 39%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--crash-accent) 66%, white), color-mix(in srgb, var(--crash-accent) 62%, transparent) 56%, rgba(8, 16, 42, 0.52));
+  backdrop-filter: blur(10px) saturate(170%);
+  -webkit-backdrop-filter: blur(10px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 50% 58% 58% 50%;
   box-shadow:
     0 0 20px color-mix(in srgb, var(--crash-accent) 76%, transparent),
-    inset 0 1px 2px rgba(255, 255, 255, 0.68),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.2);
+    0 7px 16px rgba(1, 6, 20, 0.24),
+    inset 0 1px 2px rgba(255, 255, 255, 0.86),
+    inset 0 -5px 10px rgba(0, 0, 0, 0.18);
   color: #f8ffff;
   display: grid;
   font-size: 17px;
@@ -2376,6 +2449,20 @@ body::before {
   top: 14px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   width: 48px;
+}
+
+.crash-rocket-body::before {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.82), transparent);
+  border-radius: 999px;
+  content: "";
+  height: 4px;
+  left: 9px;
+  opacity: 0.78;
+  position: absolute;
+  top: 4px;
+  transform: rotate(-11deg);
+  width: 21px;
+  z-index: 2;
 }
 
 .crash-rocket-body::after {
@@ -2396,9 +2483,10 @@ body::before {
 }
 
 .crash-rocket-window {
-  background: rgba(7, 16, 38, 0.64);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(145deg, rgba(237, 255, 255, 0.78), rgba(73, 210, 255, 0.34) 36%, rgba(7, 16, 38, 0.64));
+  border: 1px solid rgba(255, 255, 255, 0.88);
   border-radius: 50%;
+  box-shadow: 0 0 8px rgba(160, 245, 255, 0.58), inset 1px 1px 2px rgba(255, 255, 255, 0.8);
   height: 9px;
   left: 8px;
   position: absolute;
@@ -2408,8 +2496,11 @@ body::before {
 }
 
 .crash-rocket-fin {
-  background: color-mix(in srgb, var(--crash-accent) 72%, #081022);
-  border: 1px solid color-mix(in srgb, var(--crash-accent) 66%, white);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.36), color-mix(in srgb, var(--crash-accent) 46%, rgba(8, 16, 34, 0.58)));
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.34), 0 0 8px color-mix(in srgb, var(--crash-accent) 42%, transparent);
   height: 13px;
   position: absolute;
   width: 22px;

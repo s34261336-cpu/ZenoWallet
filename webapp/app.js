@@ -20,6 +20,7 @@ const crashRuntime = {
   displayMultiplier: null,
   crashed: false,
   settling: false,
+  lastOutcome: null,
 };
 let selectedCrashBet = "10";
 const CRASH_START_COUNTDOWN_MS = 3000;
@@ -252,6 +253,38 @@ function stopCrashAnimation() {
   rocket?.style.removeProperty("--flight-angle");
 }
 
+function clearCrashOutcome() {
+  crashRuntime.lastOutcome = null;
+  const stage = $("#crash-stage");
+  stage?.classList.remove("has-outcome", "outcome-lost", "outcome-won");
+  $("#crash-result-banner")?.classList.add("hidden");
+}
+
+function renderCrashOutcome(outcome) {
+  const stage = $("#crash-stage");
+  const banner = $("#crash-result-banner");
+  const title = $("#crash-result-title");
+  const detail = $("#crash-result-detail");
+  if (!stage || !banner || !title || !detail || !outcome) return;
+
+  const lost = outcome.result === "lost";
+  const multiplier = formatMultiplier(outcome.multiplier);
+  stage.classList.add("has-outcome");
+  stage.classList.toggle("outcome-lost", lost);
+  stage.classList.toggle("outcome-won", !lost);
+  banner.classList.remove("hidden");
+  title.textContent = lost ? "ПРОИГРЫШ" : "СТАВКА ЗАБРАНА";
+  detail.textContent = lost
+    ? `Ракета улетела на ${multiplier} · ставка сгорела`
+    : `Забрано ${formatNumber(outcome.payout)} монет на ${multiplier}`;
+  $("#crash-status").textContent = lost ? "Раунд завершён" : "Раунд выигран";
+  $("#crash-multiplier").textContent = multiplier;
+  $("#crash-cashout-value").textContent = multiplier;
+  $("#crash-hint").textContent = lost
+    ? "Попробуй ещё раз — выбери новую ставку."
+    : "Отличный тайминг. Можно запускать следующий раунд.";
+}
+
 function startCrashCountdown() {
   const stage = $("#crash-stage");
   const status = $("#crash-status");
@@ -259,6 +292,7 @@ function startCrashCountdown() {
   const countdownStartedAt = Date.now();
   const countdownEndAt = countdownStartedAt + CRASH_START_COUNTDOWN_MS;
 
+  clearCrashOutcome();
   if (crashRuntime.countdownTimer !== null) {
     window.clearTimeout(crashRuntime.countdownTimer);
   }
@@ -526,6 +560,15 @@ function renderCrash(data) {
 
   if (!active) {
     stopCrashAnimation();
+    if (crashRuntime.lastOutcome) {
+      $("#crash-start").disabled = busyActions.has("crash_start");
+      $("#crash-cashout").disabled = true;
+      $("#crash-selected-bet").textContent =
+        selectedCrashBet === "all" ? "Весь баланс" : `${formatNumber(selectedCrashBet)} монет`;
+      renderCrashOutcome(crashRuntime.lastOutcome);
+      return;
+    }
+    clearCrashOutcome();
     $("#crash-status").textContent = "Готов к старту";
     $("#crash-multiplier").textContent = "1.00x";
     $("#crash-cashout-value").textContent = "1.00x";
@@ -711,6 +754,17 @@ async function runAction(action, body = {}, options = {}) {
       $("#crash-stage")?.classList.remove("launching");
     }
     const actionResult = result.lastAction;
+    if (
+      actionResult?.type === "crash_cashout" ||
+      actionResult?.type === "crash_settle"
+    ) {
+      crashRuntime.lastOutcome = {
+        result: actionResult.result,
+        multiplier: Number(actionResult.multiplier || 1),
+        payout: Number(actionResult.payout || 0),
+        bet: Number(actionResult.bet || 0),
+      };
+    }
     if (action === "crash_start" && actionResult?.type === "crash_start") {
       appState.data = {
         ...appState.data,

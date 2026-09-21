@@ -42,6 +42,10 @@ alter table public.games
   add column if not exists payout bigint not null default 0,
   add column if not exists settled_at timestamptz;
 
+-- Roulette rows share this ledger but do not have a crash point.
+alter table public.games
+  alter column crash_at drop not null;
+
 -- Upgrade the first crash-game migration from the old 1.5x–10x range.
 alter table public.games drop constraint if exists games_crash_at_check;
 alter table public.games drop constraint if exists games_crash_at_range_check;
@@ -556,6 +560,9 @@ begin
   );
 end;
 $$;
+
+grant execute on function public.roulette_play(bigint, bigint)
+  to anon, authenticated, service_role;
 
 -- Remove ZenoToken awarded by older season versions. Season rewards belong
 -- only in the main wallet balance, so this migration reverses the old

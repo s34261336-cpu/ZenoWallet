@@ -1759,6 +1759,15 @@ def is_crash_schema_error(error: Exception) -> bool:
     )
 
 
+def is_roulette_schema_error(error: Exception) -> bool:
+    error_text = str(error).lower()
+    return (
+        "roulette" in error_text
+        or "roulette_daily" in error_text
+        or "roulette_jackpot_daily" in error_text
+    )
+
+
 def web_app_state(
     bot: WalletBot,
     user: dict[str, Any],
@@ -1789,7 +1798,7 @@ def web_app_state(
         roulette_status = supabase.get_roulette_status(user_id)
         roulette_history = supabase.get_roulette_history(user_id)
     except RuntimeError as error:
-        if not is_crash_schema_error(error):
+        if not is_roulette_schema_error(error):
             raise
         log.warning("Roulette schema is not ready; keeping wallet available")
         roulette_available = False
@@ -2245,16 +2254,32 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     "crash_setup_required",
                 )
                 return
-            if action == "roulette_play" and is_crash_schema_error(error):
+            if action == "roulette_play" and is_roulette_schema_error(error):
                 self.error_json(
-                    "Рулетка пока не настроена. Выполните supabase/schema.sql в Supabase.",
+                    "Рулетка пока не настроена в Supabase. Выполните обновлённый supabase/schema.sql.",
                     503,
                     "roulette_setup_required",
+                )
+                return
+            if action == "roulette_play":
+                log.exception("Roulette action failed")
+                self.error_json(
+                    "Рулетка временно недоступна. Обновите схему Supabase и попробуйте ещё раз.",
+                    503,
+                    "roulette_unavailable",
                 )
                 return
             log.exception("Mini-app action request failed")
             self.error_json("Не удалось выполнить операцию.", 500)
         except Exception:
+            if action == "roulette_play":
+                log.exception("Roulette action failed")
+                self.error_json(
+                    "Рулетка временно недоступна. Обновите схему Supabase и попробуйте ещё раз.",
+                    503,
+                    "roulette_unavailable",
+                )
+                return
             log.exception("Mini-app action request failed")
             self.error_json("Не удалось выполнить операцию.", 500)
 

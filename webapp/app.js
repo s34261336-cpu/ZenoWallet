@@ -553,7 +553,7 @@ function showToast(message, tone = "success") {
   toast.classList.toggle("danger", tone === "danger");
   toast.classList.add("show");
   window.clearTimeout(showToast.timeout);
-  showToast.timeout = window.setTimeout(() => toast.classList.remove("show"), 4600);
+  showToast.timeout = window.setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
 function showError(message) {

@@ -812,17 +812,7 @@ def progress_bar(percent: int, width: int = 10) -> str:
 
 def menu_keyboard(is_admin: bool = False) -> dict[str, Any]:
     keyboard = [
-        *(
-            [[
-                {
-                    "text": "🚀 Открыть мини-апп",
-                    "web_app": {"url": WEBAPP_URL},
-                }
-            ]]
-            if WEBAPP_URL
-            else []
-        ),
-        [{"text": "🎁 Открыть кейс"}, {"text": "☀️ Ежедневный бонус"}],
+        [{"text": "☀️ Ежедневный бонус"}],
         [{"text": "💳 Мой баланс"}, {"text": "👥 Пригласить друзей"}],
         [{"text": "📤 Вывести монеты"}],
         [{"text": "🏆 Сезон"}, {"text": "📊 Топ сезона"}],

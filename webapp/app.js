@@ -264,17 +264,20 @@ function clearCrashOutcome() {
   crashRuntime.lastOutcome = null;
   const stage = $("#crash-stage");
   const banner = $("#crash-result-banner");
+  const slot = $("#crash-result-slot");
   stage?.classList.remove("has-outcome", "outcome-lost", "outcome-won");
   banner?.classList.remove("outcome-lost", "outcome-won");
   banner?.classList.add("hidden");
+  slot?.classList.remove("has-result");
 }
 
 function renderCrashOutcome(outcome) {
   const stage = $("#crash-stage");
   const banner = $("#crash-result-banner");
+  const slot = $("#crash-result-slot");
   const title = $("#crash-result-title");
   const detail = $("#crash-result-detail");
-  if (!stage || !banner || !title || !detail || !outcome) return;
+  if (!stage || !banner || !slot || !title || !detail || !outcome) return;
 
   const lost = outcome.result === "lost";
   const multiplier = formatMultiplier(outcome.multiplier);
@@ -292,6 +295,7 @@ function renderCrashOutcome(outcome) {
   stage.classList.toggle("outcome-won", !lost);
   banner.classList.toggle("outcome-lost", lost);
   banner.classList.toggle("outcome-won", !lost);
+  slot.classList.add("has-result");
   banner.classList.remove("hidden");
   title.textContent = lost
     ? `ПРОИГРЫШ на ${multiplier} · ставка сгорела`
@@ -317,11 +321,12 @@ function renderCrashOutcome(outcome) {
       stage.classList.remove("has-outcome", "outcome-lost", "outcome-won");
       banner.classList.remove("outcome-lost", "outcome-won");
       banner.classList.add("hidden");
+      slot.classList.remove("has-result");
       $("#crash-status").textContent = "Готов к старту";
       $("#crash-multiplier").textContent = "1.00x";
       $("#crash-cashout-value").textContent = "1.00x";
       $("#crash-hint").textContent = "Выбери ставку и запусти раунд.";
-    }, 2600);
+    }, 4600);
   }
 }
 

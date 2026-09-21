@@ -14,3 +14,9 @@ If a root mini-app and a registered API artifact both claim `/api`, shared-proxy
 **Why:** A healthy root server can still appear broken in preview when the proxy resolves `/api/*` to another service first; the browser then receives a misleading 404 or `Backend Not Configured`.
 
 **How to apply:** Check the actual proxy response for static files and API calls, not only the direct workflow port, whenever an imported app has sibling artifacts mounted under a path prefix.
+
+Imported repositories can contain tracked artifact manifests from an earlier Replit workspace. Those managed workflows are not removable through ordinary workflow controls and can remain failed when the imported app is Python-only.
+
+**Why:** Starting unused artifact services wastes quota and can keep the shared preview router pointed at a dead service even when the primary workflow is healthy.
+
+**How to apply:** Treat legacy artifact manifests as a separate cleanup task; do not install their frontend/backend dependencies just to silence workflows outside the imported app runtime.

@@ -2274,19 +2274,20 @@ body::before {
   -webkit-backdrop-filter: blur(16px) saturate(155%);
   background: linear-gradient(135deg, rgba(29, 22, 60, 0.78), rgba(14, 20, 48, 0.68));
   border: 1px solid rgba(255, 119, 203, 0.46);
-  border-radius: 18px;
-  bottom: 17px;
+  border-radius: 999px;
+  top: 12px;
   box-shadow:
     0 12px 28px rgba(2, 4, 18, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0 0 24px rgba(255, 119, 203, 0.12);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: 8px;
   left: 50%;
-  max-width: calc(100% - 32px);
-  padding: 9px 16px 10px;
+  max-width: calc(100% - 24px);
+  padding: 7px 13px;
   position: absolute;
-  text-align: center;
+  text-align: left;
   transform: translateX(-50%);
   z-index: 5;
 }
@@ -2300,22 +2301,27 @@ body::before {
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .crash-result-banner strong {
   color: #ff8dce;
   font-family: "Manrope", sans-serif;
-  font-size: 17px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   line-height: 1.25;
-  margin-top: 2px;
+  white-space: nowrap;
 }
 
 .crash-result-detail {
   color: #f1d9eb;
   font-size: 10px;
-  margin-top: 2px;
-  white-space: nowrap;
+  line-height: 1.2;
+  max-width: 220px;
+}
+
+.crash-stage.has-outcome .crash-status {
+  opacity: 0;
 }
 
 .crash-stage.outcome-won .crash-result-banner {

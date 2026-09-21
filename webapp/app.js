@@ -21,6 +21,8 @@ const crashRuntime = {
   crashed: false,
   settling: false,
   lastOutcome: null,
+  outcomeTimer: null,
+  outcomeKey: null,
 };
 let selectedCrashBet = "10";
 const CRASH_START_COUNTDOWN_MS = 3000;
@@ -254,6 +256,11 @@ function stopCrashAnimation() {
 }
 
 function clearCrashOutcome() {
+  if (crashRuntime.outcomeTimer !== null) {
+    window.clearTimeout(crashRuntime.outcomeTimer);
+  }
+  crashRuntime.outcomeTimer = null;
+  crashRuntime.outcomeKey = null;
   crashRuntime.lastOutcome = null;
   const stage = $("#crash-stage");
   stage?.classList.remove("has-outcome", "outcome-lost", "outcome-won");
@@ -269,6 +276,15 @@ function renderCrashOutcome(outcome) {
 
   const lost = outcome.result === "lost";
   const multiplier = formatMultiplier(outcome.multiplier);
+  const outcomeKey = [
+    outcome.result,
+    outcome.multiplier,
+    outcome.payout,
+    outcome.bet,
+  ].join(":");
+  const shouldStartTimer =
+    crashRuntime.outcomeKey !== outcomeKey || banner.classList.contains("hidden");
+
   stage.classList.add("has-outcome");
   stage.classList.toggle("outcome-lost", lost);
   stage.classList.toggle("outcome-won", !lost);
@@ -283,6 +299,25 @@ function renderCrashOutcome(outcome) {
   $("#crash-hint").textContent = lost
     ? "Попробуй ещё раз — выбери новую ставку."
     : "Отличный тайминг. Можно запускать следующий раунд.";
+
+  if (shouldStartTimer) {
+    if (crashRuntime.outcomeTimer !== null) {
+      window.clearTimeout(crashRuntime.outcomeTimer);
+    }
+    crashRuntime.outcomeKey = outcomeKey;
+    crashRuntime.outcomeTimer = window.setTimeout(() => {
+      if (crashRuntime.outcomeKey !== outcomeKey) return;
+      crashRuntime.outcomeTimer = null;
+      crashRuntime.outcomeKey = null;
+      crashRuntime.lastOutcome = null;
+      stage.classList.remove("has-outcome", "outcome-lost", "outcome-won");
+      banner.classList.add("hidden");
+      $("#crash-status").textContent = "Готов к старту";
+      $("#crash-multiplier").textContent = "1.00x";
+      $("#crash-cashout-value").textContent = "1.00x";
+      $("#crash-hint").textContent = "Выбери ставку и запусти раунд.";
+    }, 2600);
+  }
 }
 
 function startCrashCountdown() {

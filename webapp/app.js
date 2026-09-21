@@ -13,6 +13,8 @@ const crashRuntime = {
   visualCatchupStartedPerfMs: null,
   visualCatchupElapsedMs: 0,
   settleRetryTimer: null,
+  lastFramePerfMs: null,
+  lagCashoutRequested: false,
   bounds: null,
   phase: null,
   displayMultiplier: null,
@@ -226,6 +228,8 @@ function stopCrashAnimation() {
   crashRuntime.settleTimer = null;
   crashRuntime.countdownTimer = null;
   crashRuntime.settleRetryTimer = null;
+  crashRuntime.lastFramePerfMs = null;
+  crashRuntime.lagCashoutRequested = false;
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
   crashRuntime.startedPerfMs = null;
@@ -379,6 +383,24 @@ async function settleCrashRound(gameId) {
   }
 }
 
+function protectCrashRoundFromLag(gameId, reason) {
+  if (
+    crashRuntime.lagCashoutRequested ||
+    crashRuntime.settling ||
+    busyActions.has("crash_cashout") ||
+    appState.data?.crash?.active?.id !== gameId
+  ) {
+    return;
+  }
+  crashRuntime.lagCashoutRequested = true;
+  $("#crash-status").textContent = reason;
+  runAction("crash_cashout", { gameId }, { silent: true })
+    .catch(() => {})
+    .finally(() => {
+      crashRuntime.lagCashoutRequested = false;
+    });
+}
+
 function startCrashAnimation(active) {
   if (
     crashRuntime.gameId === active.id &&
@@ -398,11 +420,24 @@ function startCrashAnimation(active) {
   crashRuntime.startedPerfMs = getTimingNow() - initialElapsedMs;
   crashRuntime.visualCatchupElapsedMs = initialElapsedMs;
   crashRuntime.visualCatchupStartedPerfMs = getTimingNow();
+  crashRuntime.lastFramePerfMs = getTimingNow();
 
   const tick = () => {
     if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) {
       crashRuntime.frame = null;
       return false;
+    }
+    const now = getTimingNow();
+    const frameGapMs =
+      crashRuntime.lastFramePerfMs === null
+        ? 0
+        : Math.max(0, now - crashRuntime.lastFramePerfMs);
+    crashRuntime.lastFramePerfMs = now;
+    if (frameGapMs >= 900) {
+      protectCrashRoundFromLag(active.id, "Связь прервалась — забираем ставку…");
+    }
+    if (crashRuntime.lagCashoutRequested) {
+      return true;
     }
     const multiplier = getCrashMultiplier(active.startedAt);
     updateCrashVisual(Math.min(multiplier, active.crashAt), active.crashAt);
@@ -822,6 +857,15 @@ $("#crash-cashout").addEventListener("click", () => {
 });
 
 $("#refresh-button").addEventListener("click", loadState);
+document.addEventListener("visibilitychange", () => {
+  const activeGame = appState.data?.crash?.active;
+  if (!activeGame) return;
+  if (document.visibilityState === "hidden") {
+    protectCrashRoundFromLag(activeGame.id, "Мини-апп свёрнут — забираем ставку…");
+  } else {
+    loadState();
+  }
+});
 $("#close-withdraw").addEventListener("click", closeWithdraw);
 $("#withdraw-modal").addEventListener("click", (event) => {
   if (event.target.id === "withdraw-modal") closeWithdraw();

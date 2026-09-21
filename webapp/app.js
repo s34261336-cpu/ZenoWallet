@@ -10,6 +10,8 @@ const crashRuntime = {
   countdownTimer: null,
   startedAtMs: null,
   startedPerfMs: null,
+  visualCatchupStartedPerfMs: null,
+  visualCatchupElapsedMs: 0,
   bounds: null,
   phase: null,
   displayMultiplier: null,
@@ -220,6 +222,8 @@ function stopCrashAnimation() {
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
   crashRuntime.startedPerfMs = null;
+  crashRuntime.visualCatchupStartedPerfMs = null;
+  crashRuntime.visualCatchupElapsedMs = 0;
   crashRuntime.bounds = null;
   crashRuntime.phase = null;
   crashRuntime.displayMultiplier = null;
@@ -311,13 +315,33 @@ function updateCrashVisual(multiplier, crashAt) {
 
 function getCrashElapsedSeconds(startedAt) {
   const parsedStartedAt = Date.parse(String(startedAt || ""));
+  const now = getTimingNow();
+  let actualElapsedMs;
   if (crashRuntime.startedPerfMs !== null) {
-    return Math.max(0, (getTimingNow() - crashRuntime.startedPerfMs) / 1000);
+    actualElapsedMs = Math.max(0, now - crashRuntime.startedPerfMs);
+  } else {
+    const startedAtMs = Number.isFinite(parsedStartedAt)
+      ? parsedStartedAt
+      : crashRuntime.startedAtMs ?? Date.now() + serverClockOffsetMs;
+    actualElapsedMs = Math.max(0, Date.now() + serverClockOffsetMs - startedAtMs);
   }
-  const startedAtMs = Number.isFinite(parsedStartedAt)
-    ? parsedStartedAt
-    : crashRuntime.startedAtMs ?? Date.now() + serverClockOffsetMs;
-  return Math.max(0, (Date.now() + serverClockOffsetMs - startedAtMs) / 1000);
+
+  if (crashRuntime.visualCatchupStartedPerfMs !== null) {
+    const catchupDurationMs = 800;
+    const catchupProgress = Math.min(
+      1,
+      Math.max(0, (now - crashRuntime.visualCatchupStartedPerfMs) / catchupDurationMs),
+    );
+    if (catchupProgress < 1) {
+      const catchupTargetMs = crashRuntime.visualCatchupElapsedMs + catchupDurationMs;
+      return (
+        Math.min(actualElapsedMs, catchupTargetMs * catchupProgress) / 1000
+      );
+    }
+    crashRuntime.visualCatchupStartedPerfMs = null;
+  }
+
+  return actualElapsedMs / 1000;
 }
 
 async function settleCrashRound(gameId) {
@@ -358,6 +382,8 @@ function startCrashAnimation(active) {
     ? Math.max(0, Date.now() + serverClockOffsetMs - parsedStartedAt)
     : 0;
   crashRuntime.startedPerfMs = getTimingNow() - initialElapsedMs;
+  crashRuntime.visualCatchupElapsedMs = initialElapsedMs;
+  crashRuntime.visualCatchupStartedPerfMs = getTimingNow();
 
   const tick = () => {
     if (!appState.data?.crash?.active || appState.data.crash.active.id !== active.id) {

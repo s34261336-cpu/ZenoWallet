@@ -2602,6 +2602,47 @@ body::before {
   opacity: 0.52;
 }
 
+.crash-custom-bet {
+  align-items: center;
+  color: #929bbe;
+  display: grid;
+  font-size: 11px;
+  gap: 10px;
+  grid-template-columns: 1fr 1.35fr;
+  letter-spacing: 0.04em;
+  margin-bottom: 13px;
+}
+
+.crash-custom-bet input {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(213, 220, 255, 0.14);
+  border-radius: 12px;
+  box-sizing: border-box;
+  color: #f5f6ff;
+  font: 700 13px "Manrope", sans-serif;
+  min-height: 38px;
+  outline: none;
+  padding: 0 12px;
+  transition: 160ms ease;
+  width: 100%;
+}
+
+.crash-custom-bet input::placeholder {
+  color: #777f9f;
+  font: 500 11px "DM Sans", sans-serif;
+}
+
+.crash-custom-bet input:focus {
+  background: rgba(117, 232, 255, 0.1);
+  border-color: rgba(117, 232, 255, 0.65);
+  box-shadow: 0 0 16px rgba(117, 232, 255, 0.12);
+}
+
+.crash-custom-bet input:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .crash-selected-bet {
   border-bottom: 1px solid rgba(213, 220, 255, 0.1);
   padding-bottom: 13px;

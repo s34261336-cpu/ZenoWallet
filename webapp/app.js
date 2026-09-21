@@ -3,6 +3,7 @@ const appState = { data: null, activeView: "home" };
 const busyActions = new Set();
 let serverClockOffsetMs = 0;
 let hasServerClock = false;
+let lastCrashToastKey = "";
 const crashRuntime = {
   gameId: null,
   frame: null,
@@ -22,6 +23,7 @@ const crashRuntime = {
   settling: false,
 };
 let selectedCrashBet = "10";
+const CRASH_PRESET_BETS = new Set(["10", "50", "100"]);
 const CRASH_START_COUNTDOWN_MS = 3000;
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
@@ -503,6 +505,7 @@ function renderCrashHistory(history) {
 function renderCrash(data) {
   const crash = data.crash || { active: null, history: [] };
   const active = crash.active;
+  const customBetInput = $("#crash-custom-bet");
   $("#crash-balance").textContent = formatNumber(data.wallet.earnBalance);
   renderCrashHistory(crash.history);
 
@@ -511,6 +514,7 @@ function renderCrash(data) {
     document.querySelectorAll("[data-crash-bet]").forEach((button) => {
       button.disabled = true;
     });
+    if (customBetInput) customBetInput.disabled = true;
     $("#crash-status").textContent = "Игра не настроена";
     $("#crash-multiplier").textContent = "—";
     $("#crash-start").disabled = true;
@@ -523,6 +527,9 @@ function renderCrash(data) {
     button.classList.toggle("selected", button.dataset.crashBet === selectedCrashBet);
     button.disabled = Boolean(active);
   });
+  if (customBetInput) {
+    customBetInput.disabled = Boolean(active) || busyActions.has("crash_start");
+  }
 
   if (!active) {
     stopCrashAnimation();
@@ -532,12 +539,23 @@ function renderCrash(data) {
     $("#crash-hint").textContent = "Выбери ставку и запусти раунд.";
     $("#crash-start").disabled = busyActions.has("crash_start");
     $("#crash-cashout").disabled = true;
+    if (customBetInput) {
+      customBetInput.value = CRASH_PRESET_BETS.has(selectedCrashBet)
+        || selectedCrashBet === "all"
+        ? ""
+        : selectedCrashBet;
+    }
     $("#crash-selected-bet").textContent =
-      selectedCrashBet === "all" ? "Весь баланс" : `${formatNumber(selectedCrashBet)} монет`;
+      selectedCrashBet === "all"
+        ? "Весь баланс"
+        : Number.parseInt(selectedCrashBet, 10) > 0
+          ? `${formatNumber(selectedCrashBet)} монет`
+          : "Введи сумму";
     return;
   }
 
   selectedCrashBet = String(active.bet);
+  if (customBetInput) customBetInput.value = String(active.bet);
   $("#crash-selected-bet").textContent = `${formatNumber(active.bet)} монет`;
   $("#crash-status").textContent = "Ракета в полёте";
   $("#crash-hint").textContent = "Забери ставку сейчас — следующий тик может стать крашем.";
@@ -753,17 +771,27 @@ async function runAction(action, body = {}, options = {}) {
       (actionResult?.type === "crash_cashout" ||
         actionResult?.type === "crash_settle")
     ) {
-      if (actionResult.result === "won") {
-        showToast(
-          `Забрано ${formatNumber(actionResult.payout)} монет на ${formatMultiplier(actionResult.multiplier)}`,
-        );
-        telegram?.HapticFeedback?.notificationOccurred("success");
-      } else {
-        showToast(
-          `ПРОИГРЫШ на ${formatMultiplier(actionResult.multiplier)} · ставка сгорела`,
-          "danger",
-        );
-        telegram?.HapticFeedback?.notificationOccurred("error");
+      const toastKey = [
+        actionResult.type,
+        actionResult.gameId ?? "",
+        actionResult.result ?? "",
+        actionResult.multiplier ?? "",
+        actionResult.payout ?? "",
+      ].join(":");
+      if (toastKey !== lastCrashToastKey) {
+        lastCrashToastKey = toastKey;
+        if (actionResult.result === "won") {
+          showToast(
+            `Забрано ${formatNumber(actionResult.payout)} монет на ${formatMultiplier(actionResult.multiplier)}`,
+          );
+          telegram?.HapticFeedback?.notificationOccurred("success");
+        } else {
+          showToast(
+            `ПРОИГРЫШ на ${formatMultiplier(actionResult.multiplier)} · ставка сгорела`,
+            "danger",
+          );
+          telegram?.HapticFeedback?.notificationOccurred("error");
+        }
       }
     }
   } catch (error) {
@@ -841,6 +869,8 @@ document.querySelectorAll("[data-crash-bet]").forEach((button) => {
   button.addEventListener("click", () => {
     if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
     selectedCrashBet = button.dataset.crashBet;
+    const customBetInput = $("#crash-custom-bet");
+    if (customBetInput) customBetInput.value = "";
     document.querySelectorAll("[data-crash-bet]").forEach((item) => {
       item.classList.toggle("selected", item === button);
     });
@@ -851,8 +881,30 @@ document.querySelectorAll("[data-crash-bet]").forEach((button) => {
   });
 });
 
+$("#crash-custom-bet").addEventListener("input", (event) => {
+  if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
+  const input = event.currentTarget;
+  const value = input.value.replace(/[^\d]/g, "");
+  input.value = value;
+  selectedCrashBet = value;
+  document.querySelectorAll("[data-crash-bet]").forEach((button) => {
+    button.classList.remove("selected");
+  });
+  $("#crash-selected-bet").textContent =
+    Number.parseInt(value, 10) > 0 ? `${formatNumber(value)} монет` : "Введи сумму";
+});
+
 $("#crash-start").addEventListener("click", () => {
-  const bet = selectedCrashBet === "all" ? "all" : Number.parseInt(selectedCrashBet, 10);
+  const parsedBet = Number.parseInt(selectedCrashBet, 10);
+  if (
+    selectedCrashBet !== "all" &&
+    (!Number.isSafeInteger(parsedBet) || parsedBet <= 0)
+  ) {
+    showToast("Введи сумму ставки", "danger");
+    $("#crash-custom-bet").focus();
+    return;
+  }
+  const bet = selectedCrashBet === "all" ? "all" : parsedBet;
   startCrashCountdown();
   runAction("crash_start", { bet });
 });

@@ -2109,6 +2109,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     result = web_app_state(self.bot, user)
                     result["lastAction"] = {
                         "type": "crash_cashout",
+                        "gameId": game_id,
                         "result": str(settled.get("result")),
                         "multiplier": float(settled.get("multiplier") or 0),
                         "payout": int(settled.get("payout") or 0),
@@ -2125,6 +2126,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     result = web_app_state(self.bot, user)
                     result["lastAction"] = {
                         "type": "crash_settle",
+                        "gameId": game_id,
                         "result": str(settled.get("result")),
                         "multiplier": float(settled.get("multiplier") or 0),
                         "payout": int(settled.get("payout") or 0),

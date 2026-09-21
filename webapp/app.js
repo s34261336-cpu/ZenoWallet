@@ -263,15 +263,14 @@ function clearCrashOutcome() {
   crashRuntime.outcomeKey = null;
   crashRuntime.lastOutcome = null;
   const stage = $("#crash-stage");
-  const game = stage?.closest(".crash-game");
+  const banner = $("#crash-result-banner");
   stage?.classList.remove("has-outcome", "outcome-lost", "outcome-won");
-  game?.classList.remove("outcome-lost", "outcome-won");
-  $("#crash-result-banner")?.classList.add("hidden");
+  banner?.classList.remove("outcome-lost", "outcome-won");
+  banner?.classList.add("hidden");
 }
 
 function renderCrashOutcome(outcome) {
   const stage = $("#crash-stage");
-  const game = stage?.closest(".crash-game");
   const banner = $("#crash-result-banner");
   const title = $("#crash-result-title");
   const detail = $("#crash-result-detail");
@@ -291,8 +290,8 @@ function renderCrashOutcome(outcome) {
   stage.classList.add("has-outcome");
   stage.classList.toggle("outcome-lost", lost);
   stage.classList.toggle("outcome-won", !lost);
-  game?.classList.toggle("outcome-lost", lost);
-  game?.classList.toggle("outcome-won", !lost);
+  banner.classList.toggle("outcome-lost", lost);
+  banner.classList.toggle("outcome-won", !lost);
   banner.classList.remove("hidden");
   title.textContent = lost
     ? `ПРОИГРЫШ на ${multiplier} · ставка сгорела`
@@ -316,7 +315,7 @@ function renderCrashOutcome(outcome) {
       crashRuntime.outcomeKey = null;
       crashRuntime.lastOutcome = null;
       stage.classList.remove("has-outcome", "outcome-lost", "outcome-won");
-      game?.classList.remove("outcome-lost", "outcome-won");
+      banner.classList.remove("outcome-lost", "outcome-won");
       banner.classList.add("hidden");
       $("#crash-status").textContent = "Готов к старту";
       $("#crash-multiplier").textContent = "1.00x";

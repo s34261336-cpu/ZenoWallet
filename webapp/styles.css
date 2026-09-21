@@ -2277,8 +2277,8 @@ body::before {
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
   border: 1px solid rgba(229, 221, 255, 0.58);
   border-radius: 22px;
-  margin: 10px 9px 0;
-  position: relative;
+  margin: 0 0 16px;
+  position: static;
   box-shadow:
     0 13px 26px rgba(25, 14, 76, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.42),
@@ -2290,7 +2290,7 @@ body::before {
   min-height: 56px;
   padding: 11px 18px;
   text-align: center;
-  width: calc(100% - 18px);
+  width: 100%;
   z-index: 2;
 }
 
@@ -2314,7 +2314,7 @@ body::before {
   display: none;
 }
 
-.crash-game.outcome-won .crash-result-banner {
+.crash-result-banner.outcome-won {
   background:
     linear-gradient(135deg, rgba(144, 116, 255, 0.96), rgba(101, 70, 215, 0.88)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
@@ -2326,7 +2326,7 @@ body::before {
     0 0 24px rgba(133, 103, 255, 0.26);
 }
 
-.crash-game.outcome-lost .crash-result-banner {
+.crash-result-banner.outcome-lost {
   background:
     linear-gradient(135deg, rgba(255, 112, 132, 0.96), rgba(190, 48, 101, 0.9)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);

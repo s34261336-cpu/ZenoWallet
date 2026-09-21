@@ -359,7 +359,11 @@ async function settleCrashRound(gameId) {
   let lastError = null;
   for (let attempt = 0; attempt < 14; attempt += 1) {
     try {
-      await runAction("crash_settle", { gameId }, { silent: true });
+      await runAction(
+        "crash_settle",
+        { gameId },
+        { silent: true, suppressSuccessToast: true },
+      );
       if (appState.data?.crash?.active?.id !== gameId) return;
     } catch (error) {
       lastError = error;
@@ -744,8 +748,9 @@ async function runAction(action, body = {}, options = {}) {
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
     } else if (
-      actionResult?.type === "crash_cashout" ||
-      actionResult?.type === "crash_settle"
+      !options.suppressSuccessToast &&
+      (actionResult?.type === "crash_cashout" ||
+        actionResult?.type === "crash_settle")
     ) {
       if (actionResult.result === "won") {
         showToast(

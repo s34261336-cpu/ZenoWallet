@@ -364,7 +364,7 @@ async function settleCrashRound(gameId) {
       await runAction(
         "crash_settle",
         { gameId },
-        { silent: true, suppressSuccessToast: true },
+        { silent: true },
       );
       if (appState.data?.crash?.active?.id !== gameId) return;
     } catch (error) {

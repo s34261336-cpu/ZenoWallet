@@ -3,3 +3,4 @@
 - [Telegram mini-app hosting](telegram-mini-app-hosting.md) — use only an explicit working external HTTPS URL; never fall back to Replit domains.
 - [Crash game settlement](crash-game-settlement.md) — keep bet deduction and payout inside Supabase RPC; the browser only animates and requests settlement.
 - [Single Telegram poller](single-telegram-poller.md) — only the ZenoWallet bot workflow may call Telegram getUpdates; legacy artifact polling stays disabled.
+- [Imported project handoff](imported-project-handoff.md) — after transition, recover the imported repository from the preserved conversation files before configuring its workflow.

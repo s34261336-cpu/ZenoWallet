@@ -20,9 +20,6 @@ const crashRuntime = {
   displayMultiplier: null,
   crashed: false,
   settling: false,
-  lastOutcome: null,
-  outcomeTimer: null,
-  outcomeKey: null,
 };
 let selectedCrashBet = "10";
 const CRASH_START_COUNTDOWN_MS = 3000;
@@ -255,81 +252,6 @@ function stopCrashAnimation() {
   rocket?.style.removeProperty("--flight-angle");
 }
 
-function clearCrashOutcome() {
-  if (crashRuntime.outcomeTimer !== null) {
-    window.clearTimeout(crashRuntime.outcomeTimer);
-  }
-  crashRuntime.outcomeTimer = null;
-  crashRuntime.outcomeKey = null;
-  crashRuntime.lastOutcome = null;
-  const stage = $("#crash-stage");
-  const banner = $("#crash-result-banner");
-  const slot = $("#crash-result-slot");
-  stage?.classList.remove("has-outcome", "outcome-lost", "outcome-won");
-  banner?.classList.remove("outcome-lost", "outcome-won");
-  banner?.classList.add("hidden");
-  slot?.classList.remove("has-result");
-}
-
-function renderCrashOutcome(outcome) {
-  const stage = $("#crash-stage");
-  const banner = $("#crash-result-banner");
-  const slot = $("#crash-result-slot");
-  const title = $("#crash-result-title");
-  const detail = $("#crash-result-detail");
-  if (!stage || !banner || !slot || !title || !detail || !outcome) return;
-
-  const lost = outcome.result === "lost";
-  const multiplier = formatMultiplier(outcome.multiplier);
-  const outcomeKey = [
-    outcome.result,
-    outcome.multiplier,
-    outcome.payout,
-    outcome.bet,
-  ].join(":");
-  const shouldStartTimer =
-    crashRuntime.outcomeKey !== outcomeKey || banner.classList.contains("hidden");
-
-  stage.classList.add("has-outcome");
-  stage.classList.toggle("outcome-lost", lost);
-  stage.classList.toggle("outcome-won", !lost);
-  banner.classList.toggle("outcome-lost", lost);
-  banner.classList.toggle("outcome-won", !lost);
-  slot.classList.add("has-result");
-  banner.classList.remove("hidden");
-  title.textContent = lost
-    ? `ПРОИГРЫШ на ${multiplier} · ставка сгорела`
-    : `Забрано ${formatNumber(outcome.payout)} монет на ${multiplier}`;
-  detail.textContent = "";
-  $("#crash-status").textContent = lost ? "Раунд завершён" : "Раунд выигран";
-  $("#crash-multiplier").textContent = multiplier;
-  $("#crash-cashout-value").textContent = multiplier;
-  $("#crash-hint").textContent = lost
-    ? "Попробуй ещё раз — выбери новую ставку."
-    : "Отличный тайминг. Можно запускать следующий раунд.";
-
-  if (shouldStartTimer) {
-    if (crashRuntime.outcomeTimer !== null) {
-      window.clearTimeout(crashRuntime.outcomeTimer);
-    }
-    crashRuntime.outcomeKey = outcomeKey;
-    crashRuntime.outcomeTimer = window.setTimeout(() => {
-      if (crashRuntime.outcomeKey !== outcomeKey) return;
-      crashRuntime.outcomeTimer = null;
-      crashRuntime.outcomeKey = null;
-      crashRuntime.lastOutcome = null;
-      stage.classList.remove("has-outcome", "outcome-lost", "outcome-won");
-      banner.classList.remove("outcome-lost", "outcome-won");
-      banner.classList.add("hidden");
-      slot.classList.remove("has-result");
-      $("#crash-status").textContent = "Готов к старту";
-      $("#crash-multiplier").textContent = "1.00x";
-      $("#crash-cashout-value").textContent = "1.00x";
-      $("#crash-hint").textContent = "Выбери ставку и запусти раунд.";
-    }, 4600);
-  }
-}
-
 function startCrashCountdown() {
   const stage = $("#crash-stage");
   const status = $("#crash-status");
@@ -337,7 +259,6 @@ function startCrashCountdown() {
   const countdownStartedAt = Date.now();
   const countdownEndAt = countdownStartedAt + CRASH_START_COUNTDOWN_MS;
 
-  clearCrashOutcome();
   if (crashRuntime.countdownTimer !== null) {
     window.clearTimeout(crashRuntime.countdownTimer);
   }
@@ -605,15 +526,6 @@ function renderCrash(data) {
 
   if (!active) {
     stopCrashAnimation();
-    if (crashRuntime.lastOutcome) {
-      $("#crash-start").disabled = busyActions.has("crash_start");
-      $("#crash-cashout").disabled = true;
-      $("#crash-selected-bet").textContent =
-        selectedCrashBet === "all" ? "Весь баланс" : `${formatNumber(selectedCrashBet)} монет`;
-      renderCrashOutcome(crashRuntime.lastOutcome);
-      return;
-    }
-    clearCrashOutcome();
     $("#crash-status").textContent = "Готов к старту";
     $("#crash-multiplier").textContent = "1.00x";
     $("#crash-cashout-value").textContent = "1.00x";
@@ -641,7 +553,7 @@ function showToast(message, tone = "success") {
   toast.classList.toggle("danger", tone === "danger");
   toast.classList.add("show");
   window.clearTimeout(showToast.timeout);
-  showToast.timeout = window.setTimeout(() => toast.classList.remove("show"), 2800);
+  showToast.timeout = window.setTimeout(() => toast.classList.remove("show"), 4600);
 }
 
 function showError(message) {
@@ -799,17 +711,6 @@ async function runAction(action, body = {}, options = {}) {
       $("#crash-stage")?.classList.remove("launching");
     }
     const actionResult = result.lastAction;
-    if (
-      actionResult?.type === "crash_cashout" ||
-      actionResult?.type === "crash_settle"
-    ) {
-      crashRuntime.lastOutcome = {
-        result: actionResult.result,
-        multiplier: Number(actionResult.multiplier || 1),
-        payout: Number(actionResult.payout || 0),
-        bet: Number(actionResult.bet || 0),
-      };
-    }
     if (action === "crash_start" && actionResult?.type === "crash_start") {
       appState.data = {
         ...appState.data,
@@ -859,7 +760,7 @@ async function runAction(action, body = {}, options = {}) {
         telegram?.HapticFeedback?.notificationOccurred("success");
       } else {
         showToast(
-          `Ракета улетела на ${formatMultiplier(actionResult.multiplier)} · ставка сгорела`,
+          `ПРОИГРЫШ на ${formatMultiplier(actionResult.multiplier)} · ставка сгорела`,
           "danger",
         );
         telegram?.HapticFeedback?.notificationOccurred("error");

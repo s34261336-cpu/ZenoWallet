@@ -34,6 +34,9 @@ CRASH_START_COUNTDOWN_SECONDS = 3
 CRASH_MULTIPLIER_LINEAR = 0.07
 CRASH_MULTIPLIER_QUADRATIC = 0.025
 CASE_REWARDS = (0, 5, 10, 25, 50, 100)
+ROULETTE_BETS = (10, 50, 100, 500)
+ROULETTE_FREE_SPINS_PER_DAY = 3
+ROULETTE_ZT_COST = 1
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
@@ -643,6 +646,37 @@ class SupabaseClient:
             self._rpc(
                 "crash_settle_loss",
                 {"p_user_id": user_id, "p_game_id": game_id},
+            )
+        )
+
+    def get_roulette_status(self, user_id: int) -> dict[str, int]:
+        today = datetime.now(timezone.utc).date().isoformat()
+        rows = self.request(
+            "roulette_daily?"
+            "select=free_plays_used"
+            f"&user_id=eq.{user_id}&play_date=eq.{today}&limit=1"
+        )
+        used = int(rows[0].get("free_plays_used") or 0) if rows else 0
+        return {
+            "freeSpinsUsed": max(0, used),
+            "freeSpinsRemaining": max(0, ROULETTE_FREE_SPINS_PER_DAY - used),
+        }
+
+    def get_roulette_history(self, user_id: int) -> list[dict[str, Any]]:
+        return self.request(
+            "games?"
+            "select=id,bet,multiplier,result,created_at,payout"
+            f"&user_id=eq.{user_id}&game_name=eq.roulette&result=in.(won,lost)"
+            "&order=created_at.desc&limit=10"
+        )
+
+    def play_roulette(self, user_id: int, bet: int) -> dict[str, Any]:
+        if bet not in ROULETTE_BETS:
+            raise ValueError("Выбери ставку: 10, 50, 100 или 500 монет")
+        return self._rpc_object(
+            self._rpc(
+                "roulette_play",
+                {"p_user_id": user_id, "p_bet": bet},
             )
         )
 
@@ -1718,7 +1752,11 @@ def validate_web_app_init_data(init_data: str, bot_token: str) -> dict[str, Any]
 
 def is_crash_schema_error(error: Exception) -> bool:
     error_text = str(error).lower()
-    return "public.games" in error_text or "public.crash_" in error_text
+    return (
+        "public.games" in error_text
+        or "public.crash_" in error_text
+        or "public.roulette_" in error_text
+    )
 
 
 def web_app_state(
@@ -1746,6 +1784,20 @@ def web_app_state(
         crash_available = False
         active_crash_game = None
         crash_history = []
+    roulette_available = True
+    try:
+        roulette_status = supabase.get_roulette_status(user_id)
+        roulette_history = supabase.get_roulette_history(user_id)
+    except RuntimeError as error:
+        if not is_crash_schema_error(error):
+            raise
+        log.warning("Roulette schema is not ready; keeping wallet available")
+        roulette_available = False
+        roulette_status = {
+            "freeSpinsUsed": 0,
+            "freeSpinsRemaining": ROULETTE_FREE_SPINS_PER_DAY,
+        }
+        roulette_history = []
     users_state = supabase.get_users_state()
     user_state = users_state.get(str(user_id))
     user_state = user_state if isinstance(user_state, dict) else {}
@@ -1855,6 +1907,25 @@ def web_app_state(
                     "createdAt": str(row["created_at"]),
                 }
                 for row in crash_history
+            ],
+        },
+        "roulette": {
+            "available": roulette_available,
+            "bets": list(ROULETTE_BETS),
+            "freeSpinsPerDay": ROULETTE_FREE_SPINS_PER_DAY,
+            "freeSpinsUsed": roulette_status["freeSpinsUsed"],
+            "freeSpinsRemaining": roulette_status["freeSpinsRemaining"],
+            "ztCost": ROULETTE_ZT_COST,
+            "history": [
+                {
+                    "id": int(row["id"]),
+                    "bet": int(row["bet"]),
+                    "multiplier": float(row.get("multiplier") or 0),
+                    "result": str(row["result"]),
+                    "payout": int(row.get("payout") or 0),
+                    "createdAt": str(row["created_at"]),
+                }
+                for row in roulette_history
             ],
         },
         "season": {
@@ -2101,6 +2172,27 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     )
                     return
 
+                if action == "roulette_play":
+                    raw_bet = body.get("bet")
+                    if isinstance(raw_bet, bool) or not isinstance(raw_bet, int):
+                        raise ValueError("Ставка должна быть целым числом")
+                    if raw_bet not in ROULETTE_BETS:
+                        raise ValueError("Выбери ставку: 10, 50, 100 или 500 монет")
+                    played = self.supabase.play_roulette(user_id, raw_bet)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "roulette_play",
+                        "gameId": int(played.get("gameId") or 0),
+                        "bet": int(played.get("bet") or raw_bet),
+                        "result": str(played.get("result") or "lost"),
+                        "multiplier": float(played.get("multiplier") or 0),
+                        "payout": int(played.get("payout") or 0),
+                        "paidSpin": bool(played.get("paidSpin")),
+                        "ztCost": int(played.get("ztCost") or 0),
+                    }
+                    self.send_json(result)
+                    return
+
                 if action == "crash_cashout":
                     game_id = body.get("gameId")
                     if isinstance(game_id, bool) or not isinstance(game_id, int):
@@ -2151,6 +2243,13 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     "Ракетка пока не настроена. Выполните supabase/schema.sql в Supabase.",
                     503,
                     "crash_setup_required",
+                )
+                return
+            if action == "roulette_play" and is_crash_schema_error(error):
+                self.error_json(
+                    "Рулетка пока не настроена. Выполните supabase/schema.sql в Supabase.",
+                    503,
+                    "roulette_setup_required",
                 )
                 return
             log.exception("Mini-app action request failed")

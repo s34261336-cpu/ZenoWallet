@@ -2104,6 +2104,18 @@ body::before {
   white-space: nowrap;
 }
 
+.roulette-launch-card {
+  background:
+    radial-gradient(circle at 88% 10%, rgba(255, 119, 203, 0.24), transparent 30%),
+    linear-gradient(135deg, rgba(71, 30, 70, 0.94), rgba(16, 12, 37, 0.92));
+  margin-top: 11px;
+}
+
+.roulette-icon {
+  background: linear-gradient(145deg, rgba(255, 119, 203, 0.3), rgba(140, 123, 255, 0.28));
+  border-color: rgba(255, 119, 203, 0.35);
+}
+
 .back-link {
   background: transparent;
   color: var(--cyan);
@@ -2140,6 +2152,22 @@ body::before {
   background: var(--lime);
   border-radius: 50%;
   box-shadow: 0 0 12px var(--lime);
+  display: inline-block;
+  height: 6px;
+  width: 6px;
+}
+
+.roulette-live-pill {
+  align-items: center;
+  color: var(--pink);
+  display: inline-flex;
+  gap: 6px;
+}
+
+.roulette-live-pill i {
+  background: var(--pink);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--pink);
   display: inline-block;
   height: 6px;
   width: 6px;
@@ -2794,6 +2822,210 @@ body::before {
   font-size: 11px;
   padding: 16px;
   text-align: center;
+}
+
+/* Roulette */
+.roulette-game,
+.roulette-odds-card {
+  background: linear-gradient(145deg, rgba(33, 21, 55, 0.94), rgba(10, 12, 29, 0.9));
+  border: 1px solid rgba(255, 119, 203, 0.22);
+  border-radius: 25px;
+  box-shadow:
+    0 20px 45px rgba(2, 4, 18, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.roulette-stage {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 119, 203, 0.2), transparent 34%),
+    radial-gradient(circle at 50% 100%, rgba(117, 232, 255, 0.12), transparent 44%),
+    linear-gradient(145deg, #301941, #111328 70%, #080a18);
+  border-bottom: 1px solid rgba(255, 119, 203, 0.18);
+  display: flex;
+  height: 280px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.roulette-stage::before,
+.roulette-stage::after {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 50%;
+  content: "";
+  height: 255px;
+  position: absolute;
+  width: 255px;
+}
+
+.roulette-stage::after {
+  height: 225px;
+  width: 225px;
+}
+
+.roulette-pointer {
+  background: var(--lime);
+  border-radius: 0 10px 10px 10px;
+  box-shadow: 0 0 16px rgba(189, 245, 103, 0.8);
+  height: 24px;
+  left: 50%;
+  position: absolute;
+  top: 9px;
+  transform: translateX(-50%) rotate(45deg);
+  width: 24px;
+  z-index: 3;
+}
+
+.roulette-wheel {
+  background:
+    conic-gradient(
+      from -18deg,
+      #ff6b9d 0deg 30deg,
+      #20295b 30deg 62deg,
+      #8c7bff 62deg 92deg,
+      #25265a 92deg 128deg,
+      #75e8ff 128deg 155deg,
+      #2a2252 155deg 194deg,
+      #ff77cb 194deg 218deg,
+      #27285e 218deg 270deg,
+      #bdf567 270deg 286deg,
+      #292050 286deg 338deg,
+      #ffe07b 338deg 360deg
+    );
+  border: 8px solid rgba(8, 10, 24, 0.82);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.18),
+    0 16px 50px rgba(0, 0, 0, 0.45),
+    0 0 42px rgba(255, 119, 203, 0.25);
+  height: 225px;
+  position: relative;
+  transform: rotate(28deg);
+  transition: transform 3s cubic-bezier(0.12, 0.78, 0.16, 1);
+  width: 225px;
+  z-index: 2;
+}
+
+.roulette-wheel::before {
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  content: "";
+  inset: 13px;
+  position: absolute;
+}
+
+.roulette-wheel.spinning {
+  animation: roulette-spin 0.7s linear infinite;
+  transition: none;
+}
+
+.roulette-wheel-center {
+  align-items: center;
+  background: radial-gradient(circle at 35% 25%, #20285d, #090b1d 72%);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(117, 232, 255, 0.28);
+  color: #fff;
+  display: flex;
+  font-family: "Manrope", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  height: 68px;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 68px;
+}
+
+.roulette-result {
+  color: #fff;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  left: 0;
+  letter-spacing: 0.06em;
+  position: absolute;
+  right: 0;
+  text-align: center;
+  text-transform: uppercase;
+  top: 24px;
+  z-index: 4;
+}
+
+.roulette-controls {
+  padding: 17px;
+}
+
+.roulette-bet-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.roulette-meta {
+  align-items: center;
+  color: #929bbe;
+  display: flex;
+  font-size: 10px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.roulette-meta strong {
+  color: var(--lime);
+}
+
+.roulette-spin-button {
+  margin-top: 15px;
+  width: 100%;
+}
+
+.roulette-odds-card {
+  margin-top: 11px;
+  padding: 4px 17px 15px;
+}
+
+.roulette-odds-card .compact-heading {
+  margin-left: -2px;
+  margin-right: -2px;
+}
+
+.roulette-odds-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.roulette-odds-grid span {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(213, 220, 255, 0.1);
+  border-radius: 12px;
+  color: #aeb5d2;
+  font-size: 10px;
+  padding: 9px 8px;
+}
+
+.roulette-odds-grid strong {
+  color: #fff;
+  display: block;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.roulette-odds-card p {
+  color: #7f87a9;
+  font-size: 10px;
+  line-height: 1.45;
+  margin-top: 12px;
+}
+
+@keyframes roulette-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 390px) {

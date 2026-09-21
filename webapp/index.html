@@ -193,7 +193,7 @@
               <span class="eyebrow">Игровая зона</span>
               <h2>Игры</h2>
             </div>
-            <span class="section-counter">01 / 01</span>
+            <span class="section-counter">01 / 02</span>
           </div>
           <p class="games-intro">
             Выбирай игру и забирай выигрыш вовремя. Новые режимы будут появляться здесь.
@@ -209,12 +209,22 @@
             <span class="game-launch-arrow" aria-hidden="true">↗</span>
           </button>
 
+          <button class="game-launch-card roulette-launch-card" data-view="roulette" type="button">
+            <span class="game-launch-icon roulette-icon" aria-hidden="true">◉</span>
+            <span class="game-launch-copy">
+              <span class="eyebrow">LIVE · удача и риск</span>
+              <strong>Рулетка <span class="crash-title-mark">50X</span></strong>
+              <small>Три бесплатных прокрута в сутки. Дальше — 1 ZT за прокрут.</small>
+            </span>
+            <span class="game-launch-arrow" aria-hidden="true">↗</span>
+          </button>
+
           <div class="game-odds-card">
             <div>
               <span class="eyebrow">Честные шансы</span>
-              <strong>1.2x выпадает чаще всего</strong>
+              <strong>Джекпот 50x — максимум раз в сутки</strong>
             </div>
-            <span>500x · 0.2%</span>
+            <span>50x · 0.5%</span>
           </div>
         </section>
 
@@ -332,6 +342,88 @@
             </div>
             <div class="crash-history" id="crash-history">
               <div class="crash-history-empty">Раундов пока нет</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view hidden" id="roulette-view">
+          <button class="back-link" data-view="games" type="button">← Все игры</button>
+          <div class="section-heading rocket-heading">
+            <div>
+              <span class="eyebrow">Игровая зона</span>
+              <h2>Рулетка <span class="crash-title-mark">50X</span></h2>
+            </div>
+            <span class="season-pill roulette-live-pill"><i></i> LIVE</span>
+          </div>
+          <p class="crash-intro">
+            Выбери ставку и крути колесо. Сначала используются 3 бесплатных прокрута, затем — 1 ZT за игру.
+          </p>
+
+          <section class="roulette-game" aria-label="Игра Рулетка">
+            <div class="roulette-stage">
+              <div class="roulette-pointer" aria-hidden="true"></div>
+              <div class="roulette-wheel" id="roulette-wheel" aria-hidden="true">
+                <div class="roulette-wheel-center">ZT</div>
+              </div>
+              <div class="roulette-result" id="roulette-result">Готов к прокруту</div>
+            </div>
+
+            <div class="roulette-controls">
+              <div class="crash-bet-heading">
+                <span>Ставка</span>
+                <span>Баланс <strong id="roulette-balance">—</strong></span>
+              </div>
+              <div class="crash-bet-grid roulette-bet-grid" role="group" aria-label="Размер ставки">
+                <button type="button" data-roulette-bet="10">10</button>
+                <button type="button" data-roulette-bet="50">50</button>
+                <button type="button" data-roulette-bet="100">100</button>
+                <button type="button" data-roulette-bet="500">500</button>
+              </div>
+              <div class="roulette-meta">
+                <span>Бесплатно сегодня <strong id="roulette-free-spins">—</strong></span>
+                <span id="roulette-cost">После лимита: 1 ZT</span>
+              </div>
+              <button
+                class="primary-button roulette-spin-button"
+                id="roulette-spin"
+                data-action="roulette_play"
+                type="button"
+              >
+                Крутить <span>↗</span>
+              </button>
+              <p class="crash-hint" id="roulette-hint">Выбери ставку и прокрути колесо.</p>
+            </div>
+          </section>
+
+          <section class="roulette-odds-card">
+            <div class="section-heading compact-heading">
+              <div>
+                <span class="eyebrow">Шансы</span>
+                <h3>Таблица выигрышей</h3>
+              </div>
+              <span class="history-count">50x · 0,5%</span>
+            </div>
+            <div class="roulette-odds-grid">
+              <span>Мимо <strong>50%</strong></span>
+              <span>2x <strong>20%</strong></span>
+              <span>3x <strong>10%</strong></span>
+              <span>5x <strong>4%</strong></span>
+              <span>10x <strong>2%</strong></span>
+              <span>50x <strong>0,5%</strong></span>
+            </div>
+            <p>Джекпот 50x разыгрывается максимум один раз в сутки на весь бот. Оставшиеся 13,5% от заданных шансов тоже считаются промахом.</p>
+          </section>
+
+          <section class="crash-history-card">
+            <div class="section-heading compact-heading">
+              <div>
+                <span class="eyebrow">Последние игры</span>
+                <h3>История рулетки</h3>
+              </div>
+              <span class="history-count">10 максимум</span>
+            </div>
+            <div class="crash-history" id="roulette-history">
+              <div class="crash-history-empty">Игр пока нет</div>
             </div>
           </section>
         </section>

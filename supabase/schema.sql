@@ -67,6 +67,21 @@ create unique index if not exists games_one_active_rocket_idx
   on public.games (user_id, game_name)
   where result = 'active' and game_name = 'rocket';
 
+-- Roulette uses the same immutable game ledger as crash, with one daily
+-- counter per user and one global jackpot lock per UTC day.
+create table if not exists public.roulette_daily (
+  user_id bigint not null,
+  play_date date not null default current_date,
+  free_plays_used integer not null default 0 check (free_plays_used >= 0),
+  primary key (user_id, play_date)
+);
+
+create table if not exists public.roulette_jackpot_daily (
+  play_date date primary key default current_date,
+  claimed_at timestamptz,
+  claimed_by bigint
+);
+
 -- The bot uses the REST API with the project key. Keep RLS disabled for this
 -- server-side table, or add equivalent policies for the key used by the bot.
 -- Never expose SUPABASE_KEY in a client-side application.
@@ -404,6 +419,140 @@ begin
     'multiplier', v_game.crash_at,
     'payout', 0,
     'balance', v_wallet.earn_balance
+  );
+end;
+$$;
+
+-- Roulette probabilities are server-side and atomic. The requested
+-- probabilities add up to 86.5%; the remaining 13.5% is also a miss so that
+-- every roll has a deterministic outcome. After the first jackpot of a UTC
+-- day, a jackpot roll becomes a miss.
+create or replace function public.roulette_play(
+  p_user_id bigint,
+  p_bet bigint
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_wallet public.wallet%rowtype;
+  v_daily public.roulette_daily%rowtype;
+  v_jackpot public.roulette_jackpot_daily%rowtype;
+  v_roll numeric;
+  v_multiplier numeric := 0;
+  v_result text := 'lost';
+  v_payout bigint := 0;
+  v_game_id bigint;
+  v_paid_spin boolean := false;
+  v_today date := current_date;
+begin
+  if p_bet is null or p_bet not in (10, 50, 100, 500) then
+    raise exception 'Выбери ставку: 10, 50, 100 или 500 монет';
+  end if;
+
+  insert into public.wallet (user_id, earn_balance, zeno_balance)
+  values (p_user_id, 0, 0)
+  on conflict (user_id) do nothing;
+
+  select *
+    into v_wallet
+    from public.wallet
+   where user_id = p_user_id
+   for update;
+
+  if v_wallet.earn_balance < p_bet then
+    raise exception 'Недостаточно монет для этой ставки';
+  end if;
+
+  insert into public.roulette_daily (user_id, play_date, free_plays_used)
+  values (p_user_id, v_today, 0)
+  on conflict (user_id, play_date) do nothing;
+
+  select *
+    into v_daily
+    from public.roulette_daily
+   where user_id = p_user_id
+     and play_date = v_today
+   for update;
+
+  insert into public.roulette_jackpot_daily (play_date)
+  values (v_today)
+  on conflict (play_date) do nothing;
+
+  select *
+    into v_jackpot
+    from public.roulette_jackpot_daily
+   where play_date = v_today
+   for update;
+
+  if v_daily.free_plays_used >= 3 then
+    if v_wallet.zeno_balance < 1 then
+      raise exception 'Бесплатные прокруты закончились. Нужен 1 ZT';
+    end if;
+    v_paid_spin := true;
+  end if;
+
+  v_roll := random() * 100;
+  if v_roll < 50 then
+    v_multiplier := 0;
+  elsif v_roll < 70 then
+    v_multiplier := 2;
+  elsif v_roll < 80 then
+    v_multiplier := 3;
+  elsif v_roll < 84 then
+    v_multiplier := 5;
+  elsif v_roll < 86 then
+    v_multiplier := 10;
+  elsif v_roll < 86.5 and v_jackpot.claimed_at is null then
+    v_multiplier := 50;
+    v_result := 'won';
+    update public.roulette_jackpot_daily
+       set claimed_at = now(), claimed_by = p_user_id
+     where play_date = v_today;
+  end if;
+
+  if v_multiplier > 0 and v_result <> 'won' then
+    v_result := 'won';
+  end if;
+  v_payout := floor(p_bet * v_multiplier)::bigint;
+
+  update public.wallet
+     set earn_balance = earn_balance - p_bet + v_payout,
+         zeno_balance = zeno_balance - case when v_paid_spin then 1 else 0 end,
+         updated_at = now()
+   where user_id = p_user_id
+   returning * into v_wallet;
+
+  if not v_paid_spin then
+    update public.roulette_daily
+       set free_plays_used = free_plays_used + 1
+     where user_id = p_user_id
+       and play_date = v_today
+     returning * into v_daily;
+  end if;
+
+  insert into public.games (
+    user_id, game_name, bet, multiplier, result, payout
+  )
+  values (
+    p_user_id, 'roulette', p_bet, v_multiplier, v_result, v_payout
+  )
+  returning id into v_game_id;
+
+  return jsonb_build_object(
+    'gameId', v_game_id,
+    'bet', p_bet,
+    'result', v_result,
+    'multiplier', v_multiplier,
+    'payout', v_payout,
+    'paidSpin', v_paid_spin,
+    'ztCost', case when v_paid_spin then 1 else 0 end,
+    'balance', v_wallet.earn_balance,
+    'zenoBalance', v_wallet.zeno_balance,
+    'freeSpinsUsed', v_daily.free_plays_used,
+    'freeSpinsRemaining', greatest(0, 3 - v_daily.free_plays_used)
   );
 end;
 $$;

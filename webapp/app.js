@@ -4,6 +4,7 @@ const busyActions = new Set();
 let serverClockOffsetMs = 0;
 let hasServerClock = false;
 let lastCrashToastKey = "";
+let lastRouletteToastKey = "";
 const crashRuntime = {
   gameId: null,
   frame: null,
@@ -24,6 +25,12 @@ const crashRuntime = {
 };
 let selectedCrashBet = "10";
 const CRASH_PRESET_BETS = new Set(["10", "50", "100"]);
+let selectedRouletteBet = "10";
+const ROULETTE_PRESET_BETS = new Set(["10", "50", "100", "500"]);
+const rouletteRuntime = {
+  spinning: false,
+  finishTimer: null,
+};
 const CRASH_START_COUNTDOWN_MS = 3000;
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
@@ -502,6 +509,124 @@ function renderCrashHistory(history) {
     .join("");
 }
 
+function renderRouletteHistory(history) {
+  const container = $("#roulette-history");
+  if (!container) return;
+  if (!history?.length) {
+    container.innerHTML = '<div class="crash-history-empty">Игр пока нет</div>';
+    return;
+  }
+  container.innerHTML = history
+    .map((game) => {
+      const multiplier = Number(game.multiplier || 0);
+      const won = game.result === "won" && multiplier > 0;
+      const label = multiplier >= 50 ? "Джекпот" : won ? "Выигрыш" : "Мимо";
+      const time = new Date(game.createdAt).toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `
+        <div class="crash-history-row ${won ? "win" : "loss"}">
+          <span class="crash-history-result"><i></i>${label}</span>
+          <strong>${won ? formatMultiplier(multiplier) : "—"}</strong>
+          <span class="crash-history-bet">${formatNumber(game.bet)} → ${won ? `+${formatNumber(game.payout)}` : `−${formatNumber(game.bet)}`}</span>
+          <time>${time}</time>
+        </div>`;
+    })
+    .join("");
+}
+
+function stopRouletteSpin() {
+  if (rouletteRuntime.finishTimer !== null) {
+    window.clearTimeout(rouletteRuntime.finishTimer);
+    rouletteRuntime.finishTimer = null;
+  }
+  rouletteRuntime.spinning = false;
+  $("#roulette-wheel")?.classList.remove("spinning");
+}
+
+function startRouletteSpin() {
+  const wheel = $("#roulette-wheel");
+  if (!wheel) return;
+  stopRouletteSpin();
+  rouletteRuntime.spinning = true;
+  wheel.classList.add("spinning");
+  $("#roulette-result").textContent = "Колесо крутится…";
+  $("#roulette-hint").textContent = "Смотрим, куда упадёт шарик…";
+}
+
+function finishRouletteSpin(actionResult) {
+  const wheel = $("#roulette-wheel");
+  if (!wheel) return;
+  const multiplier = Number(actionResult?.multiplier || 0);
+  const angleByMultiplier = {
+    0: 28,
+    2: 94,
+    3: 157,
+    5: 220,
+    10: 281,
+    50: 337,
+  };
+  const landingAngle = angleByMultiplier[multiplier] ?? 28;
+  wheel.classList.remove("spinning");
+  wheel.style.transform = `rotate(${1800 + landingAngle}deg)`;
+  rouletteRuntime.finishTimer = window.setTimeout(() => {
+    rouletteRuntime.spinning = false;
+    rouletteRuntime.finishTimer = null;
+    const result = Number(actionResult?.multiplier || 0);
+    $("#roulette-result").textContent =
+      result > 0
+        ? result >= 50
+          ? "ДЖЕКПОТ · 50.00x"
+          : `Выигрыш · ${formatMultiplier(result)}`
+        : "Мимо · ставка сгорела";
+    $("#roulette-hint").textContent =
+      result > 0 ? "Результат записан в историю." : "Попробуй ещё раз завтра бесплатно.";
+    renderRoulette(appState.data);
+  }, 3000);
+}
+
+function renderRoulette(data) {
+  const roulette = data.roulette || {
+    available: false,
+    bets: [],
+    freeSpinsPerDay: 3,
+    freeSpinsRemaining: 0,
+    history: [],
+    ztCost: 1,
+  };
+  const activeBetButtons = document.querySelectorAll("[data-roulette-bet]");
+  const spinButton = $("#roulette-spin");
+  const available = roulette.available !== false;
+  $("#roulette-balance").textContent = formatNumber(data.wallet.earnBalance);
+  $("#roulette-free-spins").textContent =
+    `${roulette.freeSpinsRemaining} / ${roulette.freeSpinsPerDay}`;
+  $("#roulette-cost").textContent =
+    roulette.freeSpinsRemaining > 0
+      ? "После 3 прокрутов: 1 ZT"
+      : `Прокрут сейчас: ${roulette.ztCost} ZT`;
+  renderRouletteHistory(roulette.history);
+
+  activeBetButtons.forEach((button) => {
+    button.classList.toggle("selected", button.dataset.rouletteBet === selectedRouletteBet);
+    button.disabled = !available || busyActions.has("roulette_play") || rouletteRuntime.spinning;
+  });
+  if (!available) {
+    $("#roulette-result").textContent = "Игра не настроена";
+    $("#roulette-hint").textContent = "Администратору нужно выполнить supabase/schema.sql в Supabase.";
+  } else if (!rouletteRuntime.spinning && !rouletteRuntime.finishTimer) {
+    $("#roulette-result").textContent = "Готов к прокруту";
+    $("#roulette-hint").textContent =
+      roulette.freeSpinsRemaining > 0
+        ? "Выбери ставку и используй бесплатный прокрут."
+        : "Бесплатные прокруты закончились — понадобится 1 ZT.";
+  }
+  if (spinButton) {
+    spinButton.disabled =
+      !available || busyActions.has("roulette_play") || rouletteRuntime.spinning;
+  }
+}
+
 function renderCrash(data) {
   const crash = data.crash || { active: null, history: [] };
   const active = crash.active;
@@ -674,6 +799,7 @@ function render() {
   setAvatars(user, level.percent);
   renderHomeLeaders(season.top);
   renderCrash(data);
+  renderRoulette(data);
 
   const dailyButton = document.querySelector('[data-action="daily"]');
   dailyButton.disabled = !daily.ready;
@@ -729,6 +855,9 @@ async function runAction(action, body = {}, options = {}) {
       $("#crash-stage")?.classList.remove("launching");
     }
     const actionResult = result.lastAction;
+    if (action === "roulette_play" && actionResult?.type === "roulette_play") {
+      finishRouletteSpin(actionResult);
+    }
     if (action === "crash_start" && actionResult?.type === "crash_start") {
       appState.data = {
         ...appState.data,
@@ -767,12 +896,35 @@ async function runAction(action, body = {}, options = {}) {
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
     } else if (
+      actionResult?.type === "roulette_play"
+    ) {
+      const toastKey = [
+        actionResult.gameId ?? "",
+        actionResult.result ?? "",
+        actionResult.multiplier ?? "",
+        actionResult.payout ?? "",
+      ].join(":");
+      if (toastKey !== lastRouletteToastKey) {
+        lastRouletteToastKey = toastKey;
+        if (Number(actionResult.multiplier || 0) > 0) {
+          showToast(
+            actionResult.multiplier >= 50
+              ? "ДЖЕКПОТ · +50x к ставке"
+              : `Выигрыш ${formatNumber(actionResult.payout)} монет · ${formatMultiplier(actionResult.multiplier)}`,
+          );
+          telegram?.HapticFeedback?.notificationOccurred("success");
+        } else {
+          showToast("Мимо · ставка сгорела", "danger");
+          telegram?.HapticFeedback?.notificationOccurred("error");
+        }
+      }
+    } else if (
+      !options.silent &&
       !options.suppressSuccessToast &&
       (actionResult?.type === "crash_cashout" ||
         actionResult?.type === "crash_settle")
     ) {
       const toastKey = [
-        actionResult.type,
         actionResult.gameId ?? "",
         actionResult.result ?? "",
         actionResult.multiplier ?? "",
@@ -795,6 +947,10 @@ async function runAction(action, body = {}, options = {}) {
       }
     }
   } catch (error) {
+    if (action === "roulette_play") {
+      stopRouletteSpin();
+      renderRoulette(appState.data);
+    }
     if (!options.silent) {
       if (error.code === "daily_cooldown" && error.nextAt) {
         showToast(`Бонус будет доступен через ${formatRemaining(error.nextAt)}`, "danger");
@@ -881,6 +1037,22 @@ document.querySelectorAll("[data-crash-bet]").forEach((button) => {
   });
 });
 
+document.querySelectorAll("[data-roulette-bet]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (
+      appState.data?.roulette?.available === false ||
+      busyActions.has("roulette_play") ||
+      rouletteRuntime.spinning
+    ) {
+      return;
+    }
+    selectedRouletteBet = button.dataset.rouletteBet;
+    document.querySelectorAll("[data-roulette-bet]").forEach((item) => {
+      item.classList.toggle("selected", item === button);
+    });
+  });
+});
+
 $("#crash-custom-bet").addEventListener("input", (event) => {
   if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
   const input = event.currentTarget;
@@ -914,6 +1086,23 @@ $("#crash-cashout").addEventListener("click", () => {
   if (gameId && !crashRuntime.crashed) {
     runAction("crash_cashout", { gameId });
   }
+});
+
+$("#roulette-spin").addEventListener("click", () => {
+  if (
+    rouletteRuntime.spinning ||
+    busyActions.has("roulette_play") ||
+    appState.data?.roulette?.available === false
+  ) {
+    return;
+  }
+  const bet = Number.parseInt(selectedRouletteBet, 10);
+  if (!ROULETTE_PRESET_BETS.has(String(bet))) {
+    showToast("Выбери ставку 10, 50, 100 или 500", "danger");
+    return;
+  }
+  startRouletteSpin();
+  runAction("roulette_play", { bet });
 });
 
 $("#refresh-button").addEventListener("click", loadState);

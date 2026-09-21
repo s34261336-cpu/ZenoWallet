@@ -253,6 +253,8 @@ function startCrashCountdown() {
     if (remainingMs <= 0) {
       crashRuntime.countdownTimer = null;
       stage?.classList.remove("launching");
+      if (status) status.textContent = "Запуск ракеты…";
+      if (multiplier) multiplier.textContent = "1.00x";
       return;
     }
     const remaining = Math.ceil(remainingMs / 1000);
@@ -696,6 +698,13 @@ async function runAction(action, body = {}, options = {}) {
     }
     throw error;
   } finally {
+    if (action === "crash_start") {
+      if (crashRuntime.countdownTimer !== null) {
+        window.clearTimeout(crashRuntime.countdownTimer);
+        crashRuntime.countdownTimer = null;
+      }
+      $("#crash-stage")?.classList.remove("launching");
+    }
     busyActions.delete(action);
     buttons.forEach((button) => {
       button.classList.remove("working");

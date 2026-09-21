@@ -38,21 +38,19 @@ DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
 }
-# The requested percentages add up to 101%, so they are treated as relative
-# weights and normalized by the total weight. Each weight selects a range,
-# rather than one fixed crash point, so rounds can end at values such as 1.37x
-# or 4.21x while preserving the intended probability curve.
+# Weights select a range rather than one fixed crash point, so rounds can end
+# at values such as 1.37x or 4.21x. High multipliers are deliberately rare:
+# the 10x+ tail is about 2.5% of rounds, while 50x+ is below 0.1%.
 CRASH_POINT_BANDS = (
-    (1.2, 1.5, 4000),
-    (1.5, 2.0, 2500),
+    (1.2, 1.5, 4700),
+    (1.5, 2.0, 3000),
     (2.0, 3.0, 1500),
-    (3.0, 5.0, 1000),
-    (5.0, 10.0, 600),
-    (10.0, 20.0, 300),
-    (20.0, 50.0, 100),
-    (50.0, 100.0, 50),
-    # The old 100x and 500x points share the final 100x–500x tail.
-    (100.0, 500.0, 30 + 20),
+    (3.0, 5.0, 850),
+    (5.0, 10.0, 500),
+    (10.0, 20.0, 220),
+    (20.0, 50.0, 35),
+    (50.0, 100.0, 8),
+    (100.0, 500.0, 2),
 )
 CRASH_POINT_WEIGHT_TOTAL = sum(weight for _, _, weight in CRASH_POINT_BANDS)
 CRASH_RANDOM = random.SystemRandom()
@@ -2150,7 +2148,11 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     return
                 raise ValueError("Неизвестное действие")
         except ValueError as error:
-            self.error_json(str(error), 400)
+            error_message = str(error)
+            if action == "crash_settle" and error_message == "Ракета ещё в полёте":
+                self.error_json(error_message, 409, "crash_not_ready")
+            else:
+                self.error_json(error_message, 400)
         except RuntimeError as error:
             if action and str(action).startswith("crash_") and is_crash_schema_error(error):
                 self.error_json(

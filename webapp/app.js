@@ -319,14 +319,23 @@ function getCrashElapsedSeconds(startedAt) {
 }
 
 async function settleCrashRound(gameId) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await runAction("crash_settle", { gameId });
-    if (appState.data?.crash?.active?.id !== gameId) return;
-    if (attempt < 2) {
-      await new Promise((resolve) => window.setTimeout(resolve, 700));
+  let lastError = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await runAction("crash_settle", { gameId }, { silent: true });
+      if (appState.data?.crash?.active?.id !== gameId) return;
+    } catch (error) {
+      lastError = error;
+      if (error.code !== "crash_not_ready") break;
     }
-    await loadState();
-    if (appState.data?.crash?.active?.id !== gameId) return;
+    if (attempt < 4) {
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      await loadState();
+      if (appState.data?.crash?.active?.id !== gameId) return;
+    }
+  }
+  if (lastError && appState.data?.crash?.active?.id === gameId) {
+    showToast("Раунд не завершился. Нажмите обновить и повторите.", "danger");
   }
 }
 
@@ -598,7 +607,7 @@ function setView(viewName) {
   if (telegram?.HapticFeedback) telegram.HapticFeedback.selectionChanged();
 }
 
-async function runAction(action, body = {}) {
+async function runAction(action, body = {}, options = {}) {
   if (busyActions.has(action) || !appState.data) return;
   const buttons = document.querySelectorAll(`[data-action="${action}"]`);
   busyActions.add(action);
@@ -675,13 +684,17 @@ async function runAction(action, body = {}) {
       }
     }
   } catch (error) {
-    if (error.code === "daily_cooldown" && error.nextAt) {
-      showToast(`Бонус будет доступен через ${formatRemaining(error.nextAt)}`, "danger");
-    } else if (error.code === "case_limit" && error.nextAt) {
-      showToast(`Следующий кейс через ${formatRemaining(error.nextAt)}`, "danger");
-    } else {
-      showToast(error.message, "danger");
+    if (!options.silent) {
+      if (error.code === "daily_cooldown" && error.nextAt) {
+        showToast(`Бонус будет доступен через ${formatRemaining(error.nextAt)}`, "danger");
+      } else if (error.code === "case_limit" && error.nextAt) {
+        showToast(`Следующий кейс через ${formatRemaining(error.nextAt)}`, "danger");
+      } else {
+        showToast(error.message, "danger");
+      }
+      return;
     }
+    throw error;
   } finally {
     busyActions.delete(action);
     buttons.forEach((button) => {

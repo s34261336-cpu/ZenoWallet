@@ -12,6 +12,7 @@ const crashRuntime = {
   startedPerfMs: null,
   visualCatchupStartedPerfMs: null,
   visualCatchupElapsedMs: 0,
+  settleRetryTimer: null,
   bounds: null,
   phase: null,
   displayMultiplier: null,
@@ -150,11 +151,13 @@ function syncServerClock(serverNow, requestStartedAt, requestFinishedAt) {
   hasServerClock = true;
 }
 
-function getCrashTravelProgress(multiplier, crashAt) {
+function getCrashTravelProgress(multiplier) {
   const current = Math.max(1, Number(multiplier || 1));
-  const target = Math.max(1.01, Number(crashAt || 1.01));
-  const progress = Math.log(current) / Math.log(target);
-  return Math.max(0, Math.min(1, progress));
+  // Keep the path tied to the visible multiplier, not to this round's
+  // crash point. A short 1.20x round should end near the launch area
+  // instead of making the rocket jump to the top of the chart.
+  const progress = Math.log(current) / Math.log(6);
+  return Math.max(0, Math.min(0.96, progress));
 }
 
 function getCrashTrajectoryPoint(progress) {
@@ -216,9 +219,13 @@ function stopCrashAnimation() {
   if (crashRuntime.countdownTimer !== null) {
     window.clearTimeout(crashRuntime.countdownTimer);
   }
+  if (crashRuntime.settleRetryTimer !== null) {
+    window.clearTimeout(crashRuntime.settleRetryTimer);
+  }
   crashRuntime.frame = null;
   crashRuntime.settleTimer = null;
   crashRuntime.countdownTimer = null;
+  crashRuntime.settleRetryTimer = null;
   crashRuntime.gameId = null;
   crashRuntime.startedAtMs = null;
   crashRuntime.startedPerfMs = null;
@@ -276,7 +283,7 @@ function updateCrashVisual(multiplier, crashAt) {
   const flightLine = $(".crash-flight-line");
   const trajectory = $("#crash-trajectory-progress");
   const trajectoryGlow = $(".crash-trajectory-glow");
-  const travelProgress = getCrashTravelProgress(multiplier, crashAt);
+  const travelProgress = getCrashTravelProgress(multiplier);
   const displayMultiplier = formatMultiplier(multiplier);
   const multiplierElement = $("#crash-multiplier");
   const cashoutElement = $("#crash-cashout-value");
@@ -346,7 +353,7 @@ function getCrashElapsedSeconds(startedAt) {
 
 async function settleCrashRound(gameId) {
   let lastError = null;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 14; attempt += 1) {
     try {
       await runAction("crash_settle", { gameId }, { silent: true });
       if (appState.data?.crash?.active?.id !== gameId) return;
@@ -354,14 +361,21 @@ async function settleCrashRound(gameId) {
       lastError = error;
       if (error.code !== "crash_not_ready") break;
     }
-    if (attempt < 4) {
+    if (attempt < 13) {
       await new Promise((resolve) => window.setTimeout(resolve, 450));
       await loadState();
       if (appState.data?.crash?.active?.id !== gameId) return;
     }
   }
   if (lastError && appState.data?.crash?.active?.id === gameId) {
-    showToast("Раунд не завершился. Нажмите обновить и повторите.", "danger");
+    $("#crash-status").textContent = "Синхронизация результата…";
+    crashRuntime.settleRetryTimer = window.setTimeout(() => {
+      crashRuntime.settleRetryTimer = null;
+      crashRuntime.settling = true;
+      settleCrashRound(gameId).finally(() => {
+        crashRuntime.settling = false;
+      });
+    }, 1500);
   }
 }
 
@@ -489,7 +503,7 @@ function renderCrash(data) {
   $("#crash-hint").textContent = "Забери ставку сейчас — следующий тик может стать крашем.";
   $("#crash-start").disabled = true;
   $("#crash-cashout").disabled =
-    busyActions.has("crash_cashout") || crashRuntime.settling;
+    busyActions.has("crash_cashout");
   startCrashAnimation(active);
 }
 

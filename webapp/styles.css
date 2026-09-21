@@ -2348,6 +2348,7 @@ body::before {
   pointer-events: none;
   position: absolute;
   top: 0;
+  transition: transform 180ms linear;
   width: 78px;
   will-change: transform;
   backface-visibility: hidden;

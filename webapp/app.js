@@ -18,6 +18,7 @@ const crashRuntime = {
   bounds: null,
   phase: null,
   displayMultiplier: null,
+  crashed: false,
   settling: false,
 };
 let selectedCrashBet = "10";
@@ -238,6 +239,7 @@ function stopCrashAnimation() {
   crashRuntime.bounds = null;
   crashRuntime.phase = null;
   crashRuntime.displayMultiplier = null;
+  crashRuntime.crashed = false;
   crashRuntime.settling = false;
   $("#crash-stage")?.classList.remove("running", "crashed");
   $("#crash-stage")?.classList.remove("launching", "phase-low", "phase-mid", "phase-high");
@@ -447,16 +449,15 @@ function startCrashAnimation(active) {
     updateCrashVisual(Math.min(multiplier, active.crashAt), active.crashAt);
     if (multiplier >= active.crashAt) {
       crashRuntime.frame = null;
+      crashRuntime.crashed = true;
+      $("#crash-cashout").disabled = true;
       $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;
       $("#crash-stage").classList.add("crashed");
       if (!crashRuntime.settling) {
         crashRuntime.settling = true;
-        crashRuntime.settleTimer = window.setTimeout(() => {
-          crashRuntime.settleTimer = null;
-          settleCrashRound(active.id).finally(() => {
-            crashRuntime.settling = false;
-          });
-        }, 650);
+        settleCrashRound(active.id).finally(() => {
+          crashRuntime.settling = false;
+        });
       }
       return false;
     }
@@ -542,7 +543,7 @@ function renderCrash(data) {
   $("#crash-hint").textContent = "Забери ставку сейчас — следующий тик может стать крашем.";
   $("#crash-start").disabled = true;
   $("#crash-cashout").disabled =
-    busyActions.has("crash_cashout");
+    crashRuntime.crashed || busyActions.has("crash_cashout");
   startCrashAnimation(active);
 }
 
@@ -858,7 +859,9 @@ $("#crash-start").addEventListener("click", () => {
 
 $("#crash-cashout").addEventListener("click", () => {
   const gameId = appState.data?.crash?.active?.id;
-  if (gameId) runAction("crash_cashout", { gameId });
+  if (gameId && !crashRuntime.crashed) {
+    runAction("crash_cashout", { gameId });
+  }
 });
 
 $("#refresh-button").addEventListener("click", loadState);

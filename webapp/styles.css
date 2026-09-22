@@ -3268,60 +3268,31 @@ body::before {
   }
 }
 
-/* Rocket silhouette: roll around its flight axis, with a visible propeller */
+/* Rocket silhouette: the whole rocket rotates while the outer node follows the flight path */
 .crash-rocket {
   height: 78px;
-  perspective: 220px;
   width: 126px;
 }
 
-.crash-rocket::before {
-  animation: crash-propeller-spin 520ms linear infinite;
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0 39%,
-      color-mix(in srgb, var(--crash-accent) 76%, white) 40% 60%,
-      transparent 61%
-    ),
-    linear-gradient(
-      0deg,
-      transparent 0 39%,
-      color-mix(in srgb, var(--crash-accent) 64%, white) 40% 60%,
-      transparent 61%
-    );
-  border: 1px solid color-mix(in srgb, var(--crash-accent) 70%, transparent);
-  border-radius: 50%;
-  box-shadow:
-    0 0 9px color-mix(in srgb, var(--crash-accent) 84%, transparent),
-    inset 0 0 7px color-mix(in srgb, var(--crash-accent) 42%, transparent);
-  content: "";
-  height: 34px;
-  left: 11px;
-  opacity: 0.9;
+.crash-rocket-spin {
+  animation: crash-rocket-propeller-roll 780ms linear infinite;
+  height: 100%;
+  left: 0;
   position: absolute;
-  top: 22px;
-  transform-origin: center;
-  width: 34px;
-  z-index: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  width: 100%;
+  will-change: transform;
 }
 
+.crash-rocket::before,
 .crash-rocket::after {
-  background: #eaffff;
-  border: 2px solid color-mix(in srgb, var(--crash-accent) 72%, white);
-  border-radius: 50%;
-  box-shadow: 0 0 9px color-mix(in srgb, var(--crash-accent) 92%, transparent);
-  content: "";
-  height: 7px;
-  left: 25px;
-  position: absolute;
-  top: 35px;
-  width: 7px;
-  z-index: 4;
+  content: none;
+  display: none;
 }
 
 .crash-rocket-body {
-  animation: crash-rocket-roll 1.08s linear infinite;
+  animation: none;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.46), transparent 34%),
     linear-gradient(
@@ -3338,10 +3309,7 @@ body::before {
     inset 0 -5px 7px rgba(0, 0, 0, 0.36);
   height: 26px;
   left: 40px;
-  perspective: 180px;
   top: 26px;
-  transform-origin: 24% 50%;
-  transform-style: preserve-3d;
   width: 62px;
   z-index: 2;
 }
@@ -3440,25 +3408,7 @@ body::before {
   z-index: 0;
 }
 
-@keyframes crash-rocket-roll {
-  0% {
-    transform: rotateX(0deg);
-  }
-  25% {
-    transform: rotateX(82deg);
-  }
-  50% {
-    transform: rotateX(180deg);
-  }
-  75% {
-    transform: rotateX(278deg);
-  }
-  100% {
-    transform: rotateX(360deg);
-  }
-}
-
-@keyframes crash-propeller-spin {
+@keyframes crash-rocket-propeller-roll {
   to {
     transform: rotate(360deg);
   }

@@ -300,7 +300,7 @@ function startCrashCountdown() {
       crashRuntime.countdownResolve = null;
       stage?.classList.remove("launching");
       if (completed) {
-        if (status) status.textContent = "Запуск ракеты…";
+        if (status) status.textContent = "Запуск монеты Z…";
         if (multiplier) multiplier.textContent = "1.00x";
       }
       resolve(completed);

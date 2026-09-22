@@ -179,11 +179,12 @@ function getCrashTrajectoryPoint(progress) {
   const inverseT = 1 - t;
   return {
     x:
+      inverseT * inverseT * inverseT * 8 +
       3 * inverseT * inverseT * t * 24 +
       3 * inverseT * t * t * 62 +
       t * t * t * 100,
     y:
-      inverseT * inverseT * inverseT * 94 +
+      inverseT * inverseT * inverseT * 91 +
       3 * inverseT * inverseT * t * 100 +
       3 * inverseT * t * t * 84 +
       t * t * t * 8,
@@ -194,11 +195,11 @@ function getCrashTrajectoryAngle(progress) {
   const t = Math.max(0, Math.min(1, progress));
   const inverseT = 1 - t;
   const dx =
-    3 * inverseT * inverseT * 24 +
+    3 * inverseT * inverseT * (24 - 8) +
     6 * inverseT * t * (62 - 24) +
     3 * t * t * (100 - 62);
   const dy =
-    3 * inverseT * inverseT * (100 - 94) +
+    3 * inverseT * inverseT * (100 - 91) +
     6 * inverseT * t * (84 - 100) +
     3 * t * t * (8 - 84);
   return (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -487,7 +488,7 @@ function startCrashAnimation(active) {
       crashRuntime.frame = null;
       crashRuntime.crashed = true;
       $("#crash-cashout").disabled = true;
-      $("#crash-status").textContent = `Ракета улетела на ${formatMultiplier(active.crashAt)}`;
+      $("#crash-status").textContent = `Монета Z улетела на ${formatMultiplier(active.crashAt)}`;
       $("#crash-stage").classList.add("crashed");
       if (!crashRuntime.settling) {
         crashRuntime.settling = true;

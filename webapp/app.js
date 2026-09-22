@@ -22,6 +22,8 @@ const crashRuntime = {
   displayMultiplier: null,
   crashed: false,
   settling: false,
+  countdownActive: false,
+  countdownResolve: null,
 };
 let selectedCrashBet = "10";
 const CRASH_PRESET_BETS = new Set(["10", "50", "100"]);
@@ -31,7 +33,7 @@ const rouletteRuntime = {
   spinning: false,
   finishTimer: null,
 };
-const CRASH_START_COUNTDOWN_MS = 3000;
+const CRASH_START_COUNTDOWN_MS = 7000;
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
 
@@ -231,12 +233,18 @@ function stopCrashAnimation() {
   if (crashRuntime.countdownTimer !== null) {
     window.clearTimeout(crashRuntime.countdownTimer);
   }
+  if (crashRuntime.countdownResolve) {
+    const resolveCountdown = crashRuntime.countdownResolve;
+    crashRuntime.countdownResolve = null;
+    resolveCountdown(false);
+  }
   if (crashRuntime.settleRetryTimer !== null) {
     window.clearTimeout(crashRuntime.settleRetryTimer);
   }
   crashRuntime.frame = null;
   crashRuntime.settleTimer = null;
   crashRuntime.countdownTimer = null;
+  crashRuntime.countdownActive = false;
   crashRuntime.settleRetryTimer = null;
   crashRuntime.lastFramePerfMs = null;
   crashRuntime.lagCashoutRequested = false;
@@ -265,31 +273,50 @@ function startCrashCountdown() {
   const stage = $("#crash-stage");
   const status = $("#crash-status");
   const multiplier = $("#crash-multiplier");
+  const startButton = $("#crash-start");
+  const countdownFill = $("#crash-countdown-fill");
+  if (crashRuntime.countdownActive) return Promise.resolve(false);
   const countdownStartedAt = Date.now();
   const countdownEndAt = countdownStartedAt + CRASH_START_COUNTDOWN_MS;
 
   if (crashRuntime.countdownTimer !== null) {
     window.clearTimeout(crashRuntime.countdownTimer);
   }
+  crashRuntime.countdownActive = true;
   stage?.classList.add("launching");
   stage?.classList.remove("running", "crashed");
+  if (startButton) startButton.disabled = true;
+  countdownFill?.style.setProperty(
+    "--countdown-duration",
+    `${CRASH_START_COUNTDOWN_MS}ms`,
+  );
 
-  const tick = () => {
-    const remainingMs = Math.max(0, countdownEndAt - Date.now());
-    if (remainingMs <= 0) {
+  return new Promise((resolve) => {
+    crashRuntime.countdownResolve = resolve;
+    const finish = (completed) => {
       crashRuntime.countdownTimer = null;
+      crashRuntime.countdownActive = false;
+      crashRuntime.countdownResolve = null;
       stage?.classList.remove("launching");
-      if (status) status.textContent = "Запуск ракеты…";
-      if (multiplier) multiplier.textContent = "1.00x";
-      return;
-    }
-    const remaining = Math.ceil(remainingMs / 1000);
-    if (status) status.textContent = `Приём ставок · ${remaining}`;
-    if (multiplier) multiplier.textContent = String(remaining);
-    crashRuntime.countdownTimer = window.setTimeout(tick, 80);
-  };
-
-  tick();
+      if (completed) {
+        if (status) status.textContent = "Запуск ракеты…";
+        if (multiplier) multiplier.textContent = "1.00x";
+      }
+      resolve(completed);
+    };
+    const tick = () => {
+      const remainingMs = Math.max(0, countdownEndAt - Date.now());
+      if (remainingMs <= 0) {
+        finish(true);
+        return;
+      }
+      const remaining = Math.ceil(remainingMs / 1000);
+      if (status) status.textContent = "Приём ставок";
+      if (multiplier) multiplier.textContent = String(remaining);
+      crashRuntime.countdownTimer = window.setTimeout(tick, 80);
+    };
+    tick();
+  });
 }
 
 function updateCrashVisual(multiplier, crashAt) {
@@ -509,6 +536,21 @@ function renderCrashHistory(history) {
     .join("");
 }
 
+function renderCrashRecentMultipliers(history) {
+  const container = $("#crash-recent-multipliers");
+  if (!container) return;
+  const rounds = (history || []).slice(0, 8);
+  container.innerHTML = rounds.length
+    ? rounds
+        .map((game) => {
+          const multiplier = Number(game.multiplier || 1);
+          const tone = multiplier >= 3.5 ? "high" : multiplier >= 2 ? "mid" : "low";
+          return `<span class="crash-recent-pill ${tone}">${formatMultiplier(multiplier)}</span>`;
+        })
+        .join("")
+    : '<span class="crash-recent-pill low">1.00x</span>';
+}
+
 function renderRouletteHistory(history) {
   const container = $("#roulette-history");
   if (!container) return;
@@ -633,6 +675,7 @@ function renderCrash(data) {
   const customBetInput = $("#crash-custom-bet");
   $("#crash-balance").textContent = formatNumber(data.wallet.earnBalance);
   renderCrashHistory(crash.history);
+  renderCrashRecentMultipliers(crash.history);
 
   if (crash.available === false) {
     stopCrashAnimation();
@@ -1066,7 +1109,7 @@ $("#crash-custom-bet").addEventListener("input", (event) => {
     Number.parseInt(value, 10) > 0 ? `${formatNumber(value)} монет` : "Введи сумму";
 });
 
-$("#crash-start").addEventListener("click", () => {
+$("#crash-start").addEventListener("click", async () => {
   const parsedBet = Number.parseInt(selectedCrashBet, 10);
   if (
     selectedCrashBet !== "all" &&
@@ -1077,7 +1120,8 @@ $("#crash-start").addEventListener("click", () => {
     return;
   }
   const bet = selectedCrashBet === "all" ? "all" : parsedBet;
-  startCrashCountdown();
+  const countdownCompleted = await startCrashCountdown();
+  if (!countdownCompleted) return;
   runAction("crash_start", { bet });
 });
 

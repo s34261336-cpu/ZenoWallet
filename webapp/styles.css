@@ -3413,3 +3413,150 @@ body::before {
     transform: rotate(360deg);
   }
 }
+
+/* Crash round pacing and video-style launch states */
+.crash-stage {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(35, 190, 120, 0.2), transparent 36%),
+    radial-gradient(circle at 82% 12%, rgba(85, 219, 151, 0.12), transparent 24%),
+    linear-gradient(145deg, #102d2a 0%, #071c1a 54%, #050b13 100%);
+}
+
+.crash-stage.phase-mid,
+.crash-stage.phase-high {
+  --crash-accent: #6da5ff;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(64, 126, 239, 0.22), transparent 36%),
+    radial-gradient(circle at 82% 12%, rgba(104, 166, 255, 0.14), transparent 24%),
+    linear-gradient(145deg, #152b4c 0%, #0b1a32 54%, #050b13 100%);
+}
+
+.crash-countdown-meter {
+  background: rgba(28, 30, 62, 0.72);
+  border: 1px solid rgba(154, 173, 255, 0.13);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.32);
+  height: 8px;
+  left: 18%;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 151px;
+  transition: opacity 180ms ease;
+  width: 64%;
+  z-index: 2;
+}
+
+.crash-countdown-fill {
+  background: linear-gradient(90deg, #37db9a, #63efad);
+  border-radius: inherit;
+  box-shadow: 0 0 12px rgba(73, 236, 165, 0.86);
+  display: block;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  width: 100%;
+}
+
+.crash-stage.launching .crash-countdown-meter {
+  opacity: 1;
+}
+
+.crash-stage.launching .crash-countdown-fill {
+  animation: crash-countdown-fill var(--countdown-duration, 7s) linear forwards;
+}
+
+.crash-stage.launching .crash-trajectory {
+  opacity: 0.08;
+}
+
+.crash-recent-multipliers {
+  align-items: center;
+  bottom: 7px;
+  display: flex;
+  gap: 8px;
+  left: 10px;
+  overflow: hidden;
+  position: absolute;
+  right: 10px;
+  z-index: 3;
+}
+
+.crash-recent-pill {
+  background: rgba(7, 25, 25, 0.82);
+  border: 1px solid rgba(74, 226, 160, 0.48);
+  border-radius: 999px;
+  color: #4fe2a1;
+  flex: 0 0 auto;
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  min-width: 66px;
+  padding: 8px 11px;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(79, 226, 161, 0.42);
+}
+
+.crash-recent-pill.mid {
+  border-color: rgba(100, 151, 255, 0.58);
+  color: #72a9ff;
+  text-shadow: 0 0 8px rgba(114, 169, 255, 0.42);
+}
+
+.crash-recent-pill.high {
+  border-color: rgba(255, 108, 118, 0.62);
+  color: #ff7f89;
+  text-shadow: 0 0 8px rgba(255, 108, 118, 0.42);
+}
+
+.crash-rocket {
+  opacity: 0;
+  transition: opacity 170ms ease, filter 170ms ease;
+  visibility: hidden;
+}
+
+.crash-stage.running .crash-rocket,
+.crash-stage.crashed .crash-rocket {
+  opacity: 1;
+  visibility: visible;
+}
+
+.crash-stage.crashed .crash-rocket-body,
+.crash-stage.crashed .crash-rocket-fin {
+  opacity: 0;
+  transform: scale(0.42);
+  transition: opacity 210ms ease, transform 210ms ease;
+}
+
+.crash-stage.crashed .crash-rocket-trail {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 63, 78, 0.2) 24%,
+    rgba(255, 67, 79, 0.74) 78%,
+    #ff6b72 100%
+  );
+  box-shadow: 0 0 12px rgba(255, 64, 77, 0.9);
+}
+
+.crash-stage.crashed .crash-rocket-trail::after {
+  background: #ffd36a;
+  box-shadow:
+    -18px 8px 0 -1px rgba(255, 114, 68, 0.8),
+    -38px -6px 0 -2px rgba(255, 67, 78, 0.78),
+    -61px 10px 0 -3px rgba(255, 67, 78, 0.52);
+}
+
+.crash-stage.crashed .crash-multiplier {
+  color: #70a7ff;
+  text-shadow: 0 0 24px rgba(82, 137, 255, 0.5);
+}
+
+@keyframes crash-countdown-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

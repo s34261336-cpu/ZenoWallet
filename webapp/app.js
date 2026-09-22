@@ -35,6 +35,7 @@ const rouletteRuntime = {
 };
 const CRASH_START_COUNTDOWN_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
+const MAIN_VIEWS = new Set(["home", "games", "season", "profile"]);
 const $ = (selector) => document.querySelector(selector);
 
 if (telegram) {
@@ -849,6 +850,7 @@ function render() {
   $("#user-name").textContent = user.firstName;
   $("#earn-balance").textContent = formatNumber(wallet.earnBalance);
   $("#zeno-balance").textContent = formatNumber(wallet.zenoBalance);
+  $("#screen-balance").textContent = `${formatNumber(wallet.earnBalance)} ZT`;
   $("#case-remaining").textContent = caseData.remaining;
   $("#case-limit").textContent = `${caseData.hourlyLimit} в час`;
   const caseButton = document.querySelector('[data-action="case"]');
@@ -899,15 +901,28 @@ function render() {
 }
 
 function setView(viewName) {
-  appState.activeView = viewName;
-  if (viewName !== "rocket") closeCrashBetSheet();
+  const normalizedView = viewName === "more" ? "profile" : viewName;
+  appState.activeView = normalizedView;
+  if (normalizedView !== "rocket") closeCrashBetSheet();
   document.querySelectorAll(".view").forEach((view) => {
-    view.classList.toggle("hidden", view.id !== `${viewName}-view`);
+    view.classList.toggle("hidden", view.id !== `${normalizedView}-view`);
   });
-  const navView = viewName === "rocket" ? "games" : viewName;
+  document.body.classList.remove(
+    "screen-home",
+    "screen-games",
+    "screen-rocket",
+    "screen-roulette",
+    "screen-season",
+    "screen-profile",
+    "nested-screen",
+  );
+  document.body.classList.add(`screen-${normalizedView}`);
+  document.body.classList.toggle("nested-screen", !MAIN_VIEWS.has(normalizedView));
+  const navView = MAIN_VIEWS.has(normalizedView) ? normalizedView : null;
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === navView);
   });
+  window.scrollTo(0, 0);
   if (telegram?.HapticFeedback) telegram.HapticFeedback.selectionChanged();
 }
 
@@ -1062,7 +1077,7 @@ async function copyReferral() {
   try {
     await navigator.clipboard.writeText(appState.data.referralLink);
     showToast("Ссылка скопирована");
-    setView("more");
+    setView("profile");
   } catch {
     showToast("Не удалось скопировать ссылку", "danger");
   }

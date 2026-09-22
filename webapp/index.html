@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
-  <body>
+  <body class="screen-home">
     <div class="ambient ambient-one"></div>
     <div class="ambient ambient-two"></div>
 
@@ -30,9 +30,10 @@
             <span>EARN · PLAY · RISE</span>
           </div>
         </div>
-        <button class="icon-button" id="refresh-button" aria-label="Обновить">
-          ↻
-        </button>
+        <div class="topbar-actions">
+          <div class="screen-balance" id="screen-balance" aria-label="Баланс">— ZT</div>
+          <button class="icon-button" id="refresh-button" aria-label="Обновить">↻</button>
+        </div>
       </header>
 
       <main>
@@ -116,6 +117,33 @@
 
           <div class="section-heading capabilities-heading">
             <div>
+              <span class="eyebrow">Игровая зона</span>
+              <h2>Попробуй игру</h2>
+            </div>
+            <button class="text-button" data-view="games">Все игры <span>↗</span></button>
+          </div>
+
+          <section class="home-game-preview" aria-label="Превью игр">
+            <button class="home-game-preview-card home-game-preview-crash" data-view="rocket" type="button">
+              <span class="home-game-preview-icon">🚀</span>
+              <span>
+                <strong>Ракетка</strong>
+                <small>Забери вовремя</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+            <button class="home-game-preview-card home-game-preview-roulette" data-view="roulette" type="button">
+              <span class="home-game-preview-icon">◉</span>
+              <span>
+                <strong>Рулетка</strong>
+                <small>До 50x за прокрут</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+          </section>
+
+          <div class="section-heading capabilities-heading">
+            <div>
               <span class="eyebrow">Твой путь</span>
               <h2>Ещё возможности</h2>
             </div>
@@ -150,6 +178,7 @@
         </section>
 
         <section class="view hidden" id="season-view">
+          <button class="back-link" data-view="home" type="button">← Назад</button>
           <div class="section-heading">
             <div>
               <span class="eyebrow">Рейтинг</span>
@@ -188,6 +217,7 @@
         </section>
 
         <section class="view hidden" id="games-view">
+          <button class="back-link" data-view="home" type="button">← Назад</button>
           <div class="section-heading">
             <div>
               <span class="eyebrow">Игровая зона</span>
@@ -229,7 +259,7 @@
         </section>
 
         <section class="view hidden" id="rocket-view">
-          <button class="back-link" data-view="games" type="button">← Все игры</button>
+          <button class="back-link" data-view="games" type="button">← Назад</button>
           <div class="section-heading rocket-heading">
             <div>
               <span class="eyebrow">Игровая зона</span>
@@ -370,7 +400,7 @@
         </section>
 
         <section class="view hidden" id="roulette-view">
-          <button class="back-link" data-view="games" type="button">← Все игры</button>
+          <button class="back-link" data-view="games" type="button">← Назад</button>
           <div class="section-heading rocket-heading">
             <div>
               <span class="eyebrow">Игровая зона</span>
@@ -451,7 +481,8 @@
           </section>
         </section>
 
-        <section class="view hidden" id="more-view">
+        <section class="view hidden" id="profile-view">
+          <button class="back-link" data-view="home" type="button">← Назад</button>
           <div class="section-heading">
             <div>
               <span class="eyebrow">Ещё</span>
@@ -503,7 +534,7 @@
         <button class="nav-item" data-view="season">
           <span>♛</span><small>Турниры</small>
         </button>
-        <button class="nav-item" data-view="more">
+        <button class="nav-item" data-view="profile">
           <span>◌</span><small>Профиль</small>
         </button>
       </nav>

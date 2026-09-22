@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Replit conversation mount; this is not application source.
+/.conversation/

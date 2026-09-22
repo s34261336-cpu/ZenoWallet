@@ -674,6 +674,8 @@ function renderCrash(data) {
   const crash = data.crash || { active: null, history: [] };
   const active = crash.active;
   const customBetInput = $("#crash-custom-bet");
+  const openBetButton = $("#crash-open-bet");
+  const betSheet = $("#crash-bet-sheet");
   $("#crash-balance").textContent = formatNumber(data.wallet.earnBalance);
   renderCrashHistory(crash.history);
   renderCrashRecentMultipliers(crash.history);
@@ -687,6 +689,7 @@ function renderCrash(data) {
     $("#crash-status").textContent = "Игра не настроена";
     $("#crash-multiplier").textContent = "—";
     $("#crash-start").disabled = true;
+    if (openBetButton) openBetButton.disabled = true;
     $("#crash-cashout").disabled = true;
     $("#crash-hint").textContent = "Администратору нужно выполнить supabase/schema.sql в Supabase.";
     return;
@@ -705,9 +708,16 @@ function renderCrash(data) {
     $("#crash-status").textContent = "Готов к старту";
     $("#crash-multiplier").textContent = "1.00x";
     $("#crash-cashout-value").textContent = "1.00x";
-    $("#crash-hint").textContent = "Выбери ставку и запусти раунд.";
+    $("#crash-hint").textContent = "Сделай ставку, чтобы начать раунд.";
     $("#crash-start").disabled = busyActions.has("crash_start");
+    if (openBetButton) {
+      openBetButton.disabled = busyActions.has("crash_start");
+      openBetButton.classList.remove("hidden");
+    }
     $("#crash-cashout").disabled = true;
+    $("#crash-cashout").classList.add("hidden");
+    betSheet?.classList.remove("active");
+    betSheet?.setAttribute("aria-hidden", "true");
     if (customBetInput) {
       customBetInput.value = CRASH_PRESET_BETS.has(selectedCrashBet)
         || selectedCrashBet === "all"
@@ -718,19 +728,24 @@ function renderCrash(data) {
       selectedCrashBet === "all"
         ? "Весь баланс"
         : Number.parseInt(selectedCrashBet, 10) > 0
-          ? `${formatNumber(selectedCrashBet)} монет`
+          ? `${formatNumber(selectedCrashBet)} ZT`
           : "Введи сумму";
     return;
   }
 
   selectedCrashBet = String(active.bet);
   if (customBetInput) customBetInput.value = String(active.bet);
-  $("#crash-selected-bet").textContent = `${formatNumber(active.bet)} монет`;
+  $("#crash-selected-bet").textContent = `${formatNumber(active.bet)} ZT`;
   $("#crash-status").textContent = "Ракета в полёте";
   $("#crash-hint").textContent = "Забери ставку сейчас — следующий тик может стать крашем.";
   $("#crash-start").disabled = true;
+  if (openBetButton) {
+    openBetButton.disabled = true;
+    openBetButton.classList.add("hidden");
+  }
   $("#crash-cashout").disabled =
     crashRuntime.crashed || busyActions.has("crash_cashout");
+  $("#crash-cashout").classList.remove("hidden");
   startCrashAnimation(active);
 }
 
@@ -867,6 +882,7 @@ function render() {
 
 function setView(viewName) {
   appState.activeView = viewName;
+  if (viewName !== "rocket") closeCrashBetSheet();
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("hidden", view.id !== `${viewName}-view`);
   });
@@ -1045,6 +1061,27 @@ function closeWithdraw() {
   telegram?.BackButton?.hide();
 }
 
+function openCrashBetSheet() {
+  if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
+  const sheet = $("#crash-bet-sheet");
+  const backdrop = $("#crash-bet-sheet-backdrop");
+  if (!sheet || !backdrop) return;
+  backdrop.classList.remove("hidden");
+  sheet.classList.add("active");
+  sheet.setAttribute("aria-hidden", "false");
+  document.body.classList.add("crash-sheet-open");
+  window.setTimeout(() => $("#crash-custom-bet")?.focus(), 180);
+}
+
+function closeCrashBetSheet() {
+  const sheet = $("#crash-bet-sheet");
+  const backdrop = $("#crash-bet-sheet-backdrop");
+  sheet?.classList.remove("active");
+  sheet?.setAttribute("aria-hidden", "true");
+  backdrop?.classList.add("hidden");
+  document.body.classList.remove("crash-sheet-open");
+}
+
 document.querySelectorAll(".nav-item, [data-view]").forEach((button) => {
   button.addEventListener("click", () => {
     if (button.dataset.view) setView(button.dataset.view);
@@ -1077,7 +1114,7 @@ document.querySelectorAll("[data-crash-bet]").forEach((button) => {
     $("#crash-selected-bet").textContent =
       selectedCrashBet === "all"
         ? "Весь баланс"
-        : `${formatNumber(selectedCrashBet)} монет`;
+        : `${formatNumber(selectedCrashBet)} ZT`;
   });
 });
 
@@ -1107,8 +1144,12 @@ $("#crash-custom-bet").addEventListener("input", (event) => {
     button.classList.remove("selected");
   });
   $("#crash-selected-bet").textContent =
-    Number.parseInt(value, 10) > 0 ? `${formatNumber(value)} монет` : "Введи сумму";
+    Number.parseInt(value, 10) > 0 ? `${formatNumber(value)} ZT` : "Введи сумму";
 });
+
+$("#crash-open-bet").addEventListener("click", openCrashBetSheet);
+$("#crash-close-bet").addEventListener("click", closeCrashBetSheet);
+$("#crash-bet-sheet-backdrop").addEventListener("click", closeCrashBetSheet);
 
 $("#crash-start").addEventListener("click", async () => {
   const parsedBet = Number.parseInt(selectedCrashBet, 10);
@@ -1121,6 +1162,7 @@ $("#crash-start").addEventListener("click", async () => {
     return;
   }
   const bet = selectedCrashBet === "all" ? "all" : parsedBet;
+  closeCrashBetSheet();
   const countdownCompleted = await startCrashCountdown();
   if (!countdownCompleted) return;
   runAction("crash_start", { bet });

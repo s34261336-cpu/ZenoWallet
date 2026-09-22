@@ -288,54 +288,71 @@
               <div class="crash-recent-multipliers" id="crash-recent-multipliers" aria-label="Последние множители"></div>
             </div>
 
-            <div class="crash-controls">
-              <div class="crash-bet-heading">
-                <span>Ставка</span>
-                <span>Баланс <strong id="crash-balance">—</strong></span>
-              </div>
-              <div class="crash-bet-grid" role="group" aria-label="Размер ставки">
-                <button type="button" data-crash-bet="10">10</button>
-                <button type="button" data-crash-bet="50">50</button>
-                <button type="button" data-crash-bet="100">100</button>
-                <button type="button" data-crash-bet="all">Всё</button>
-              </div>
-              <label class="crash-custom-bet" for="crash-custom-bet">
-                <span>Своя ставка</span>
-                <input
-                  id="crash-custom-bet"
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="Введите сумму"
-                  autocomplete="off"
-                />
-              </label>
-              <div class="crash-selected-bet">
-                <span>Раунд</span>
-                <strong id="crash-selected-bet">10 монет</strong>
-              </div>
-              <div class="crash-actions">
-                <button
-                  class="primary-button crash-start-button"
-                  id="crash-start"
-                  data-action="crash_start"
-                  type="button"
-                >
-                  Старт <span>↗</span>
-                </button>
-                <button
-                  class="crash-cashout-button"
-                  id="crash-cashout"
-                  data-action="crash_cashout"
-                  type="button"
-                  disabled
-                >
-                  Забрать <span id="crash-cashout-value">1.00x</span>
-                </button>
-              </div>
-              <p class="crash-hint" id="crash-hint">Выбери ставку и запусти раунд.</p>
+            <div class="crash-action-bar">
+              <button class="primary-button crash-open-bet" id="crash-open-bet" type="button">
+                Сделать ставку <span>↗</span>
+              </button>
+              <button
+                class="crash-cashout-button"
+                id="crash-cashout"
+                data-action="crash_cashout"
+                type="button"
+                disabled
+              >
+                Забрать <span id="crash-cashout-value">1.00x</span>
+              </button>
             </div>
+            <p class="crash-hint crash-round-hint" id="crash-hint">Сделай ставку, чтобы начать раунд.</p>
+          </section>
+
+          <div class="crash-bet-sheet-backdrop hidden" id="crash-bet-sheet-backdrop"></div>
+          <section class="crash-bet-sheet" id="crash-bet-sheet" aria-label="Ставка в Ракетке" aria-hidden="true">
+            <div class="crash-sheet-handle" aria-hidden="true"></div>
+            <div class="crash-sheet-heading">
+              <div>
+                <span class="eyebrow">Игра на токены</span>
+                <h3>Ставка в Ракетке</h3>
+              </div>
+              <button class="crash-sheet-close" id="crash-close-bet" type="button" aria-label="Закрыть">×</button>
+            </div>
+            <div class="crash-token-tabs" role="tablist" aria-label="Валюта ставки">
+              <span class="crash-token-tab active" role="tab" aria-selected="true">Токенами</span>
+            </div>
+            <div class="crash-sheet-balance">
+              <span>Доступно</span>
+              <strong><span id="crash-balance">—</span> ZT</strong>
+            </div>
+            <label class="crash-custom-bet" for="crash-custom-bet">
+              <span>Сумма, ZT</span>
+              <input
+                id="crash-custom-bet"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                placeholder="Введите сумму"
+                autocomplete="off"
+              />
+            </label>
+            <div class="crash-bet-grid" role="group" aria-label="Размер ставки">
+              <button type="button" data-crash-bet="10">10</button>
+              <button type="button" data-crash-bet="50">50</button>
+              <button type="button" data-crash-bet="100">100</button>
+              <button type="button" data-crash-bet="all">Всё</button>
+            </div>
+            <div class="crash-selected-bet">
+              <span>Ставка</span>
+              <strong id="crash-selected-bet">10 ZT</strong>
+            </div>
+            <button
+              class="primary-button crash-start-button"
+              id="crash-start"
+              data-action="crash_start"
+              type="button"
+            >
+              Подтвердить ставку <span>↗</span>
+            </button>
+            <p class="crash-sheet-hint">После ставки панель закроется, и начнётся новый раунд.</p>
           </section>
 
           <section class="crash-history-card">

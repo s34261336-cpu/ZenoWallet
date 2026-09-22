@@ -275,6 +275,7 @@ function startCrashCountdown() {
   const status = $("#crash-status");
   const multiplier = $("#crash-multiplier");
   const startButton = $("#crash-start");
+  const openBetButton = $("#crash-open-bet");
   const countdownFill = $("#crash-countdown-fill");
   if (crashRuntime.countdownActive) return Promise.resolve(false);
   const countdownStartedAt = Date.now();
@@ -287,6 +288,11 @@ function startCrashCountdown() {
   stage?.classList.add("launching");
   stage?.classList.remove("running", "crashed");
   if (startButton) startButton.disabled = true;
+  if (openBetButton) {
+    openBetButton.disabled = true;
+    openBetButton.classList.add("is-locked");
+    openBetButton.setAttribute("aria-disabled", "true");
+  }
   countdownFill?.style.setProperty(
     "--countdown-duration",
     `${CRASH_START_COUNTDOWN_MS}ms`,
@@ -302,6 +308,10 @@ function startCrashCountdown() {
       if (completed) {
         if (status) status.textContent = "Запуск монеты Z…";
         if (multiplier) multiplier.textContent = "1.00x";
+      } else if (openBetButton && !appState.data?.crash?.active) {
+        openBetButton.disabled = false;
+        openBetButton.classList.remove("is-locked");
+        openBetButton.setAttribute("aria-disabled", "false");
       }
       resolve(completed);
     };
@@ -673,6 +683,8 @@ function renderRoulette(data) {
 function renderCrash(data) {
   const crash = data.crash || { active: null, history: [] };
   const active = crash.active;
+  const crashBetLocked =
+    Boolean(active) || crashRuntime.countdownActive || busyActions.has("crash_start");
   const customBetInput = $("#crash-custom-bet");
   const openBetButton = $("#crash-open-bet");
   const betSheet = $("#crash-bet-sheet");
@@ -697,10 +709,10 @@ function renderCrash(data) {
 
   document.querySelectorAll("[data-crash-bet]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.crashBet === selectedCrashBet);
-    button.disabled = Boolean(active);
+    button.disabled = crashBetLocked;
   });
   if (customBetInput) {
-    customBetInput.disabled = Boolean(active) || busyActions.has("crash_start");
+    customBetInput.disabled = crashBetLocked;
   }
 
   if (!active) {
@@ -709,9 +721,11 @@ function renderCrash(data) {
     $("#crash-multiplier").textContent = "1.00x";
     $("#crash-cashout-value").textContent = "1.00x";
     $("#crash-hint").textContent = "Сделай ставку, чтобы начать раунд.";
-    $("#crash-start").disabled = busyActions.has("crash_start");
+    $("#crash-start").disabled = crashBetLocked;
     if (openBetButton) {
-      openBetButton.disabled = busyActions.has("crash_start");
+      openBetButton.disabled = crashBetLocked;
+      openBetButton.classList.toggle("is-locked", crashBetLocked);
+      openBetButton.setAttribute("aria-disabled", String(crashBetLocked));
       openBetButton.classList.remove("hidden");
     }
     $("#crash-cashout").disabled = true;
@@ -741,7 +755,9 @@ function renderCrash(data) {
   $("#crash-start").disabled = true;
   if (openBetButton) {
     openBetButton.disabled = true;
-    openBetButton.classList.add("hidden");
+    openBetButton.classList.add("is-locked");
+    openBetButton.classList.remove("hidden");
+    openBetButton.setAttribute("aria-disabled", "true");
   }
   $("#crash-cashout").disabled =
     crashRuntime.crashed || busyActions.has("crash_cashout");
@@ -1062,7 +1078,13 @@ function closeWithdraw() {
 }
 
 function openCrashBetSheet() {
-  if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
+  if (
+    appState.data?.crash?.active ||
+    crashRuntime.countdownActive ||
+    busyActions.has("crash_start")
+  ) {
+    return;
+  }
   const sheet = $("#crash-bet-sheet");
   const backdrop = $("#crash-bet-sheet-backdrop");
   if (!sheet || !backdrop) return;
@@ -1104,7 +1126,13 @@ document.querySelectorAll('[data-action="friends"]').forEach((button) => {
 
 document.querySelectorAll("[data-crash-bet]").forEach((button) => {
   button.addEventListener("click", () => {
-    if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
+    if (
+      appState.data?.crash?.active ||
+      crashRuntime.countdownActive ||
+      busyActions.has("crash_start")
+    ) {
+      return;
+    }
     selectedCrashBet = button.dataset.crashBet;
     const customBetInput = $("#crash-custom-bet");
     if (customBetInput) customBetInput.value = "";
@@ -1135,7 +1163,13 @@ document.querySelectorAll("[data-roulette-bet]").forEach((button) => {
 });
 
 $("#crash-custom-bet").addEventListener("input", (event) => {
-  if (appState.data?.crash?.active || busyActions.has("crash_start")) return;
+  if (
+    appState.data?.crash?.active ||
+    crashRuntime.countdownActive ||
+    busyActions.has("crash_start")
+  ) {
+    return;
+  }
   const input = event.currentTarget;
   const value = input.value.replace(/[^\d]/g, "");
   input.value = value;
@@ -1152,6 +1186,13 @@ $("#crash-close-bet").addEventListener("click", closeCrashBetSheet);
 $("#crash-bet-sheet-backdrop").addEventListener("click", closeCrashBetSheet);
 
 $("#crash-start").addEventListener("click", async () => {
+  if (
+    appState.data?.crash?.active ||
+    crashRuntime.countdownActive ||
+    busyActions.has("crash_start")
+  ) {
+    return;
+  }
   const parsedBet = Number.parseInt(selectedCrashBet, 10);
   if (
     selectedCrashBet !== "all" &&

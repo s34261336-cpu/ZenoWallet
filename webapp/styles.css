@@ -3714,12 +3714,12 @@ body::before {
 
 .crash-flight-line,
 .crash-trajectory {
-  bottom: 78px;
-  height: 390px;
+  bottom: 58px;
+  height: 310px;
 }
 
 .crash-coin {
-  transform: translate3d(8px, 355px, 0) translate(-50%, -50%) rotate(-16deg);
+  transform: translate3d(8px, 278px, 0) translate(-50%, -50%) rotate(-16deg);
 }
 
 @media (max-width: 390px) {
@@ -3729,12 +3729,12 @@ body::before {
 
   .crash-flight-line,
   .crash-trajectory {
-    bottom: 68px;
-    height: 315px;
+    bottom: 54px;
+    height: 270px;
   }
 
   .crash-coin {
-    transform: translate3d(8px, 286px, 0) translate(-50%, -50%) rotate(-16deg);
+    transform: translate3d(8px, 236px, 0) translate(-50%, -50%) rotate(-16deg);
   }
 }
 
@@ -3776,37 +3776,44 @@ body.crash-sheet-open {
 }
 
 .crash-stage {
-  height: clamp(430px, 67svh, 520px);
-  min-height: 430px;
+  height: clamp(360px, 52svh, 420px);
+  min-height: 360px;
 }
 
 .crash-action-bar {
   display: grid;
-  gap: 10px;
-  padding: 13px 13px 0;
+  gap: 8px;
+  padding: 10px 13px 0;
 }
 
 .crash-open-bet {
   background: linear-gradient(110deg, #4b66ff 0%, #7654ef 54%, #9850f2 100%);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 18px;
+  border-radius: 14px;
   box-shadow:
     0 12px 26px rgba(78, 83, 255, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 900;
-  min-height: 66px;
+  min-height: 52px;
   letter-spacing: -0.03em;
 }
 
 .crash-open-bet span,
 .crash-start-button span {
-  font-size: 18px;
-  margin-left: 5px;
+  font-size: 15px;
+  margin-left: 4px;
+}
+
+.crash-open-bet.is-locked {
+  box-shadow: none;
+  filter: grayscale(0.45);
+  opacity: 0.42;
 }
 
 .crash-cashout-button {
-  min-height: 66px;
+  min-height: 52px;
+  font-size: 13px;
 }
 
 .crash-round-hint {
@@ -3826,18 +3833,18 @@ body.crash-sheet-open {
     linear-gradient(160deg, #151a2c 0%, #101526 58%, #0b1020 100%);
   border: 1px solid rgba(190, 201, 255, 0.17);
   border-bottom: 0;
-  border-radius: 28px 28px 0 0;
+  border-radius: 22px 22px 0 0;
   bottom: 0;
   box-shadow: 0 -18px 60px rgba(2, 4, 18, 0.55);
   left: 50%;
-  max-height: min(690px, calc(100svh - 18px));
+  max-height: min(620px, calc(100svh - 28px));
   opacity: 0;
-  padding: 10px 18px calc(21px + var(--safe-bottom));
+  padding: 8px 15px calc(16px + var(--safe-bottom));
   pointer-events: none;
   position: fixed;
   transform: translate(-50%, 105%);
-  transition: opacity 240ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
-  width: min(100%, 462px);
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: min(100%, 430px);
   z-index: 21;
 }
 
@@ -3850,9 +3857,9 @@ body.crash-sheet-open {
 .crash-sheet-handle {
   background: rgba(224, 231, 255, 0.22);
   border-radius: 999px;
-  height: 5px;
-  margin: 0 auto 17px;
-  width: 62px;
+  height: 4px;
+  margin: 0 auto 12px;
+  width: 50px;
 }
 
 .crash-sheet-heading {
@@ -3864,7 +3871,7 @@ body.crash-sheet-open {
 .crash-sheet-heading h3 {
   color: #f6f7ff;
   font-family: "Manrope", sans-serif;
-  font-size: 23px;
+  font-size: 19px;
   letter-spacing: -0.06em;
   margin-top: 5px;
 }
@@ -3874,27 +3881,27 @@ body.crash-sheet-open {
   border: 1px solid rgba(213, 220, 255, 0.13);
   border-radius: 50%;
   color: #9ba4c4;
-  font-size: 25px;
-  height: 35px;
+  font-size: 22px;
+  height: 31px;
   line-height: 1;
-  width: 35px;
+  width: 31px;
 }
 
 .crash-token-tabs {
   background: rgba(7, 10, 24, 0.42);
   border: 1px solid rgba(205, 213, 255, 0.1);
-  border-radius: 18px;
+  border-radius: 14px;
   display: flex;
-  margin-top: 20px;
+  margin-top: 14px;
   padding: 4px;
 }
 
 .crash-token-tab {
-  border-radius: 14px;
+  border-radius: 11px;
   color: #9da5c5;
   flex: 1;
-  font-size: 16px;
-  padding: 12px;
+  font-size: 14px;
+  padding: 9px;
   text-align: center;
 }
 
@@ -3911,47 +3918,47 @@ body.crash-sheet-open {
   display: flex;
   font-size: 12px;
   justify-content: space-between;
-  margin: 17px 2px 9px;
+  margin: 12px 2px 7px;
 }
 
 .crash-sheet-balance strong {
   color: var(--lime);
   font-family: "Manrope", sans-serif;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .crash-bet-sheet .crash-custom-bet {
   display: block;
-  margin: 0 0 12px;
+  margin: 0 0 9px;
 }
 
 .crash-bet-sheet .crash-custom-bet span {
   color: #9da5c5;
   display: block;
   font-size: 12px;
-  margin: 0 0 8px 2px;
+  margin: 0 0 5px 2px;
 }
 
 .crash-bet-sheet .crash-custom-bet input {
   background: rgba(30, 37, 61, 0.72);
   border-color: rgba(144, 159, 220, 0.18);
-  border-radius: 17px;
-  font-size: 27px;
-  min-height: 70px;
-  padding: 0 19px;
+  border-radius: 14px;
+  font-size: 22px;
+  min-height: 55px;
+  padding: 0 15px;
 }
 
 .crash-bet-sheet .crash-bet-grid {
-  gap: 9px;
-  margin: 0 0 14px;
+  gap: 7px;
+  margin: 0 0 10px;
 }
 
 .crash-bet-sheet .crash-bet-grid button {
   background: rgba(31, 38, 62, 0.8);
   border-color: rgba(144, 159, 220, 0.2);
-  border-radius: 15px;
-  font-size: 15px;
-  min-height: 49px;
+  border-radius: 12px;
+  font-size: 13px;
+  min-height: 43px;
 }
 
 .crash-bet-sheet .crash-bet-grid button.selected,
@@ -3962,19 +3969,19 @@ body.crash-sheet-open {
 
 .crash-bet-sheet .crash-selected-bet {
   border-bottom: 0;
-  padding: 3px 2px 14px;
+  padding: 2px 2px 10px;
 }
 
 .crash-bet-sheet .crash-start-button {
   background: linear-gradient(110deg, #4b66ff 0%, #7654ef 54%, #9850f2 100%);
-  border-radius: 17px;
+  border-radius: 14px;
   box-shadow: 0 10px 26px rgba(80, 80, 255, 0.24);
-  min-height: 58px;
+  min-height: 50px;
 }
 
 .crash-sheet-hint {
   color: #777f9f;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.45;
   margin: 10px 4px 0;
   text-align: center;
@@ -3982,8 +3989,8 @@ body.crash-sheet-open {
 
 @media (max-width: 390px) {
   .crash-stage {
-    height: 430px;
-    min-height: 430px;
+    height: 390px;
+    min-height: 390px;
   }
 
   .crash-bet-sheet {

@@ -33,7 +33,7 @@ const rouletteRuntime = {
   spinning: false,
   finishTimer: null,
 };
-const CRASH_START_COUNTDOWN_MS = 7000;
+const CRASH_START_COUNTDOWN_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
 const $ = (selector) => document.querySelector(selector);
 
@@ -268,6 +268,9 @@ function stopCrashAnimation() {
   const rocket = $("#crash-rocket");
   rocket?.style.removeProperty("transform");
   rocket?.style.removeProperty("--flight-angle");
+  const rocketTrail = $(".crash-rocket-trail");
+  rocketTrail?.style.removeProperty("background");
+  rocketTrail?.style.removeProperty("box-shadow");
 }
 
 function startCrashCountdown() {
@@ -306,7 +309,6 @@ function startCrashCountdown() {
       crashRuntime.countdownResolve = null;
       stage?.classList.remove("launching");
       if (completed) {
-        if (status) status.textContent = "Запуск монеты Z…";
         if (multiplier) multiplier.textContent = "1.00x";
       } else if (openBetButton && !appState.data?.crash?.active) {
         openBetButton.disabled = false;
@@ -995,10 +997,10 @@ async function runAction(action, body = {}, options = {}) {
         }
       }
     } else if (
-      !options.silent &&
       !options.suppressSuccessToast &&
       (actionResult?.type === "crash_cashout" ||
-        actionResult?.type === "crash_settle")
+        actionResult?.type === "crash_settle") &&
+      (!options.silent || actionResult?.type === "crash_settle")
     ) {
       const toastKey = [
         actionResult.gameId ?? "",

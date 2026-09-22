@@ -3737,3 +3737,26 @@ body::before {
     transform: translate3d(8px, 286px, 0) translate(-50%, -50%) rotate(-16deg);
   }
 }
+
+/* Match the narrow Telegram mini-app viewport from the reference screen. */
+.app-shell {
+  max-width: 462px;
+}
+
+.bottom-nav {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(calc(100% - 26px), 436px);
+}
+
+@media (max-width: 480px) {
+  .app-shell {
+    padding-left: 13px;
+    padding-right: 13px;
+  }
+
+  .bottom-nav {
+    width: calc(100% - 26px);
+  }
+}

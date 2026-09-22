@@ -3706,3 +3706,34 @@ body::before {
 .crash-trajectory-track {
   opacity: 0;
 }
+
+/* Keep the flight area above the recent multiplier strip, like the reference video. */
+.crash-stage {
+  height: 520px;
+}
+
+.crash-flight-line,
+.crash-trajectory {
+  bottom: 78px;
+  height: 390px;
+}
+
+.crash-coin {
+  transform: translate3d(8px, 355px, 0) translate(-50%, -50%) rotate(-16deg);
+}
+
+@media (max-width: 390px) {
+  .crash-stage {
+    height: 430px;
+  }
+
+  .crash-flight-line,
+  .crash-trajectory {
+    bottom: 68px;
+    height: 315px;
+  }
+
+  .crash-coin {
+    transform: translate3d(8px, 286px, 0) translate(-50%, -50%) rotate(-16deg);
+  }
+}

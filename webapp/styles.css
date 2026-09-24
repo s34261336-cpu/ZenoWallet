@@ -3041,6 +3041,44 @@ body::before {
   overflow: hidden;
 }
 
+.roulette-mode-tabs {
+  background: rgba(5, 7, 8, 0.44);
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 7px;
+}
+
+.roulette-mode-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #818a85;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 36px;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.roulette-mode-tab.active {
+  background: rgba(38, 100, 160, 0.3);
+  border-color: rgba(102, 183, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ecf7ff;
+}
+
+.roulette-game.premium-mode .roulette-mode-tab.active {
+  background: rgba(160, 91, 37, 0.26);
+  border-color: rgba(247, 183, 85, 0.48);
+  color: #ffe6a8;
+}
+
 .roulette-stage {
   align-items: center;
   background:
@@ -3086,40 +3124,48 @@ body::before {
 .roulette-wheel {
   background:
     conic-gradient(
-      from -9deg,
-      #8c1f2d 0deg 18deg,
-      #f0e4c8 18deg 36deg,
-      #17191a 36deg 54deg,
-      #8c1f2d 54deg 72deg,
-      #f0e4c8 72deg 90deg,
-      #17191a 90deg 108deg,
-      #8c1f2d 108deg 126deg,
-      #f0e4c8 126deg 144deg,
-      #17191a 144deg 162deg,
-      #8c1f2d 162deg 180deg,
-      #f0e4c8 180deg 198deg,
-      #17191a 198deg 216deg,
-      #8c1f2d 216deg 234deg,
-      #f0e4c8 234deg 252deg,
-      #17191a 252deg 270deg,
-      #8c1f2d 270deg 288deg,
-      #f0e4c8 288deg 306deg,
-      #17191a 306deg 324deg,
-      #8c1f2d 324deg 342deg,
-      #f0e4c8 342deg 360deg
+      from -22.5deg,
+      #234c78 0deg 45deg,
+      #315f91 45deg 90deg,
+      #234c78 90deg 135deg,
+      #315f91 135deg 180deg,
+      #234c78 180deg 225deg,
+      #315f91 225deg 270deg,
+      #234c78 270deg 315deg,
+      #315f91 315deg 360deg
     );
-  border: 8px solid #c08a3d;
+  border: 8px solid #3e8bd1;
   border-radius: 50%;
   box-shadow:
     0 0 0 2px rgba(248, 224, 166, 0.48),
     0 16px 50px rgba(0, 0, 0, 0.52),
-    0 0 34px rgba(211, 166, 88, 0.2);
+    0 0 34px rgba(68, 161, 240, 0.28);
   height: 225px;
   position: relative;
   transform: rotate(28deg);
-  transition: transform 3s cubic-bezier(0.12, 0.78, 0.16, 1);
+  transition: transform 4.6s cubic-bezier(0.12, 0.78, 0.16, 1);
   width: 225px;
   z-index: 2;
+}
+
+.roulette-game.premium-mode .roulette-wheel {
+  background:
+    conic-gradient(
+      from -22.5deg,
+      #67461e 0deg 45deg,
+      #8b5a24 45deg 90deg,
+      #67461e 90deg 135deg,
+      #9e6b2b 135deg 180deg,
+      #67461e 180deg 225deg,
+      #8b5a24 225deg 270deg,
+      #4f351b 270deg 315deg,
+      #9e6b2b 315deg 360deg
+    );
+  border-color: #d69a3f;
+  box-shadow:
+    0 0 0 2px rgba(255, 223, 142, 0.46),
+    0 16px 50px rgba(0, 0, 0, 0.52),
+    0 0 38px rgba(239, 166, 57, 0.32);
 }
 
 .roulette-wheel::before {
@@ -3146,8 +3192,58 @@ body::before {
 }
 
 .roulette-wheel.spinning {
-  animation: roulette-spin 0.7s linear infinite;
+  animation: roulette-spin 0.62s linear infinite;
   transition: none;
+}
+
+.roulette-segments {
+  inset: 0;
+  position: absolute;
+}
+
+.roulette-segment-label {
+  align-items: center;
+  color: #e6f4ff;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(calc(var(--segment-index) * 45deg)) translateY(-78px);
+  width: 54px;
+  z-index: 1;
+}
+
+.roulette-segment-label i {
+  color: #ffd44f;
+  font-size: 18px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.roulette-segment-label strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.roulette-segment-label.miss {
+  color: rgba(226, 239, 250, 0.7);
+}
+
+.roulette-segment-label.miss i {
+  color: rgba(189, 218, 240, 0.6);
+}
+
+.roulette-game.premium-mode .roulette-segment-label {
+  color: #fff0c9;
+}
+
+.roulette-game.premium-mode .roulette-segment-label i {
+  color: #ffd35e;
 }
 
 .roulette-wheel-center {
@@ -3168,6 +3264,7 @@ body::before {
   top: 50%;
   transform: translate(-50%, -50%);
   width: 68px;
+  z-index: 4;
 }
 
 .roulette-result {
@@ -3204,6 +3301,29 @@ body::before {
 
 .roulette-meta strong {
   color: #e2bd72;
+}
+
+.roulette-zt-balance {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(211, 166, 88, 0.14);
+  border-radius: 10px;
+  color: #8e988f;
+  display: flex;
+  font-size: 10px;
+  justify-content: space-between;
+  margin-top: 9px;
+  padding: 8px 10px;
+}
+
+.roulette-zt-balance strong {
+  color: #f0d49b;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+}
+
+.roulette-game.premium-mode .roulette-zt-balance strong {
+  color: #ffd36f;
 }
 
 .roulette-spin-button {

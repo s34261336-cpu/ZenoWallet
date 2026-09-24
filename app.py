@@ -37,6 +37,7 @@ CASE_REWARDS = (0, 5, 10, 25, 50, 100)
 ROULETTE_BETS = (10, 50, 100, 500)
 ROULETTE_FREE_SPINS_PER_DAY = 3
 ROULETTE_ZT_COST = 1
+ROULETTE_PREMIUM_ZT_COST = 100
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
@@ -665,17 +666,25 @@ class SupabaseClient:
     def get_roulette_history(self, user_id: int) -> list[dict[str, Any]]:
         return self.request(
             "games?"
-            "select=id,bet,multiplier,result,created_at,payout"
-            f"&user_id=eq.{user_id}&game_name=eq.roulette&result=in.(won,lost)"
+            "select=id,game_name,bet,multiplier,result,created_at,payout"
+            f"&user_id=eq.{user_id}&game_name=in.(roulette,roulette_premium)&result=in.(won,lost)"
             "&order=created_at.desc&limit=10"
         )
 
-    def play_roulette(self, user_id: int, bet: int) -> dict[str, Any]:
+    def play_roulette(
+        self,
+        user_id: int,
+        bet: int,
+        mode: str = "standard",
+    ) -> dict[str, Any]:
         if bet not in ROULETTE_BETS:
             raise ValueError("Выбери ставку: 10, 50, 100 или 500 монет")
+        if mode not in {"standard", "premium"}:
+            raise ValueError("Неизвестный режим рулетки")
+        function_name = "roulette_play_premium" if mode == "premium" else "roulette_play"
         return self._rpc_object(
             self._rpc(
-                "roulette_play",
+                function_name,
                 {"p_user_id": user_id, "p_bet": bet},
             )
         )
@@ -1925,9 +1934,16 @@ def web_app_state(
             "freeSpinsUsed": roulette_status["freeSpinsUsed"],
             "freeSpinsRemaining": roulette_status["freeSpinsRemaining"],
             "ztCost": ROULETTE_ZT_COST,
+            "premiumZtCost": ROULETTE_PREMIUM_ZT_COST,
+            "premiumBets": list(ROULETTE_BETS),
             "history": [
                 {
                     "id": int(row["id"]),
+                    "mode": (
+                        "premium"
+                        if str(row.get("game_name")) == "roulette_premium"
+                        else "standard"
+                    ),
                     "bet": int(row["bet"]),
                     "multiplier": float(row.get("multiplier") or 0),
                     "result": str(row["result"]),
@@ -2183,11 +2199,12 @@ class MiniAppHandler(BaseHTTPRequestHandler):
 
                 if action == "roulette_play":
                     raw_bet = body.get("bet")
+                    mode = str(body.get("mode") or "standard")
                     if isinstance(raw_bet, bool) or not isinstance(raw_bet, int):
                         raise ValueError("Ставка должна быть целым числом")
                     if raw_bet not in ROULETTE_BETS:
                         raise ValueError("Выбери ставку: 10, 50, 100 или 500 монет")
-                    played = self.supabase.play_roulette(user_id, raw_bet)
+                    played = self.supabase.play_roulette(user_id, raw_bet, mode)
                     result = web_app_state(self.bot, user)
                     result["lastAction"] = {
                         "type": "roulette_play",
@@ -2198,6 +2215,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                         "payout": int(played.get("payout") or 0),
                         "paidSpin": bool(played.get("paidSpin")),
                         "ztCost": int(played.get("ztCost") or 0),
+                        "mode": mode,
                     }
                     self.send_json(result)
                     return

@@ -412,10 +412,33 @@
             Выбери ставку и крути колесо. Сначала используются 3 бесплатных прокрута, затем — 1 ZT за игру.
           </p>
 
-          <section class="roulette-game" aria-label="Игра Рулетка">
+          <section class="roulette-game" id="roulette-game" aria-label="Игра Рулетка">
+            <div class="roulette-mode-tabs" role="tablist" aria-label="Режим рулетки">
+              <button
+                class="roulette-mode-tab active"
+                id="roulette-mode-standard"
+                data-roulette-mode="standard"
+                role="tab"
+                aria-selected="true"
+                type="button"
+              >
+                Обычная
+              </button>
+              <button
+                class="roulette-mode-tab"
+                id="roulette-mode-premium"
+                data-roulette-mode="premium"
+                role="tab"
+                aria-selected="false"
+                type="button"
+              >
+                Премиум
+              </button>
+            </div>
             <div class="roulette-stage">
               <div class="roulette-pointer" aria-hidden="true"></div>
               <div class="roulette-wheel" id="roulette-wheel" aria-hidden="true">
+                <div class="roulette-segments" id="roulette-segments"></div>
                 <div class="roulette-wheel-center">ZT</div>
               </div>
               <div class="roulette-result" id="roulette-result">Готов к прокруту</div>
@@ -436,13 +459,17 @@
                 <span>Бесплатно сегодня <strong id="roulette-free-spins">—</strong></span>
                 <span id="roulette-cost">После лимита: 1 ZT</span>
               </div>
+              <div class="roulette-zt-balance">
+                <span>Баланс ZenoToken</span>
+                <strong id="roulette-zt-balance">— ZT</strong>
+              </div>
               <button
                 class="primary-button roulette-spin-button"
                 id="roulette-spin"
                 data-action="roulette_play"
                 type="button"
               >
-                Крутить <span>↗</span>
+                Крутить бесплатно <span>↗</span>
               </button>
               <p class="crash-hint" id="roulette-hint">Выбери ставку и прокрути колесо.</p>
             </div>
@@ -454,17 +481,17 @@
                 <span class="eyebrow">Шансы</span>
                 <h3>Таблица выигрышей</h3>
               </div>
-              <span class="history-count">50x · 0,5%</span>
+              <span class="history-count">50x · 0,2%</span>
             </div>
             <div class="roulette-odds-grid">
-              <span>Мимо <strong>50%</strong></span>
-              <span>2x <strong>20%</strong></span>
-              <span>3x <strong>10%</strong></span>
-              <span>5x <strong>4%</strong></span>
-              <span>10x <strong>2%</strong></span>
-              <span>50x <strong>0,5%</strong></span>
+              <span>Мимо <strong>70%</strong></span>
+              <span>2x <strong>18%</strong></span>
+              <span>3x <strong>7%</strong></span>
+              <span>5x <strong>3%</strong></span>
+              <span>10x <strong>1,8%</strong></span>
+              <span>50x <strong>0,2%</strong></span>
             </div>
-            <p>Джекпот 50x разыгрывается максимум один раз в сутки на весь бот. Оставшиеся 13,5% от заданных шансов тоже считаются промахом.</p>
+            <p>Для премиум-режима действует отдельная таблица с 20x. Джекпот 50x разыгрывается максимум один раз в сутки на весь бот.</p>
           </section>
 
           <section class="crash-history-card">

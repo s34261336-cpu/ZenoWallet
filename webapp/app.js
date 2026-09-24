@@ -28,10 +28,34 @@ const crashRuntime = {
 let selectedCrashBet = "10";
 const CRASH_PRESET_BETS = new Set(["10", "50", "100"]);
 let selectedRouletteBet = "10";
+let selectedRouletteMode = "standard";
 const ROULETTE_PRESET_BETS = new Set(["10", "50", "100", "500"]);
+const ROULETTE_SEGMENTS = {
+  standard: [
+    { label: "50x", multiplier: 50, icon: "★" },
+    { label: "2x", multiplier: 2, icon: "✦" },
+    { label: "10x", multiplier: 10, icon: "★" },
+    { label: "Мимо", multiplier: 0, icon: "—" },
+    { label: "5x", multiplier: 5, icon: "★" },
+    { label: "3x", multiplier: 3, icon: "✦" },
+    { label: "Мимо", multiplier: 0, icon: "—" },
+    { label: "2x", multiplier: 2, icon: "✦" },
+  ],
+  premium: [
+    { label: "50x", multiplier: 50, icon: "★" },
+    { label: "10x", multiplier: 10, icon: "★" },
+    { label: "20x", multiplier: 20, icon: "★" },
+    { label: "5x", multiplier: 5, icon: "★" },
+    { label: "3x", multiplier: 3, icon: "✦" },
+    { label: "2x", multiplier: 2, icon: "✦" },
+    { label: "Мимо", multiplier: 0, icon: "—" },
+    { label: "10x", multiplier: 10, icon: "★" },
+  ],
+};
 const rouletteRuntime = {
   spinning: false,
   finishTimer: null,
+  rotation: 28,
 };
 const CRASH_START_COUNTDOWN_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
@@ -577,13 +601,14 @@ function renderRouletteHistory(history) {
       const multiplier = Number(game.multiplier || 0);
       const won = game.result === "won" && multiplier > 0;
       const label = multiplier >= 50 ? "Джекпот" : won ? "Выигрыш" : "Мимо";
+      const modeLabel = game.mode === "premium" ? "Премиум" : "Обычная";
       const time = new Date(game.createdAt).toLocaleTimeString("ru-RU", {
         hour: "2-digit",
         minute: "2-digit",
       });
       return `
         <div class="crash-history-row ${won ? "win" : "loss"}">
-          <span class="crash-history-result"><i></i>${label}</span>
+          <span class="crash-history-result"><i></i>${label} <small>${modeLabel}</small></span>
           <strong>${won ? formatMultiplier(multiplier) : "—"}</strong>
           <span class="crash-history-bet">${formatNumber(game.bet)} → ${won ? `+${formatNumber(game.payout)}` : `−${formatNumber(game.bet)}`}</span>
           <time>${time}</time>
@@ -605,6 +630,8 @@ function startRouletteSpin() {
   const wheel = $("#roulette-wheel");
   if (!wheel) return;
   stopRouletteSpin();
+  wheel.style.transition = "none";
+  wheel.style.transform = `rotate(${rouletteRuntime.rotation}deg)`;
   rouletteRuntime.spinning = true;
   wheel.classList.add("spinning");
   $("#roulette-result").textContent = "Колесо крутится…";
@@ -615,17 +642,36 @@ function finishRouletteSpin(actionResult) {
   const wheel = $("#roulette-wheel");
   if (!wheel) return;
   const multiplier = Number(actionResult?.multiplier || 0);
-  const angleByMultiplier = {
-    0: 28,
-    2: 94,
-    3: 157,
-    5: 220,
-    10: 281,
-    50: 337,
-  };
+  const mode = actionResult?.mode || selectedRouletteMode;
+  const angleByMultiplier =
+    mode === "premium"
+      ? {
+          0: 90,
+          2: 135,
+          3: 180,
+          5: 225,
+          10: 315,
+          20: 270,
+          50: 0,
+        }
+      : {
+          0: 225,
+          2: 315,
+          3: 135,
+          5: 180,
+          10: 270,
+          50: 0,
+        };
   const landingAngle = angleByMultiplier[multiplier] ?? 28;
+  const currentRotation = rouletteRuntime.rotation;
+  const currentModulo = ((currentRotation % 360) + 360) % 360;
+  const correction = (landingAngle - currentModulo + 360) % 360;
   wheel.classList.remove("spinning");
-  wheel.style.transform = `rotate(${1800 + landingAngle}deg)`;
+  wheel.style.transform = `rotate(${currentRotation}deg)`;
+  void wheel.offsetWidth;
+  rouletteRuntime.rotation = currentRotation + 1800 + correction;
+  wheel.style.transition = "transform 4.6s cubic-bezier(0.12, 0.78, 0.16, 1)";
+  wheel.style.transform = `rotate(${rouletteRuntime.rotation}deg)`;
   rouletteRuntime.finishTimer = window.setTimeout(() => {
     rouletteRuntime.spinning = false;
     rouletteRuntime.finishTimer = null;
@@ -639,7 +685,24 @@ function finishRouletteSpin(actionResult) {
     $("#roulette-hint").textContent =
       result > 0 ? "Результат записан в историю." : "Попробуй ещё раз завтра бесплатно.";
     renderRoulette(appState.data);
-  }, 3000);
+  }, 4700);
+}
+
+function renderRouletteSegments(mode) {
+  const container = $("#roulette-segments");
+  if (!container) return;
+  container.innerHTML = (ROULETTE_SEGMENTS[mode] || ROULETTE_SEGMENTS.standard)
+    .map(
+      (segment, index) => `
+        <span
+          class="roulette-segment-label ${segment.multiplier === 0 ? "miss" : ""}"
+          style="--segment-index: ${index}"
+        >
+          <i>${segment.icon}</i>
+          <strong>${segment.label}</strong>
+        </span>`,
+    )
+    .join("");
 }
 
 function renderRoulette(data) {
@@ -650,17 +713,37 @@ function renderRoulette(data) {
     freeSpinsRemaining: 0,
     history: [],
     ztCost: 1,
+    premiumZtCost: 100,
   };
   const activeBetButtons = document.querySelectorAll("[data-roulette-bet]");
+  const modeButtons = document.querySelectorAll("[data-roulette-mode]");
   const spinButton = $("#roulette-spin");
+  const rouletteGame = $("#roulette-game");
   const available = roulette.available !== false;
+  const premiumZtCost = Number(roulette.premiumZtCost || 100);
+  const isPremium = selectedRouletteMode === "premium";
+  const freeSpinsAvailable = Number(roulette.freeSpinsRemaining || 0) > 0;
+  const canAffordExtraSpin =
+    Number(data.wallet.zenoBalance || 0) >= Number(roulette.ztCost || 1);
+  const canAffordPremium =
+    Number(data.wallet.zenoBalance || 0) >= premiumZtCost;
+  rouletteGame?.classList.toggle("premium-mode", isPremium);
+  modeButtons.forEach((button) => {
+    const selected = button.dataset.rouletteMode === selectedRouletteMode;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  });
+  renderRouletteSegments(selectedRouletteMode);
   $("#roulette-balance").textContent = formatNumber(data.wallet.earnBalance);
+  $("#roulette-zt-balance").textContent = `${formatNumber(data.wallet.zenoBalance)} ZT`;
   $("#roulette-free-spins").textContent =
     `${roulette.freeSpinsRemaining} / ${roulette.freeSpinsPerDay}`;
   $("#roulette-cost").textContent =
-    roulette.freeSpinsRemaining > 0
-      ? "После 3 прокрутов: 1 ZT"
-      : `Прокрут сейчас: ${roulette.ztCost} ZT`;
+    isPremium
+      ? `Премиум-спин: ${premiumZtCost} ZT`
+      : freeSpinsAvailable
+        ? "Бесплатный спин"
+        : `Доп. спин: ${roulette.ztCost} ZT`;
   renderRouletteHistory(roulette.history);
 
   activeBetButtons.forEach((button) => {
@@ -673,13 +756,23 @@ function renderRoulette(data) {
   } else if (!rouletteRuntime.spinning && !rouletteRuntime.finishTimer) {
     $("#roulette-result").textContent = "Готов к прокруту";
     $("#roulette-hint").textContent =
-      roulette.freeSpinsRemaining > 0
-        ? "Выбери ставку и используй бесплатный прокрут."
-        : "Бесплатные прокруты закончились — понадобится 1 ZT.";
+      isPremium
+        ? `Премиум-режим: один спин стоит ${premiumZtCost} ZT.`
+        : roulette.freeSpinsRemaining > 0
+          ? "Выбери ставку и используй бесплатный прокрут."
+          : "Бесплатные прокруты закончились — понадобится 1 ZT.";
   }
   if (spinButton) {
     spinButton.disabled =
-      !available || busyActions.has("roulette_play") || rouletteRuntime.spinning;
+      !available ||
+      busyActions.has("roulette_play") ||
+      rouletteRuntime.spinning ||
+      (isPremium ? !canAffordPremium : !freeSpinsAvailable && !canAffordExtraSpin);
+    spinButton.innerHTML = isPremium
+      ? `Крутить премиум <span>↗</span>`
+      : freeSpinsAvailable
+        ? `Крутить бесплатно <span>↗</span>`
+        : `Крутить за ${roulette.ztCost} ZT <span>↗</span>`;
   }
 }
 
@@ -1179,6 +1272,14 @@ document.querySelectorAll("[data-roulette-bet]").forEach((button) => {
   });
 });
 
+document.querySelectorAll("[data-roulette-mode]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (busyActions.has("roulette_play") || rouletteRuntime.spinning) return;
+    selectedRouletteMode = button.dataset.rouletteMode || "standard";
+    renderRoulette(appState.data);
+  });
+});
+
 $("#crash-custom-bet").addEventListener("input", (event) => {
   if (
     appState.data?.crash?.active ||
@@ -1247,7 +1348,7 @@ $("#roulette-spin").addEventListener("click", () => {
     return;
   }
   startRouletteSpin();
-  runAction("roulette_play", { bet });
+  runAction("roulette_play", { bet, mode: selectedRouletteMode });
 });
 
 $("#refresh-button").addEventListener("click", loadState);

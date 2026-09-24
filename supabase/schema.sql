@@ -427,10 +427,8 @@ begin
 end;
 $$;
 
--- Roulette probabilities are server-side and atomic. The requested
--- probabilities add up to 86.5%; the remaining 13.5% is also a miss so that
--- every roll has a deterministic outcome. After the first jackpot of a UTC
--- day, a jackpot roll becomes a miss.
+-- Standard roulette probabilities are server-side and atomic. The 50x
+-- jackpot is limited to one successful claim per UTC day.
 create or replace function public.roulette_play(
   p_user_id bigint,
   p_bet bigint
@@ -499,17 +497,17 @@ begin
   end if;
 
   v_roll := random() * 100;
-  if v_roll < 50 then
+  if v_roll < 70 then
     v_multiplier := 0;
-  elsif v_roll < 70 then
+  elsif v_roll < 88 then
     v_multiplier := 2;
-  elsif v_roll < 80 then
+  elsif v_roll < 95 then
     v_multiplier := 3;
-  elsif v_roll < 84 then
+  elsif v_roll < 98 then
     v_multiplier := 5;
-  elsif v_roll < 86 then
+  elsif v_roll < 99.8 then
     v_multiplier := 10;
-  elsif v_roll < 86.5 and v_jackpot.claimed_at is null then
+  elsif v_roll < 100 and v_jackpot.claimed_at is null then
     v_multiplier := 50;
     v_result := 'won';
     update public.roulette_jackpot_daily
@@ -553,6 +551,7 @@ begin
     'payout', v_payout,
     'paidSpin', v_paid_spin,
     'ztCost', case when v_paid_spin then 1 else 0 end,
+    'mode', 'standard',
     'balance', v_wallet.earn_balance,
     'zenoBalance', v_wallet.zeno_balance,
     'freeSpinsUsed', v_daily.free_plays_used,
@@ -562,6 +561,118 @@ end;
 $$;
 
 grant execute on function public.roulette_play(bigint, bigint)
+  to anon, authenticated, service_role;
+
+-- Premium roulette is paid in ZenoToken instead of Telegram Stars. It keeps
+-- the regular earn-balance bet, charges 100 ZT for the premium spin, and uses
+-- a separate, still conservative multiplier table.
+create or replace function public.roulette_play_premium(
+  p_user_id bigint,
+  p_bet bigint
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_wallet public.wallet%rowtype;
+  v_jackpot public.roulette_jackpot_daily%rowtype;
+  v_roll numeric;
+  v_multiplier numeric := 0;
+  v_result text := 'lost';
+  v_payout bigint := 0;
+  v_game_id bigint;
+  v_today date := current_date;
+begin
+  if p_bet is null or p_bet not in (10, 50, 100, 500) then
+    raise exception 'Выбери ставку: 10, 50, 100 или 500 монет';
+  end if;
+
+  insert into public.wallet (user_id, earn_balance, zeno_balance)
+  values (p_user_id, 0, 0)
+  on conflict (user_id) do nothing;
+
+  select *
+    into v_wallet
+    from public.wallet
+   where user_id = p_user_id
+   for update;
+
+  if v_wallet.earn_balance < p_bet then
+    raise exception 'Недостаточно монет для этой ставки';
+  end if;
+  if v_wallet.zeno_balance < 100 then
+    raise exception 'Для премиум-прокрута нужен 100 ZT';
+  end if;
+
+  insert into public.roulette_jackpot_daily (play_date)
+  values (v_today)
+  on conflict (play_date) do nothing;
+
+  select *
+    into v_jackpot
+    from public.roulette_jackpot_daily
+   where play_date = v_today
+   for update;
+
+  v_roll := random() * 100;
+  if v_roll < 73 then
+    v_multiplier := 0;
+  elsif v_roll < 87 then
+    v_multiplier := 2;
+  elsif v_roll < 94 then
+    v_multiplier := 3;
+  elsif v_roll < 97 then
+    v_multiplier := 5;
+  elsif v_roll < 99 then
+    v_multiplier := 10;
+  elsif v_roll < 99.8 then
+    v_multiplier := 20;
+  elsif v_jackpot.claimed_at is null then
+    v_multiplier := 50;
+    v_result := 'won';
+    update public.roulette_jackpot_daily
+       set claimed_at = now(), claimed_by = p_user_id
+     where play_date = v_today;
+  end if;
+
+  if v_multiplier > 0 and v_result <> 'won' then
+    v_result := 'won';
+  end if;
+  v_payout := floor(p_bet * v_multiplier)::bigint;
+
+  update public.wallet
+     set earn_balance = earn_balance - p_bet + v_payout,
+         zeno_balance = zeno_balance - 100,
+         updated_at = now()
+   where user_id = p_user_id
+   returning * into v_wallet;
+
+  insert into public.games (
+    user_id, game_name, bet, multiplier, result, payout
+  )
+  values (
+    p_user_id, 'roulette_premium', p_bet, v_multiplier, v_result, v_payout
+  )
+  returning id into v_game_id;
+
+  return jsonb_build_object(
+    'gameId', v_game_id,
+    'bet', p_bet,
+    'result', v_result,
+    'multiplier', v_multiplier,
+    'payout', v_payout,
+    'paidSpin', true,
+    'ztCost', 100,
+    'mode', 'premium',
+    'balance', v_wallet.earn_balance,
+    'zenoBalance', v_wallet.zeno_balance
+  );
+end;
+$$;
+
+grant execute on function public.roulette_play_premium(bigint, bigint)
   to anon, authenticated, service_role;
 
 -- Remove ZenoToken awarded by older season versions. Season rewards belong

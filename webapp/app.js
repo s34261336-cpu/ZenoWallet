@@ -55,6 +55,8 @@ const ROULETTE_SEGMENTS = {
 const rouletteRuntime = {
   spinning: false,
   finishTimer: null,
+  frame: null,
+  lastFrameAt: null,
   rotation: 28,
   previousWallet: null,
   previousRoulette: null,
@@ -63,6 +65,7 @@ const CRASH_START_COUNTDOWN_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
 const ROULETTE_SPIN_DURATION_MS = 3500;
 const ROULETTE_SPIN_EXTRA_TURNS = 3;
+const ROULETTE_SPIN_SPEED_DEG_PER_SEC = 720;
 const MAIN_VIEWS = new Set(["home", "games", "season", "profile"]);
 const $ = (selector) => document.querySelector(selector);
 
@@ -626,10 +629,43 @@ function stopRouletteSpin() {
     window.clearTimeout(rouletteRuntime.finishTimer);
     rouletteRuntime.finishTimer = null;
   }
+  if (rouletteRuntime.frame !== null) {
+    window.cancelAnimationFrame(rouletteRuntime.frame);
+    rouletteRuntime.frame = null;
+  }
+  rouletteRuntime.lastFrameAt = null;
   rouletteRuntime.spinning = false;
   rouletteRuntime.previousWallet = null;
   rouletteRuntime.previousRoulette = null;
-  $("#roulette-wheel")?.classList.remove("spinning");
+  const wheel = $("#roulette-wheel");
+  if (wheel) {
+    wheel.classList.remove("spinning");
+    wheel.style.transition = "none";
+  }
+}
+
+function animateRouletteSpin(now) {
+  if (
+    !rouletteRuntime.spinning ||
+    rouletteRuntime.finishTimer !== null ||
+    rouletteRuntime.frame === null
+  ) {
+    rouletteRuntime.frame = null;
+    rouletteRuntime.lastFrameAt = null;
+    return;
+  }
+  const wheel = $("#roulette-wheel");
+  if (!wheel) {
+    stopRouletteSpin();
+    return;
+  }
+  const lastFrameAt = rouletteRuntime.lastFrameAt ?? now;
+  const elapsedMs = Math.min(50, Math.max(0, now - lastFrameAt));
+  rouletteRuntime.lastFrameAt = now;
+  rouletteRuntime.rotation +=
+    (ROULETTE_SPIN_SPEED_DEG_PER_SEC * elapsedMs) / 1000;
+  wheel.style.transform = `rotate(${rouletteRuntime.rotation}deg)`;
+  rouletteRuntime.frame = window.requestAnimationFrame(animateRouletteSpin);
 }
 
 function startRouletteSpin() {
@@ -648,9 +684,16 @@ function startRouletteSpin() {
   wheel.style.transition = "none";
   wheel.style.transform = `rotate(${rouletteRuntime.rotation}deg)`;
   rouletteRuntime.spinning = true;
+  rouletteRuntime.lastFrameAt = null;
   wheel.classList.add("spinning");
+  selectedRouletteBet = null;
+  document.querySelectorAll("[data-roulette-bet]").forEach((button) => {
+    button.classList.remove("selected");
+    button.disabled = true;
+  });
   $("#roulette-result").textContent = "Колесо крутится…";
   $("#roulette-hint").textContent = "Смотрим, куда упадёт шарик…";
+  rouletteRuntime.frame = window.requestAnimationFrame(animateRouletteSpin);
 }
 
 function finishRouletteSpin(actionResult) {
@@ -681,6 +724,11 @@ function finishRouletteSpin(actionResult) {
   const currentRotation = rouletteRuntime.rotation;
   const currentModulo = ((currentRotation % 360) + 360) % 360;
   const correction = (landingAngle - currentModulo + 360) % 360;
+  if (rouletteRuntime.frame !== null) {
+    window.cancelAnimationFrame(rouletteRuntime.frame);
+    rouletteRuntime.frame = null;
+  }
+  rouletteRuntime.lastFrameAt = null;
   wheel.classList.remove("spinning");
   wheel.style.transform = `rotate(${currentRotation}deg)`;
   void wheel.offsetWidth;
@@ -785,7 +833,11 @@ function renderRoulette(data) {
   renderRouletteHistory(roulette.history);
 
   activeBetButtons.forEach((button) => {
-    button.classList.toggle("selected", button.dataset.rouletteBet === selectedRouletteBet);
+    button.classList.toggle(
+      "selected",
+      !rouletteRuntime.spinning &&
+        button.dataset.rouletteBet === selectedRouletteBet,
+    );
     button.disabled = !available || busyActions.has("roulette_play") || rouletteRuntime.spinning;
   });
   if (!available) {

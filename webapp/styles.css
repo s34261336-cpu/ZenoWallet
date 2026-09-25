@@ -3192,8 +3192,8 @@ body::before {
 }
 
 .roulette-wheel.spinning {
-  animation: roulette-spin 0.8s linear infinite;
   transition: none;
+  will-change: transform;
 }
 
 .roulette-segments {

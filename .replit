@@ -30,7 +30,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=8000 python3 app.py"
+args = "PORT=8000 WEB_ONLY=1 python3 app.py"
 waitForPort = 8000
 
 [agent]

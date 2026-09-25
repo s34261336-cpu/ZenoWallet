@@ -799,20 +799,21 @@ function renderRoulette(data) {
     freeSpinsRemaining: 0,
     history: [],
     ztCost: 1,
-    premiumZtCost: 100,
+    premiumFee: 100,
   };
   const activeBetButtons = document.querySelectorAll("[data-roulette-bet]");
   const modeButtons = document.querySelectorAll("[data-roulette-mode]");
   const spinButton = $("#roulette-spin");
   const rouletteGame = $("#roulette-game");
   const available = roulette.available !== false;
-  const premiumZtCost = Number(roulette.premiumZtCost || 100);
+  const premiumFee = Number(roulette.premiumFee || 100);
   const isPremium = selectedRouletteMode === "premium";
   const freeSpinsAvailable = Number(roulette.freeSpinsRemaining || 0) > 0;
   const canAffordExtraSpin =
     Number(data.wallet.zenoBalance || 0) >= Number(roulette.ztCost || 1);
+  const selectedBet = Number.parseInt(selectedRouletteBet, 10) || 0;
   const canAffordPremium =
-    Number(data.wallet.zenoBalance || 0) >= premiumZtCost;
+    Number(data.wallet.earnBalance || 0) >= selectedBet + premiumFee;
   rouletteGame?.classList.toggle("premium-mode", isPremium);
   modeButtons.forEach((button) => {
     const selected = button.dataset.rouletteMode === selectedRouletteMode;
@@ -826,7 +827,7 @@ function renderRoulette(data) {
     `${roulette.freeSpinsRemaining} / ${roulette.freeSpinsPerDay}`;
   $("#roulette-cost").textContent =
     isPremium
-      ? `Премиум-спин: ${premiumZtCost} ZT`
+      ? `Премиум-спин: ${premiumFee} монет + ставка`
       : freeSpinsAvailable
         ? "Бесплатный спин"
         : `Доп. спин: ${roulette.ztCost} ZT`;
@@ -847,7 +848,7 @@ function renderRoulette(data) {
     $("#roulette-result").textContent = "Готов к прокруту";
     $("#roulette-hint").textContent =
       isPremium
-        ? `Премиум-режим: один спин стоит ${premiumZtCost} ZT.`
+        ? `Премиум-режим: комиссия ${premiumFee} монет и ставка списываются с основного баланса.`
         : roulette.freeSpinsRemaining > 0
           ? "Выбери ставку и используй бесплатный прокрут."
           : "Бесплатные прокруты закончились — понадобится 1 ZT.";
@@ -1343,9 +1344,7 @@ document.querySelectorAll("[data-roulette-bet]").forEach((button) => {
       return;
     }
     selectedRouletteBet = button.dataset.rouletteBet;
-    document.querySelectorAll("[data-roulette-bet]").forEach((item) => {
-      item.classList.toggle("selected", item === button);
-    });
+    renderRoulette(appState.data);
   });
 });
 

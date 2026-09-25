@@ -37,7 +37,7 @@ CASE_REWARDS = (0, 5, 10, 25, 50, 100)
 ROULETTE_BETS = (10, 50, 100, 500)
 ROULETTE_FREE_SPINS_PER_DAY = 3
 ROULETTE_ZT_COST = 1
-ROULETTE_PREMIUM_ZT_COST = 100
+ROULETTE_PREMIUM_FEE = 100
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
@@ -1942,7 +1942,7 @@ def web_app_state(
             "freeSpinsUsed": roulette_status["freeSpinsUsed"],
             "freeSpinsRemaining": roulette_status["freeSpinsRemaining"],
             "ztCost": ROULETTE_ZT_COST,
-            "premiumZtCost": ROULETTE_PREMIUM_ZT_COST,
+            "premiumFee": ROULETTE_PREMIUM_FEE,
             "premiumBets": list(ROULETTE_BETS),
             "history": [
                 {

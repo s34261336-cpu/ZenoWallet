@@ -612,9 +612,7 @@ as $$
 declare
   v_wallet public.wallet%rowtype;
   v_jackpot public.roulette_jackpot_daily%rowtype;
-  v_users_state jsonb;
-  v_user_key text;
-  v_zeno_balance bigint;
+  v_premium_fee bigint := 100;
   v_roll numeric;
   v_multiplier numeric := 0;
   v_result text := 'lost';
@@ -636,29 +634,8 @@ begin
    where user_id = p_user_id
    for update;
 
-  select state_value
-    into v_users_state
-    from public.bot_state
-   where state_key = 'users'
-   for update;
-
-  if not found or v_users_state is null
-     or jsonb_typeof(v_users_state) <> 'object' then
-    raise exception 'Supabase bot_state row state_key=users was not found or is invalid';
-  end if;
-
-  v_user_key := p_user_id::text;
-  if coalesce(v_users_state -> v_user_key ->> 'zenotoken', '') ~ '^[0-9]+$' then
-    v_zeno_balance := (v_users_state -> v_user_key ->> 'zenotoken')::bigint;
-  else
-    v_zeno_balance := 0;
-  end if;
-
-  if v_wallet.earn_balance < p_bet then
-    raise exception 'Недостаточно монет для этой ставки';
-  end if;
-  if v_zeno_balance < 100 then
-    raise exception 'Для премиум-прокрута нужен 100 ZT';
+  if v_wallet.earn_balance < p_bet + v_premium_fee then
+    raise exception 'Недостаточно монет для премиум-ставки';
   end if;
 
   insert into public.roulette_jackpot_daily (play_date)
@@ -697,20 +674,8 @@ begin
   end if;
   v_payout := floor(p_bet * v_multiplier)::bigint;
 
-  v_zeno_balance := v_zeno_balance - 100;
-  v_users_state := jsonb_set(
-    v_users_state,
-    array[v_user_key, 'zenotoken']::text[],
-    to_jsonb(v_zeno_balance),
-    true
-  );
-  update public.bot_state
-     set state_value = v_users_state
-   where state_key = 'users';
-
   update public.wallet
-     set earn_balance = earn_balance - p_bet + v_payout,
-         zeno_balance = v_zeno_balance,
+     set earn_balance = earn_balance - p_bet - v_premium_fee + v_payout,
          updated_at = now()
    where user_id = p_user_id
    returning * into v_wallet;
@@ -730,10 +695,11 @@ begin
     'multiplier', v_multiplier,
     'payout', v_payout,
     'paidSpin', true,
-    'ztCost', 100,
+    'ztCost', 0,
+    'premiumFee', v_premium_fee,
     'mode', 'premium',
     'balance', v_wallet.earn_balance,
-    'zenoBalance', v_zeno_balance
+    'zenoBalance', v_wallet.zeno_balance
   );
 end;
 $$;

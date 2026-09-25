@@ -479,22 +479,11 @@ begin
   end if;
 
   v_user_key := p_user_id::text;
-  if jsonb_typeof(v_users_state -> v_user_key) <> 'object' then
-    v_users_state := jsonb_set(
-      v_users_state,
-      array[v_user_key],
-      '{"zenotoken": 0}'::jsonb,
-      true
-    );
+  if coalesce(v_users_state -> v_user_key ->> 'zenotoken', '') ~ '^[0-9]+$' then
+    v_zeno_balance := (v_users_state -> v_user_key ->> 'zenotoken')::bigint;
+  else
+    v_zeno_balance := 0;
   end if;
-  v_zeno_balance := case
-    when jsonb_typeof(v_users_state -> v_user_key -> 'zenotoken') = 'number'
-      then greatest(
-        0,
-        trunc((v_users_state -> v_user_key ->> 'zenotoken')::numeric)::bigint
-      )
-    else 0
-  end;
 
   if v_wallet.earn_balance < p_bet then
     raise exception 'Недостаточно монет для этой ставки';
@@ -556,7 +545,7 @@ begin
     v_zeno_balance := v_zeno_balance - 1;
     v_users_state := jsonb_set(
       v_users_state,
-      array[v_user_key, 'zenotoken'],
+      array[v_user_key, 'zenotoken']::text[],
       to_jsonb(v_zeno_balance),
       true
     );
@@ -659,22 +648,11 @@ begin
   end if;
 
   v_user_key := p_user_id::text;
-  if jsonb_typeof(v_users_state -> v_user_key) <> 'object' then
-    v_users_state := jsonb_set(
-      v_users_state,
-      array[v_user_key],
-      '{"zenotoken": 0}'::jsonb,
-      true
-    );
+  if coalesce(v_users_state -> v_user_key ->> 'zenotoken', '') ~ '^[0-9]+$' then
+    v_zeno_balance := (v_users_state -> v_user_key ->> 'zenotoken')::bigint;
+  else
+    v_zeno_balance := 0;
   end if;
-  v_zeno_balance := case
-    when jsonb_typeof(v_users_state -> v_user_key -> 'zenotoken') = 'number'
-      then greatest(
-        0,
-        trunc((v_users_state -> v_user_key ->> 'zenotoken')::numeric)::bigint
-      )
-    else 0
-  end;
 
   if v_wallet.earn_balance < p_bet then
     raise exception 'Недостаточно монет для этой ставки';
@@ -722,7 +700,7 @@ begin
   v_zeno_balance := v_zeno_balance - 100;
   v_users_state := jsonb_set(
     v_users_state,
-    array[v_user_key, 'zenotoken'],
+    array[v_user_key, 'zenotoken']::text[],
     to_jsonb(v_zeno_balance),
     true
   );

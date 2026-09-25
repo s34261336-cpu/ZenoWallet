@@ -56,9 +56,13 @@ const rouletteRuntime = {
   spinning: false,
   finishTimer: null,
   rotation: 28,
+  previousWallet: null,
+  previousRoulette: null,
 };
 const CRASH_START_COUNTDOWN_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
+const ROULETTE_SPIN_DURATION_MS = 3500;
+const ROULETTE_SPIN_EXTRA_TURNS = 3;
 const MAIN_VIEWS = new Set(["home", "games", "season", "profile"]);
 const $ = (selector) => document.querySelector(selector);
 
@@ -623,6 +627,8 @@ function stopRouletteSpin() {
     rouletteRuntime.finishTimer = null;
   }
   rouletteRuntime.spinning = false;
+  rouletteRuntime.previousWallet = null;
+  rouletteRuntime.previousRoulette = null;
   $("#roulette-wheel")?.classList.remove("spinning");
 }
 
@@ -630,6 +636,15 @@ function startRouletteSpin() {
   const wheel = $("#roulette-wheel");
   if (!wheel) return;
   stopRouletteSpin();
+  rouletteRuntime.previousWallet = appState.data?.wallet
+    ? { ...appState.data.wallet }
+    : null;
+  rouletteRuntime.previousRoulette = appState.data?.roulette
+    ? {
+        ...appState.data.roulette,
+        history: [...(appState.data.roulette.history || [])],
+      }
+    : null;
   wheel.style.transition = "none";
   wheel.style.transform = `rotate(${rouletteRuntime.rotation}deg)`;
   rouletteRuntime.spinning = true;
@@ -669,13 +684,17 @@ function finishRouletteSpin(actionResult) {
   wheel.classList.remove("spinning");
   wheel.style.transform = `rotate(${currentRotation}deg)`;
   void wheel.offsetWidth;
-  rouletteRuntime.rotation = currentRotation + 1800 + correction;
-  wheel.style.transition = "transform 4.6s cubic-bezier(0.12, 0.78, 0.16, 1)";
+  rouletteRuntime.rotation =
+    currentRotation + ROULETTE_SPIN_EXTRA_TURNS * 360 + correction;
+  wheel.style.transition = `transform ${ROULETTE_SPIN_DURATION_MS}ms cubic-bezier(0.12, 0.78, 0.16, 1)`;
   wheel.style.transform = `rotate(${rouletteRuntime.rotation}deg)`;
   rouletteRuntime.finishTimer = window.setTimeout(() => {
     rouletteRuntime.spinning = false;
     rouletteRuntime.finishTimer = null;
+    rouletteRuntime.previousWallet = null;
+    rouletteRuntime.previousRoulette = null;
     const result = Number(actionResult?.multiplier || 0);
+    render();
     $("#roulette-result").textContent =
       result > 0
         ? result >= 50
@@ -684,8 +703,27 @@ function finishRouletteSpin(actionResult) {
         : "Мимо · ставка сгорела";
     $("#roulette-hint").textContent =
       result > 0 ? "Результат записан в историю." : "Попробуй ещё раз завтра бесплатно.";
-    renderRoulette(appState.data);
-  }, 4700);
+    const toastKey = [
+      actionResult?.gameId ?? "",
+      actionResult?.result ?? "",
+      actionResult?.multiplier ?? "",
+      actionResult?.payout ?? "",
+    ].join(":");
+    if (toastKey !== lastRouletteToastKey) {
+      lastRouletteToastKey = toastKey;
+      if (result > 0) {
+        showToast(
+          result >= 50
+            ? "ДЖЕКПОТ · +50x к ставке"
+            : `Выигрыш ${formatNumber(actionResult?.payout)} монет · ${formatMultiplier(result)}`,
+        );
+        telegram?.HapticFeedback?.notificationOccurred("success");
+      } else {
+        showToast("Мимо · ставка сгорела", "danger");
+        telegram?.HapticFeedback?.notificationOccurred("error");
+      }
+    }
+  }, ROULETTE_SPIN_DURATION_MS + 120);
 }
 
 function renderRouletteSegments(mode) {
@@ -936,8 +974,18 @@ async function loadState() {
 }
 
 function render() {
-  const data = appState.data;
-  if (!data) return;
+  const currentData = appState.data;
+  if (!currentData) return;
+  const data =
+    rouletteRuntime.spinning &&
+    rouletteRuntime.previousWallet &&
+    rouletteRuntime.previousRoulette
+      ? {
+          ...currentData,
+          wallet: rouletteRuntime.previousWallet,
+          roulette: rouletteRuntime.previousRoulette,
+        }
+      : currentData;
   const { wallet, daily, case: caseData, season, user } = data;
 
   $("#user-name").textContent = user.firstName;
@@ -1081,29 +1129,6 @@ async function runAction(action, body = {}, options = {}) {
       showToast("+10 монет начислено");
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
-    } else if (
-      actionResult?.type === "roulette_play"
-    ) {
-      const toastKey = [
-        actionResult.gameId ?? "",
-        actionResult.result ?? "",
-        actionResult.multiplier ?? "",
-        actionResult.payout ?? "",
-      ].join(":");
-      if (toastKey !== lastRouletteToastKey) {
-        lastRouletteToastKey = toastKey;
-        if (Number(actionResult.multiplier || 0) > 0) {
-          showToast(
-            actionResult.multiplier >= 50
-              ? "ДЖЕКПОТ · +50x к ставке"
-              : `Выигрыш ${formatNumber(actionResult.payout)} монет · ${formatMultiplier(actionResult.multiplier)}`,
-          );
-          telegram?.HapticFeedback?.notificationOccurred("success");
-        } else {
-          showToast("Мимо · ставка сгорела", "danger");
-          telegram?.HapticFeedback?.notificationOccurred("error");
-        }
-      }
     } else if (
       !options.suppressSuccessToast &&
       (actionResult?.type === "crash_cashout" ||

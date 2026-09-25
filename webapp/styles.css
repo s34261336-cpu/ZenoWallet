@@ -3143,7 +3143,7 @@ body::before {
   height: 225px;
   position: relative;
   transform: rotate(28deg);
-  transition: transform 4.6s cubic-bezier(0.12, 0.78, 0.16, 1);
+  transition: transform 3.5s cubic-bezier(0.12, 0.78, 0.16, 1);
   width: 225px;
   z-index: 2;
 }
@@ -3192,7 +3192,7 @@ body::before {
 }
 
 .roulette-wheel.spinning {
-  animation: roulette-spin 0.62s linear infinite;
+  animation: roulette-spin 0.8s linear infinite;
   transition: none;
 }
 

@@ -1771,9 +1771,17 @@ def is_crash_schema_error(error: Exception) -> bool:
 def is_roulette_schema_error(error: Exception) -> bool:
     error_text = str(error).lower()
     return (
-        "roulette" in error_text
-        or "roulette_daily" in error_text
-        or "roulette_jackpot_daily" in error_text
+        (
+            "roulette" in error_text
+            and (
+                "could not find the function" in error_text
+                or "schema cache" in error_text
+                or "does not exist" in error_text
+                or "undefined" in error_text
+            )
+        )
+        or "roulette_daily" in error_text and "relation" in error_text
+        or "roulette_jackpot_daily" in error_text and "relation" in error_text
     )
 
 
@@ -2280,6 +2288,15 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                 )
                 return
             if action == "roulette_play":
+                error_message = str(error)
+                known_gameplay_errors = {
+                    "Для премиум-прокрута нужен 100 ZT",
+                    "Бесплатные прокруты закончились. Нужен 1 ZT",
+                    "Недостаточно монет для этой ставки",
+                }
+                if error_message in known_gameplay_errors:
+                    self.error_json(error_message, 400, "roulette_rejected")
+                    return
                 log.exception("Roulette action failed")
                 self.error_json(
                     "Рулетка временно недоступна. Обновите схему Supabase и попробуйте ещё раз.",

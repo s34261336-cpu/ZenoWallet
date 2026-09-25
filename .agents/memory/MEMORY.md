@@ -4,3 +4,4 @@
 - [Crash game settlement](crash-game-settlement.md) — keep bet deduction and payout inside Supabase RPC; the browser only animates and requests settlement.
 - [Single Telegram poller](single-telegram-poller.md) — only the ZenoWallet bot workflow may call Telegram getUpdates; legacy artifact polling stays disabled.
 - [Imported project handoff](imported-project-handoff.md) — after transition, recover the imported repository from the preserved conversation files before configuring its workflow.
+- [ZenoToken balance source](zeno-balance-source.md) — roulette and the UI must use bot_state.users[*].zenotoken as the source of truth.

@@ -442,6 +442,9 @@ declare
   v_wallet public.wallet%rowtype;
   v_daily public.roulette_daily%rowtype;
   v_jackpot public.roulette_jackpot_daily%rowtype;
+  v_users_state jsonb;
+  v_user_key text;
+  v_zeno_balance bigint;
   v_roll numeric;
   v_multiplier numeric := 0;
   v_result text := 'lost';
@@ -463,6 +466,35 @@ begin
     from public.wallet
    where user_id = p_user_id
    for update;
+
+  select state_value
+    into v_users_state
+    from public.bot_state
+   where state_key = 'users'
+   for update;
+
+  if not found or v_users_state is null
+     or jsonb_typeof(v_users_state) <> 'object' then
+    raise exception 'Supabase bot_state row state_key=users was not found or is invalid';
+  end if;
+
+  v_user_key := p_user_id::text;
+  if jsonb_typeof(v_users_state -> v_user_key) <> 'object' then
+    v_users_state := jsonb_set(
+      v_users_state,
+      array[v_user_key],
+      '{"zenotoken": 0}'::jsonb,
+      true
+    );
+  end if;
+  v_zeno_balance := case
+    when jsonb_typeof(v_users_state -> v_user_key -> 'zenotoken') = 'number'
+      then greatest(
+        0,
+        trunc((v_users_state -> v_user_key ->> 'zenotoken')::numeric)::bigint
+      )
+    else 0
+  end;
 
   if v_wallet.earn_balance < p_bet then
     raise exception 'Недостаточно монет для этой ставки';
@@ -490,7 +522,7 @@ begin
    for update;
 
   if v_daily.free_plays_used >= 3 then
-    if v_wallet.zeno_balance < 1 then
+    if v_zeno_balance < 1 then
       raise exception 'Бесплатные прокруты закончились. Нужен 1 ZT';
     end if;
     v_paid_spin := true;
@@ -520,9 +552,22 @@ begin
   end if;
   v_payout := floor(p_bet * v_multiplier)::bigint;
 
+  if v_paid_spin then
+    v_zeno_balance := v_zeno_balance - 1;
+    v_users_state := jsonb_set(
+      v_users_state,
+      array[v_user_key, 'zenotoken'],
+      to_jsonb(v_zeno_balance),
+      true
+    );
+    update public.bot_state
+       set state_value = v_users_state
+     where state_key = 'users';
+  end if;
+
   update public.wallet
      set earn_balance = earn_balance - p_bet + v_payout,
-         zeno_balance = zeno_balance - case when v_paid_spin then 1 else 0 end,
+         zeno_balance = v_zeno_balance,
          updated_at = now()
    where user_id = p_user_id
    returning * into v_wallet;
@@ -553,7 +598,7 @@ begin
     'ztCost', case when v_paid_spin then 1 else 0 end,
     'mode', 'standard',
     'balance', v_wallet.earn_balance,
-    'zenoBalance', v_wallet.zeno_balance,
+    'zenoBalance', v_zeno_balance,
     'freeSpinsUsed', v_daily.free_plays_used,
     'freeSpinsRemaining', greatest(0, 3 - v_daily.free_plays_used)
   );
@@ -578,6 +623,9 @@ as $$
 declare
   v_wallet public.wallet%rowtype;
   v_jackpot public.roulette_jackpot_daily%rowtype;
+  v_users_state jsonb;
+  v_user_key text;
+  v_zeno_balance bigint;
   v_roll numeric;
   v_multiplier numeric := 0;
   v_result text := 'lost';
@@ -599,10 +647,39 @@ begin
    where user_id = p_user_id
    for update;
 
+  select state_value
+    into v_users_state
+    from public.bot_state
+   where state_key = 'users'
+   for update;
+
+  if not found or v_users_state is null
+     or jsonb_typeof(v_users_state) <> 'object' then
+    raise exception 'Supabase bot_state row state_key=users was not found or is invalid';
+  end if;
+
+  v_user_key := p_user_id::text;
+  if jsonb_typeof(v_users_state -> v_user_key) <> 'object' then
+    v_users_state := jsonb_set(
+      v_users_state,
+      array[v_user_key],
+      '{"zenotoken": 0}'::jsonb,
+      true
+    );
+  end if;
+  v_zeno_balance := case
+    when jsonb_typeof(v_users_state -> v_user_key -> 'zenotoken') = 'number'
+      then greatest(
+        0,
+        trunc((v_users_state -> v_user_key ->> 'zenotoken')::numeric)::bigint
+      )
+    else 0
+  end;
+
   if v_wallet.earn_balance < p_bet then
     raise exception 'Недостаточно монет для этой ставки';
   end if;
-  if v_wallet.zeno_balance < 100 then
+  if v_zeno_balance < 100 then
     raise exception 'Для премиум-прокрута нужен 100 ZT';
   end if;
 
@@ -642,9 +719,20 @@ begin
   end if;
   v_payout := floor(p_bet * v_multiplier)::bigint;
 
+  v_zeno_balance := v_zeno_balance - 100;
+  v_users_state := jsonb_set(
+    v_users_state,
+    array[v_user_key, 'zenotoken'],
+    to_jsonb(v_zeno_balance),
+    true
+  );
+  update public.bot_state
+     set state_value = v_users_state
+   where state_key = 'users';
+
   update public.wallet
      set earn_balance = earn_balance - p_bet + v_payout,
-         zeno_balance = zeno_balance - 100,
+         zeno_balance = v_zeno_balance,
          updated_at = now()
    where user_id = p_user_id
    returning * into v_wallet;
@@ -667,7 +755,7 @@ begin
     'ztCost', 100,
     'mode', 'premium',
     'balance', v_wallet.earn_balance,
-    'zenoBalance', v_wallet.zeno_balance
+    'zenoBalance', v_zeno_balance
   );
 end;
 $$;

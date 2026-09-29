@@ -250,11 +250,11 @@
           </button>
 
           <button class="game-launch-card mining-launch-card" data-view="mining" type="button">
-            <span class="game-launch-icon mining-launch-icon" aria-hidden="true">◆</span>
+            <span class="game-launch-icon mining-launch-icon" aria-hidden="true">✹</span>
             <span class="game-launch-copy">
-              <span class="eyebrow">LIVE · добыча и удача</span>
-              <strong>Шахта <span class="crash-title-mark">BLOCK</span></strong>
-              <small>Ломай блоки за ZT и ищи редкую награду.</small>
+              <span class="eyebrow">LIVE · риск и удача</span>
+              <strong>Мины <span class="crash-title-mark">MINES</span></strong>
+              <small>Открывай монеты, обходи мины и забирай выигрыш.</small>
             </span>
             <span class="game-launch-arrow" aria-hidden="true">↗</span>
           </button>
@@ -523,15 +523,15 @@
           <div class="section-heading rocket-heading">
             <div>
               <span class="eyebrow">Игровая зона</span>
-              <h2>Шахта <span class="crash-title-mark mining-title-mark">BLOCK</span></h2>
+              <h2>Мины <span class="crash-title-mark mining-title-mark">MINES</span></h2>
             </div>
-            <span class="season-pill mining-live-pill"><i></i> MINE</span>
+            <span class="season-pill mining-live-pill"><i></i> LIVE</span>
           </div>
           <p class="crash-intro">
-            Каждый удар стоит <strong id="mining-intro-cost">5 ZT</strong>. Разбей блок и проверь, что внутри.
+            Открой монеты на поле 5×5. Три клетки — мины. Чем больше открыл, тем выше множитель.
           </p>
 
-          <section class="mining-game" aria-label="Игра Шахта">
+          <section class="mining-game" aria-label="Игра Мины">
             <div class="mining-scene">
               <canvas
                 id="mining-canvas"
@@ -604,8 +604,8 @@
                 <span id="mining-progress-text">0 / 8 ударов</span>
                 <span id="mining-blocks-broken">Разбито: 0</span>
               </div>
-              <button class="primary-button mining-hit-button" id="mining-hit" data-action="mine_block" type="button">
-                Ударить киркой <span>−5 ZT</span>
+              <button class="primary-button mining-hit-button" id="mining-hit" data-action="mines_start" type="button">
+                Начать игру <span>↗</span>
               </button>
               <div class="mining-result" id="mining-result" aria-live="polite">
                 <span class="mining-result-dot"></span>
@@ -736,13 +736,5 @@
     </div>
 
     <script src="./app.js"></script>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js"
-        }
-      }
-    </script>
-    <script type="module" src="./mining-3d.js"></script>
   </body>
 </html>

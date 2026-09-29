@@ -5464,3 +5464,310 @@ body.nested-screen .back-link {
     font-size: 11px;
   }
 }
+
+/* Mines game */
+.mines-game {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(245px, .92fr);
+}
+
+.mines-board-card,
+.mines-panel,
+.mines-rules-card,
+.mines-history-card {
+  background: linear-gradient(145deg, rgba(19, 29, 55, .96), rgba(10, 16, 34, .98));
+  border: 1px solid rgba(151, 181, 255, .14);
+  border-radius: 22px;
+  box-shadow: 0 18px 45px rgba(2, 7, 21, .28);
+}
+
+.mines-board-card {
+  padding: 18px;
+}
+
+.mines-board-heading,
+.mines-panel-heading,
+.mines-multiplier-row,
+.mines-cost-line {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mines-board-heading {
+  margin-bottom: 16px;
+}
+
+.mines-board-heading strong,
+.mines-panel-heading strong {
+  display: block;
+  font-size: 17px;
+  margin-top: 4px;
+}
+
+.mines-live-balance {
+  text-align: right;
+}
+
+.mines-live-balance span,
+.mines-live-balance strong {
+  color: rgba(227, 235, 255, .58);
+  font-size: 11px;
+}
+
+.mines-live-balance strong {
+  color: #f5f8ff;
+  font-size: 15px;
+}
+
+.mines-live-balance b {
+  color: #80e3d1;
+}
+
+.mines-grid {
+  background: rgba(5, 9, 24, .58);
+  border: 1px solid rgba(120, 157, 238, .12);
+  border-radius: 18px;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.mines-cell {
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, #233763, #182645);
+  border: 1px solid rgba(129, 165, 247, .23);
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 5px 12px rgba(0, 0, 0, .22);
+  color: #7df2db;
+  cursor: pointer;
+  font-size: clamp(17px, 5vw, 25px);
+  font-weight: 900;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.mines-cell:not(:disabled):hover {
+  border-color: #7df2db;
+  transform: translateY(-2px);
+}
+
+.mines-cell:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.mines-cell.safe {
+  animation: mines-safe-pop .32s ease both;
+  background: radial-gradient(circle at 50% 35%, rgba(122, 242, 219, .3), rgba(35, 65, 94, .9));
+  border-color: rgba(125, 242, 219, .48);
+}
+
+.mines-cell.mine {
+  background: radial-gradient(circle, rgba(255, 97, 122, .38), rgba(91, 24, 54, .96));
+  border-color: rgba(255, 112, 135, .7);
+  color: #ff7188;
+}
+
+.mines-cell.explode {
+  animation: mines-explode .58s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+
+.mines-multiplier-row {
+  color: rgba(227, 235, 255, .62);
+  font-size: 12px;
+  padding: 14px 4px 0;
+}
+
+.mines-multiplier-row strong {
+  color: #80e3d1;
+  font-size: 25px;
+  letter-spacing: -.04em;
+}
+
+.mines-panel {
+  padding: 18px;
+}
+
+.mines-free-pill {
+  background: rgba(128, 227, 209, .11);
+  border: 1px solid rgba(128, 227, 209, .25);
+  border-radius: 999px;
+  color: #80e3d1;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.mines-bet-grid {
+  margin: 20px 0 14px;
+}
+
+.mines-bet-grid button {
+  min-width: 0;
+}
+
+.mines-cost-line {
+  border-top: 1px solid rgba(151, 181, 255, .12);
+  color: rgba(227, 235, 255, .58);
+  font-size: 11px;
+  padding: 14px 0;
+}
+
+.mines-cost-line strong {
+  color: #f2c85b;
+}
+
+.mines-actions {
+  display: grid;
+  gap: 9px;
+}
+
+.mines-start-button,
+.mines-cashout-button {
+  min-height: 48px;
+}
+
+.mines-cashout-button {
+  background: rgba(128, 227, 209, .09);
+  border: 1px solid rgba(128, 227, 209, .3);
+  border-radius: 14px;
+  color: #80e3d1;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 12px 14px;
+  transition: background .2s ease, opacity .2s ease;
+}
+
+.mines-cashout-button:not(:disabled):hover {
+  background: rgba(128, 227, 209, .17);
+}
+
+.mines-cashout-button:disabled {
+  cursor: default;
+  opacity: .38;
+}
+
+.mines-cashout-button strong {
+  margin-left: 5px;
+}
+
+.mines-rules-card,
+.mines-history-card {
+  margin-top: 14px;
+  padding: 18px;
+}
+
+.mines-multiplier-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 15px;
+}
+
+.mines-multiplier-grid span {
+  background: rgba(111, 148, 228, .08);
+  border: 1px solid rgba(151, 181, 255, .12);
+  border-radius: 12px;
+  padding: 10px 5px;
+  text-align: center;
+}
+
+.mines-multiplier-grid b,
+.mines-multiplier-grid strong {
+  display: block;
+}
+
+.mines-multiplier-grid b {
+  color: rgba(227, 235, 255, .5);
+  font-size: 10px;
+}
+
+.mines-multiplier-grid strong {
+  color: #80e3d1;
+  font-size: 14px;
+  margin-top: 3px;
+}
+
+.mines-rules-card p {
+  color: rgba(227, 235, 255, .58);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 14px 0 0;
+}
+
+.mining-history-row {
+  align-items: center;
+  border-bottom: 1px solid rgba(151, 181, 255, .1);
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+
+.mining-history-row:last-child {
+  border-bottom: 0;
+}
+
+.mining-history-row span {
+  color: rgba(227, 235, 255, .65);
+}
+
+.mining-history-row i {
+  background: #ff7089;
+  border-radius: 50%;
+  display: inline-block;
+  height: 6px;
+  margin-right: 7px;
+  width: 6px;
+}
+
+.mining-history-row.win i {
+  background: #80e3d1;
+}
+
+.mining-history-row strong {
+  color: #ff7089;
+}
+
+.mining-history-row.win strong {
+  color: #80e3d1;
+}
+
+@keyframes mines-safe-pop {
+  0% { transform: scale(.78); }
+  70% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+@keyframes mines-explode {
+  0% { box-shadow: 0 0 0 rgba(255, 98, 122, 0); transform: scale(.8); }
+  35% { box-shadow: 0 0 28px rgba(255, 98, 122, .9); transform: scale(1.12) rotate(-5deg); }
+  100% { box-shadow: 0 0 9px rgba(255, 98, 122, .3); transform: scale(1); }
+}
+
+@media (max-width: 680px) {
+  .mines-game {
+    grid-template-columns: 1fr;
+  }
+
+  .mines-board-card,
+  .mines-panel,
+  .mines-rules-card,
+  .mines-history-card {
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .mines-grid {
+    gap: 5px;
+    padding: 7px;
+  }
+
+  .mines-cell {
+    border-radius: 8px;
+  }
+}

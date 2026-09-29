@@ -38,23 +38,11 @@ ROULETTE_BETS = (10, 50, 100, 500)
 ROULETTE_FREE_SPINS_PER_DAY = 3
 ROULETTE_ZT_COST = 1
 ROULETTE_PREMIUM_FEE = 100
-MINE_HIT_COST = 5
-MINE_BLOCK_HITS = 8
-MINE_BLOCK_TYPES = (
-    {"key": "stone", "name": "Тёмный камень", "className": "stone", "hits": 8},
-    {"key": "crystal", "name": "Кристальный блок", "className": "crystal", "hits": 7},
-    {"key": "gold", "name": "Золотая жила", "className": "gold", "hits": 6},
-    {"key": "obsidian", "name": "Обсидиан", "className": "obsidian", "hits": 10},
-)
-MINE_REWARDS = (
-    (0, 6000),
-    (10, 1900),
-    (25, 1200),
-    (75, 650),
-    (180, 200),
-    (500, 50),
-)
-MINE_REWARD_WEIGHT_TOTAL = sum(weight for _, weight in MINE_REWARDS)
+MINES_GRID_SIZE = 25
+MINES_COUNT = 3
+MINES_BETS = (10, 50, 100, 500)
+MINES_FREE_GAMES_PER_DAY = 5
+MINES_ZT_COSTS = (5, 10, 20, 40, 80, 160)
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
@@ -532,122 +520,70 @@ class SupabaseClient:
         value = user.get("zenotoken", 0)
         return int(value) if isinstance(value, (int, float)) and value >= 0 else 0
 
-    def _new_mine_block(self) -> dict[str, Any]:
-        block = CRASH_RANDOM.choice(MINE_BLOCK_TYPES)
+    def get_active_mines_game(self, user_id: int) -> dict[str, Any] | None:
+        rows = self.request(
+            "mines_games?"
+            "select=id,user_id,bet,cells_opened,multiplier,result,created_at,"
+            "opened_cells"
+            f"&user_id=eq.{user_id}&result=eq.active"
+            "&order=created_at.desc&limit=1"
+        )
+        return rows[0] if rows else None
+
+    def get_mines_history(self, user_id: int) -> list[dict[str, Any]]:
+        return self.request(
+            "mines_games?"
+            "select=id,bet,cells_opened,multiplier,result,created_at,payout"
+            f"&user_id=eq.{user_id}&result=in.(won,lost)"
+            "&order=created_at.desc&limit=10"
+        )
+
+    def get_mines_status(self, user_id: int) -> dict[str, int]:
+        today = datetime.now(timezone.utc).date().isoformat()
+        rows = self.request(
+            "mines_daily?"
+            "select=free_games_used,paid_games_used"
+            f"&user_id=eq.{user_id}&game_date=eq.{today}&limit=1"
+        )
+        used_free = int(rows[0].get("free_games_used") or 0) if rows else 0
+        paid_games = int(rows[0].get("paid_games_used") or 0) if rows else 0
+        paid_index = min(max(0, paid_games), len(MINES_ZT_COSTS) - 1)
         return {
-            "type": block["key"],
-            "name": block["name"],
-            "className": block["className"],
-            "hits": 0,
-            "hitsRequired": block["hits"],
+            "freeGamesUsed": max(0, used_free),
+            "freeGamesRemaining": max(0, MINES_FREE_GAMES_PER_DAY - used_free),
+            "paidGamesUsed": max(0, paid_games),
+            "nextZtCost": MINES_ZT_COSTS[paid_index],
         }
 
-    def get_mining_state(self, user_id: int) -> dict[str, Any]:
-        state = self.get_users_state()
-        user_state = state.get(str(user_id))
-        user_state = user_state if isinstance(user_state, dict) else {}
-        raw_mining = user_state.get("mining")
-        mining = raw_mining if isinstance(raw_mining, dict) else {}
-        active = mining.get("active")
-        if not isinstance(active, dict):
-            active = self._new_mine_block()
-            next_state = dict(state)
-            next_state[str(user_id)] = {**user_state, "mining": {
-                "active": active,
-                "blocksBroken": int(mining.get("blocksBroken") or 0),
-                "history": [],
-            }}
-            self.update_users_state(next_state)
-        return {
-            "active": active,
-            "blocksBroken": max(0, int(mining.get("blocksBroken") or 0)),
-            "history": [
-                item for item in (mining.get("history") or [])
-                if isinstance(item, dict)
-            ][:8],
-            "hitCost": MINE_HIT_COST,
-        }
+    def start_mines_game(self, user_id: int, bet: int) -> dict[str, Any]:
+        if bet not in MINES_BETS:
+            raise ValueError("Выбери ставку: 10, 50, 100 или 500 монет")
+        return self._rpc_object(
+            self._rpc(
+                "mines_start",
+                {"p_user_id": user_id, "p_bet": bet},
+            )
+        )
 
-    def mine_block(self, user_id: int) -> dict[str, Any]:
-        state = self.get_users_state()
-        user_key = str(user_id)
-        raw_user = state.get(user_key)
-        user_state = dict(raw_user) if isinstance(raw_user, dict) else {}
-        raw_mining = user_state.get("mining")
-        mining = dict(raw_mining) if isinstance(raw_mining, dict) else {}
-        active = mining.get("active")
-        if not isinstance(active, dict):
-            active = self._new_mine_block()
+    def reveal_mines_cell(self, user_id: int, game_id: int, cell: int) -> dict[str, Any]:
+        if game_id <= 0 or cell < 0 or cell >= MINES_GRID_SIZE:
+            raise ValueError("Некорректная клетка")
+        return self._rpc_object(
+            self._rpc(
+                "mines_reveal",
+                {"p_user_id": user_id, "p_game_id": game_id, "p_cell": cell},
+            )
+        )
 
-        current_zeno = user_state.get("zenotoken", 0)
-        if not isinstance(current_zeno, (int, float)) or current_zeno < 0:
-            current_zeno = 0
-        current_zeno = int(current_zeno)
-        if current_zeno < MINE_HIT_COST:
-            raise ValueError(f"Нужно минимум {MINE_HIT_COST} ZT для удара")
-
-        hits_required = max(1, int(active.get("hitsRequired") or MINE_BLOCK_HITS))
-        hits = max(0, int(active.get("hits") or 0)) + 1
-        next_zeno = current_zeno - MINE_HIT_COST
-        broken = hits >= hits_required
-        reward = 0
-        previous_block = dict(active)
-        if broken:
-            roll = CRASH_RANDOM.randrange(MINE_REWARD_WEIGHT_TOTAL)
-            cursor = 0
-            for candidate, weight in MINE_REWARDS:
-                cursor += weight
-                if roll < cursor:
-                    reward = candidate
-                    break
-            next_zeno += reward
-            history = [
-                {
-                    "block": str(previous_block.get("name") or "Блок"),
-                    "reward": reward,
-                    "createdAt": datetime.now(timezone.utc).isoformat(),
-                },
-                *[
-                    item for item in (mining.get("history") or [])
-                    if isinstance(item, dict)
-                ],
-            ][:8]
-            blocks_broken = max(0, int(mining.get("blocksBroken") or 0)) + 1
-            next_active = self._new_mine_block()
-        else:
-            history = [
-                item for item in (mining.get("history") or [])
-                if isinstance(item, dict)
-            ][:8]
-            blocks_broken = max(0, int(mining.get("blocksBroken") or 0))
-            next_active = {
-                **active,
-                "hits": hits,
-                "hitsRequired": hits_required,
-            }
-
-        next_mining = {
-            "active": next_active,
-            "blocksBroken": blocks_broken,
-            "history": history,
-        }
-        next_state = dict(state)
-        next_state[user_key] = {
-            **user_state,
-            "zenotoken": next_zeno,
-            "mining": next_mining,
-        }
-        self.update_users_state(next_state)
-        return {
-            "hitCost": MINE_HIT_COST,
-            "balance": next_zeno,
-            "broken": broken,
-            "reward": reward,
-            "block": next_active,
-            "brokenBlock": previous_block if broken else None,
-            "blocksBroken": blocks_broken,
-            "history": history,
-        }
+    def cashout_mines_game(self, user_id: int, game_id: int) -> dict[str, Any]:
+        if game_id <= 0:
+            raise ValueError("Некорректная игра")
+        return self._rpc_object(
+            self._rpc(
+                "mines_cashout",
+                {"p_user_id": user_id, "p_game_id": game_id},
+            )
+        )
 
     def credit(self, user_id: int, amount: int) -> dict[str, Any]:
         wallet = self.ensure_wallet(user_id)
@@ -1919,6 +1855,15 @@ def is_roulette_schema_error(error: Exception) -> bool:
     )
 
 
+def is_mines_schema_error(error: Exception) -> bool:
+    error_text = str(error).lower()
+    return (
+        "public.mines_games" in error_text
+        or "public.mines_daily" in error_text
+        or "public.mines_" in error_text
+    )
+
+
 def web_app_state(
     bot: WalletBot,
     user: dict[str, Any],
@@ -1958,12 +1903,29 @@ def web_app_state(
             "freeSpinsRemaining": ROULETTE_FREE_SPINS_PER_DAY,
         }
         roulette_history = []
+    mines_available = True
+    try:
+        active_mines_game = supabase.get_active_mines_game(user_id)
+        mines_history = supabase.get_mines_history(user_id)
+        mines_status = supabase.get_mines_status(user_id)
+    except RuntimeError as error:
+        if not is_mines_schema_error(error):
+            raise
+        log.warning("Mines game schema is not ready; keeping wallet available")
+        mines_available = False
+        active_mines_game = None
+        mines_history = []
+        mines_status = {
+            "freeGamesUsed": 0,
+            "freeGamesRemaining": MINES_FREE_GAMES_PER_DAY,
+            "paidGamesUsed": 0,
+            "nextZtCost": MINES_ZT_COSTS[0],
+        }
+
     users_state = supabase.get_users_state()
     user_state = users_state.get(str(user_id))
     user_state = user_state if isinstance(user_state, dict) else {}
     zeno_balance = supabase.get_zeno_balance(user_id)
-    mining = supabase.get_mining_state(user_id)
-
     settings = supabase.get_case_settings()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     recent_attempts: list[datetime] = []
@@ -2096,26 +2058,42 @@ def web_app_state(
                 for row in roulette_history
             ],
         },
-        "mining": {
-            "available": True,
-            "hitCost": int(mining["hitCost"]),
-            "blocksBroken": int(mining["blocksBroken"]),
-            "active": {
-                "type": str(mining["active"].get("type") or "stone"),
-                "name": str(mining["active"].get("name") or "Тёмный камень"),
-                "className": str(mining["active"].get("className") or "stone"),
-                "hits": int(mining["active"].get("hits") or 0),
-                "hitsRequired": int(
-                    mining["active"].get("hitsRequired") or MINE_BLOCK_HITS
-                ),
-            },
+        "mines": {
+            "available": mines_available,
+            "gridSize": MINES_GRID_SIZE,
+            "mineCount": MINES_COUNT,
+            "bets": list(MINES_BETS),
+            "freeGamesPerDay": MINES_FREE_GAMES_PER_DAY,
+            "freeGamesUsed": mines_status["freeGamesUsed"],
+            "freeGamesRemaining": mines_status["freeGamesRemaining"],
+            "paidGamesUsed": mines_status["paidGamesUsed"],
+            "nextZtCost": mines_status["nextZtCost"],
+            "active": (
+                {
+                    "id": int(active_mines_game["id"]),
+                    "bet": int(active_mines_game["bet"]),
+                    "cellsOpened": int(active_mines_game.get("cells_opened") or 0),
+                    "multiplier": float(active_mines_game.get("multiplier") or 1),
+                    "openedCells": [
+                        int(cell)
+                        for cell in (active_mines_game.get("opened_cells") or [])
+                        if isinstance(cell, int) and 0 <= cell < MINES_GRID_SIZE
+                    ],
+                }
+                if active_mines_game
+                else None
+            ),
             "history": [
                 {
-                    "block": str(item.get("block") or "Блок"),
-                    "reward": int(item.get("reward") or 0),
-                    "createdAt": str(item.get("createdAt") or ""),
+                    "id": int(row["id"]),
+                    "bet": int(row["bet"]),
+                    "cellsOpened": int(row.get("cells_opened") or 0),
+                    "multiplier": float(row.get("multiplier") or 1),
+                    "result": str(row["result"]),
+                    "payout": int(row.get("payout") or 0),
+                    "createdAt": str(row["created_at"]),
                 }
-                for item in mining["history"]
+                for row in mines_history
             ],
         },
         "season": {
@@ -2385,17 +2363,72 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     self.send_json(result)
                     return
 
-                if action == "mine_block":
-                    mined = self.supabase.mine_block(user_id)
+                if action == "mines_start":
+                    raw_bet = body.get("bet")
+                    if isinstance(raw_bet, bool) or not isinstance(raw_bet, int):
+                        raise ValueError("Ставка должна быть целым числом")
+                    started = self.supabase.start_mines_game(user_id, raw_bet)
                     result = web_app_state(self.bot, user)
                     result["lastAction"] = {
-                        "type": "mine_block",
-                        "hitCost": int(mined["hitCost"]),
-                        "balance": int(mined["balance"]),
-                        "broken": bool(mined["broken"]),
-                        "reward": int(mined["reward"]),
-                        "blocksBroken": int(mined["blocksBroken"]),
-                        "brokenBlock": mined["brokenBlock"],
+                        "type": "mines_start",
+                        "gameId": int(started["gameId"]),
+                        "bet": int(started["bet"]),
+                        "freeGame": bool(started.get("freeGame")),
+                        "ztCost": int(started.get("ztCost") or 0),
+                        "active": {
+                            "id": int(started["gameId"]),
+                            "bet": int(started["bet"]),
+                            "cellsOpened": 0,
+                            "multiplier": 1,
+                            "openedCells": [],
+                        },
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "mines_reveal":
+                    game_id = body.get("gameId")
+                    cell = body.get("cell")
+                    if (
+                        isinstance(game_id, bool)
+                        or not isinstance(game_id, int)
+                        or isinstance(cell, bool)
+                        or not isinstance(cell, int)
+                    ):
+                        raise ValueError("Некорректная клетка")
+                    revealed = self.supabase.reveal_mines_cell(user_id, game_id, cell)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "mines_reveal",
+                        "gameId": game_id,
+                        "cell": cell,
+                        "mine": bool(revealed.get("mine")),
+                        "cellsOpened": int(revealed.get("cellsOpened") or 0),
+                        "multiplier": float(revealed.get("multiplier") or 1),
+                        "result": str(revealed.get("result") or "active"),
+                        "minePositions": (
+                            [int(position) for position in revealed.get("minePositions", [])]
+                            if revealed.get("minePositions") is not None
+                            else None
+                        ),
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "mines_cashout":
+                    game_id = body.get("gameId")
+                    if isinstance(game_id, bool) or not isinstance(game_id, int):
+                        raise ValueError("Некорректная игра")
+                    cashed_out = self.supabase.cashout_mines_game(user_id, game_id)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "mines_cashout",
+                        "gameId": game_id,
+                        "result": str(cashed_out.get("result") or "won"),
+                        "cellsOpened": int(cashed_out.get("cellsOpened") or 0),
+                        "multiplier": float(cashed_out.get("multiplier") or 1),
+                        "payout": int(cashed_out.get("payout") or 0),
+                        "bet": int(cashed_out.get("bet") or 0),
                     }
                     self.send_json(result)
                     return
@@ -2457,6 +2490,36 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     "Рулетка пока не настроена в Supabase. Выполните обновлённый supabase/schema.sql.",
                     503,
                     "roulette_setup_required",
+                )
+                return
+            if action and str(action).startswith("mines_") and is_mines_schema_error(error):
+                self.error_json(
+                    "Игра «Мины» пока не настроена. Выполните обновлённый supabase/schema.sql.",
+                    503,
+                    "mines_setup_required",
+                )
+                return
+            if action and str(action).startswith("mines_"):
+                error_message = str(error)
+                known_gameplay_errors = {
+                    "Недостаточно монет для этой ставки",
+                    "Сначала заверши текущую игру.",
+                    "Игра не найдена",
+                    "Нельзя забрать ставку до открытия клетки",
+                }
+                if (
+                    error_message in known_gameplay_errors
+                    or error_message.startswith("Для продолжения нужно ")
+                    or error_message.startswith("Эта клетка уже открыта")
+                    or error_message.startswith("Игра уже завершена")
+                ):
+                    self.error_json(error_message, 400, "mines_rejected")
+                    return
+                log.exception("Mines action failed")
+                self.error_json(
+                    "Игра «Мины» временно недоступна. Попробуйте ещё раз.",
+                    503,
+                    "mines_unavailable",
                 )
                 return
             if action == "roulette_play":

@@ -66,9 +66,12 @@ const REQUEST_TIMEOUT_MS = 15000;
 const ROULETTE_SPIN_DURATION_MS = 3500;
 const ROULETTE_SPIN_EXTRA_TURNS = 3;
 const ROULETTE_SPIN_SPEED_DEG_PER_SEC = 720;
-const MINE_HIT_COST = 5;
 const MAIN_VIEWS = new Set(["home", "games", "season", "profile"]);
 const $ = (selector) => document.querySelector(selector);
+const minesRuntime = {
+  selectedBet: 10,
+  markupReady: false,
+};
 
 if (telegram) {
   telegram.ready();
@@ -868,71 +871,149 @@ function renderRoulette(data) {
   }
 }
 
+function ensureMinesMarkup() {
+  const view = $("#mining-view");
+  if (!view || minesRuntime.markupReady) return;
+  view.innerHTML = `
+    <button class="back-link" data-view="games" type="button">← Назад</button>
+    <div class="section-heading rocket-heading">
+      <div>
+        <span class="eyebrow">Игровая зона</span>
+        <h2>Мины <span class="crash-title-mark mining-title-mark">MINES</span></h2>
+      </div>
+      <span class="season-pill mining-live-pill"><i></i> LIVE</span>
+    </div>
+    <p class="crash-intro">Открой монеты на поле 5×5. Три клетки — мины. Чем больше открыл, тем выше множитель.</p>
+    <section class="mines-game" aria-label="Игра Мины">
+      <div class="mines-board-card">
+        <div class="mines-board-heading">
+          <div><span class="eyebrow">Раунд</span><strong id="mines-round-status">Новая игра</strong></div>
+          <div class="mines-live-balance"><span>Баланс</span><strong><b id="mines-balance">—</b> монет</strong></div>
+        </div>
+        <div class="mines-grid" id="mines-grid" role="grid" aria-label="Поле 5 на 5"></div>
+        <div class="mines-multiplier-row"><span><b id="mines-cells-opened">0</b> клеток</span><strong id="mines-multiplier">1.00x</strong></div>
+      </div>
+      <div class="mines-panel">
+        <div class="mines-panel-heading">
+          <div><span class="eyebrow">Ставка</span><strong id="mines-selected-bet">10 монет</strong></div>
+          <span class="mines-free-pill" id="mines-free-status">5 бесплатных игр</span>
+        </div>
+        <div class="crash-bet-grid mines-bet-grid" role="group" aria-label="Размер ставки">
+          <button type="button" data-mines-bet="10">10</button>
+          <button type="button" data-mines-bet="50">50</button>
+          <button type="button" data-mines-bet="100">100</button>
+          <button type="button" data-mines-bet="500">500</button>
+        </div>
+        <div class="mines-cost-line"><span id="mines-cost-label">Первые 5 игр бесплатно</span><strong id="mines-zt-cost">0 ZT</strong></div>
+        <div class="mines-actions">
+          <button class="primary-button mines-start-button" id="mines-start" data-action="mines_start" type="button">Начать игру <span>↗</span></button>
+          <button class="mines-cashout-button" id="mines-cashout" data-action="mines_cashout" type="button" disabled>Забрать <strong id="mines-cashout-value">0 монет</strong></button>
+        </div>
+        <p class="crash-hint" id="mines-hint">Открой первую клетку, чтобы начать охоту за множителем.</p>
+      </div>
+    </section>
+    <section class="mines-rules-card">
+      <div class="section-heading compact-heading"><div><span class="eyebrow">Множители</span><h3>Риск растёт с каждой монетой</h3></div><span class="history-count">3 мины</span></div>
+      <div class="mines-multiplier-grid"><span><b>1</b><strong>1.1x</strong></span><span><b>3</b><strong>1.5x</strong></span><span><b>5</b><strong>2x</strong></span><span><b>10</b><strong>5x</strong></span><span><b>20</b><strong>20x</strong></span></div>
+      <p>Кнопка «Забрать» фиксирует ставку × множитель. Мина завершает игру и сжигает ставку.</p>
+    </section>
+    <section class="crash-history-card mines-history-card">
+      <div class="section-heading compact-heading"><div><span class="eyebrow">Последние раунды</span><h3>История Мины</h3></div><span class="history-count">10 максимум</span></div>
+      <div class="mines-history" id="mines-history"><div class="crash-history-empty">Игр пока нет</div></div>
+    </section>`;
+  minesRuntime.markupReady = true;
+}
+
 function renderMining(data) {
-  const mining = data.mining || {
-    available: true,
-    hitCost: MINE_HIT_COST,
-    blocksBroken: 0,
-    active: {
-      name: "Тёмный камень",
-      className: "stone",
-      hits: 0,
-      hitsRequired: 8,
-    },
+  ensureMinesMarkup();
+  const mines = data.mines || {
+    available: false,
+    bets: [10, 50, 100, 500],
+    freeGamesRemaining: 5,
+    nextZtCost: 5,
+    active: null,
     history: [],
   };
-  const active = mining.active || {};
-  const hits = Math.max(0, Number(active.hits || 0));
-  const hitsRequired = Math.max(1, Number(active.hitsRequired || 8));
-  const cost = Math.max(1, Number(mining.hitCost || MINE_HIT_COST));
-  const balance = Number(data.wallet?.zenoBalance || 0);
-  const progress = Math.max(0, Math.min(100, (hits / hitsRequired) * 100));
-  const block = $("#mining-block");
-  const hitButton = $("#mining-hit");
-  const busy = busyActions.has("mine_block");
-  const affordable = balance >= cost;
+  const active = mines.active;
+  const lastAction = data.lastAction?.type?.startsWith("mines_") ? data.lastAction : null;
+  const balance = Number(data.wallet?.earnBalance || 0);
+  const selectedBet = active ? Number(active.bet) : Number(minesRuntime.selectedBet);
+  const busyStart = busyActions.has("mines_start");
+  const busyReveal = busyActions.has("mines_reveal");
+  const busyCashout = busyActions.has("mines_cashout");
+  const opened = new Set((active?.openedCells || []).map(Number));
+  const revealedMines = lastAction?.minePositions || [];
+  const ended = !active && lastAction?.type === "mines_reveal" && lastAction.result === "lost";
 
-  $("#mining-intro-cost").textContent = `${formatNumber(cost)} ZT`;
-  $("#mining-hit-cost").textContent = formatNumber(cost);
-  $("#mining-balance").textContent = formatNumber(balance);
-  $("#mining-hud-zeno").textContent = formatNumber(balance);
-  $("#mining-block-name").textContent = active.name || "Блок";
-  $("#mining-block-label").textContent = active.name || "Блок";
-  $("#mining-progress-text").textContent = `${hits} / ${hitsRequired} ударов`;
-  $("#mining-blocks-broken").textContent = `Разбито: ${formatNumber(mining.blocksBroken || 0)}`;
-  $("#mining-progress-fill").style.width = `${progress}%`;
-  block?.classList.remove("stone", "crystal", "gold", "obsidian");
-  block?.classList.add(active.className || "stone");
-  window.miningScene3D?.setState({
-    className: active.className || "stone",
-    hits,
-    hitsRequired,
-    broken: false,
+  $("#mines-balance").textContent = formatNumber(balance);
+  $("#mines-selected-bet").textContent = `${formatNumber(selectedBet)} монет`;
+  $("#mines-cells-opened").textContent = formatNumber(active?.cellsOpened || lastAction?.cellsOpened || 0);
+  $("#mines-multiplier").textContent = formatMultiplier(active?.multiplier || lastAction?.multiplier || 1);
+  $("#mines-round-status").textContent = active
+    ? `Открыто ${active.cellsOpened} из 22`
+    : ended ? "Мина! Ставка сгорела" : "Новая игра";
+  $("#mines-free-status").textContent = mines.freeGamesRemaining > 0
+    ? `${mines.freeGamesRemaining} бесплатных игр`
+    : `Дальше ${formatNumber(mines.nextZtCost)} ZT`;
+  $("#mines-cost-label").textContent = mines.freeGamesRemaining > 0
+    ? "Первые 5 игр бесплатно"
+    : "Плата за следующий раунд";
+  $("#mines-zt-cost").textContent = mines.freeGamesRemaining > 0 ? "0 ZT" : `${formatNumber(mines.nextZtCost)} ZT`;
+
+  document.querySelectorAll("[data-mines-bet]").forEach((button) => {
+    button.classList.toggle("selected", Number(button.dataset.minesBet) === selectedBet);
+    button.disabled = Boolean(active) || busyStart;
   });
-  if (hitButton) {
-    hitButton.disabled = !mining.available || busy || !affordable;
-    hitButton.classList.toggle("working", busy);
-    hitButton.innerHTML = affordable
-      ? `Ударить киркой <span>−${formatNumber(cost)} ZT</span>`
-      : `Нужно ещё ${formatNumber(cost - balance)} ZT`;
+
+  const grid = $("#mines-grid");
+  if (grid) {
+    grid.innerHTML = Array.from({ length: 25 }, (_, index) => {
+      const isOpen = opened.has(index);
+      const isMine = revealedMines.includes(index);
+      const isClickedMine = lastAction?.type === "mines_reveal" && lastAction.cell === index && lastAction.mine;
+      const classes = ["mines-cell"];
+      if (isOpen) classes.push("safe");
+      if (isMine) classes.push("mine");
+      if (isClickedMine) classes.push("explode");
+      return `<button class="${classes.join(" ")}" data-mines-cell="${index}" type="button" role="gridcell" aria-label="Клетка ${index + 1}" ${!active || isOpen || busyReveal ? "disabled" : ""}>${isOpen ? "✦" : isMine ? "✹" : ""}</button>`;
+    }).join("");
   }
-  renderMiningHistory(mining.history);
+
+  const startButton = $("#mines-start");
+  const cashoutButton = $("#mines-cashout");
+  const canStart = mines.available !== false && !active && !busyStart && balance >= selectedBet;
+  startButton.disabled = !canStart;
+  startButton.innerHTML = mines.available === false
+    ? "Игра не настроена"
+    : balance < selectedBet ? `Нужно ещё ${formatNumber(selectedBet - balance)} монет` : "Начать игру <span>↗</span>";
+  cashoutButton.disabled = !active || active.cellsOpened < 1 || busyCashout || busyReveal;
+  $("#mines-cashout-value").textContent = active
+    ? `${formatNumber(Math.floor(active.bet * active.multiplier))} монет`
+    : "0 монет";
+  $("#mines-hint").textContent = mines.available === false
+    ? "Администратору нужно выполнить обновлённый supabase/schema.sql в Supabase."
+    : active
+      ? "Продолжай открывать клетки или забери выигрыш, пока мина не нашла тебя."
+      : ended
+        ? "Раунд завершён. Выбери ставку и начни новую игру."
+        : "Открой первую клетку, чтобы начать охоту за множителем.";
+  renderMiningHistory(mines.history);
 }
 
 function renderMiningHistory(history) {
-  const container = $("#mining-history");
+  const container = $("#mines-history");
   if (!container) return;
   if (!history?.length) {
-    container.innerHTML = '<div class="crash-history-empty">Блоков пока нет</div>';
+    container.innerHTML = '<div class="crash-history-empty">Игр пока нет</div>';
     return;
   }
   container.innerHTML = history
     .map((item) => {
-      const reward = Number(item.reward || 0);
+      const won = item.result === "won";
       return `
-        <div class="mining-history-row ${reward > 0 ? "win" : "loss"}">
-          <span><i></i>${escapeHtml(item.block || "Блок")}</span>
-          <strong>${reward > 0 ? `+${formatNumber(reward)} ZT` : "Пусто"}</strong>
+        <div class="mining-history-row ${won ? "win" : "loss"}">
+          <span><i></i>${won ? "Забрано" : "Мина"} · ${formatNumber(item.bet)} монет</span>
+          <strong>${won ? `+${formatNumber(item.payout)} монет` : "− ставка"}</strong>
         </div>`;
     })
     .join("");
@@ -1185,29 +1266,12 @@ function setView(viewName) {
   );
   document.body.classList.add(`screen-${normalizedView}`);
   document.body.classList.toggle("nested-screen", !MAIN_VIEWS.has(normalizedView));
-  window.miningScene3D?.setVisible(normalizedView === "mining");
   const navView = MAIN_VIEWS.has(normalizedView) ? normalizedView : null;
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === navView);
   });
   window.scrollTo(0, 0);
   if (telegram?.HapticFeedback) telegram.HapticFeedback.selectionChanged();
-}
-
-function animateMiningHit() {
-  const miningBlock = $("#mining-block");
-  const miningSpark = $("#mining-hit-spark");
-  const miningPickaxe = $("#mining-pickaxe");
-  const hitOverlay = $("#mining-hit-overlay");
-  miningBlock?.classList.remove("hit", "broken");
-  miningPickaxe?.classList.remove("swing");
-  miningSpark?.classList.remove("show");
-  hitOverlay?.classList.remove("show");
-  void miningBlock?.offsetWidth;
-  void miningPickaxe?.offsetWidth;
-  void hitOverlay?.offsetWidth;
-  hitOverlay?.classList.add("show");
-  window.miningScene3D?.hit();
 }
 
 async function runAction(action, body = {}, options = {}) {
@@ -1272,19 +1336,19 @@ async function runAction(action, body = {}, options = {}) {
       showToast("+10 монет начислено");
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
-    } else if (actionResult?.type === "mine_block") {
-      window.miningScene3D?.resolveHit(actionResult);
-      const resultElement = $("#mining-result");
-      if (resultElement) {
-        resultElement.classList.toggle("reward", actionResult.reward > 0);
-        resultElement.classList.toggle("empty", actionResult.broken && !actionResult.reward);
-        resultElement.innerHTML = actionResult.broken
-          ? actionResult.reward > 0
-            ? `<span class="mining-result-dot"></span><span>Блок разрушен · <strong>+${formatNumber(actionResult.reward)} ZT</strong></span>`
-            : '<span class="mining-result-dot"></span><span>Блок разрушен · внутри ничего нет</span>'
-          : `<span class="mining-result-dot"></span><span>Удар принят · продолжай ломать</span>`;
+    } else if (actionResult?.type === "mines_reveal") {
+      if (actionResult.mine) {
+        showToast("Мина! Ставка сгорела", "danger");
+        telegram?.HapticFeedback?.notificationOccurred("error");
+      } else {
+        showToast(`Безопасно · ${formatMultiplier(actionResult.multiplier)}`);
+        telegram?.HapticFeedback?.impactOccurred("medium");
       }
-      telegram?.HapticFeedback?.impactOccurred("medium");
+    } else if (actionResult?.type === "mines_cashout") {
+      showToast(
+        `Забрано ${formatNumber(actionResult.payout)} монет на ${formatMultiplier(actionResult.multiplier)}`,
+      );
+      telegram?.HapticFeedback?.notificationOccurred("success");
     } else if (
       !options.suppressSuccessToast &&
       (actionResult?.type === "crash_cashout" ||
@@ -1530,18 +1594,36 @@ $("#roulette-spin").addEventListener("click", () => {
   runAction("roulette_play", { bet, mode: selectedRouletteMode });
 });
 
-$("#mining-hit").addEventListener("click", () => {
-  if (busyActions.has("mine_block") || Number(appState.data?.wallet?.zenoBalance || 0) < MINE_HIT_COST) {
+document.addEventListener("click", (event) => {
+  const betButton = event.target.closest("[data-mines-bet]");
+  if (betButton) {
+    minesRuntime.selectedBet = Number(betButton.dataset.minesBet);
+    renderMining(appState.data);
     return;
   }
-  animateMiningHit();
-  const resultElement = $("#mining-result");
-  if (resultElement) {
-    resultElement.classList.remove("reward", "empty");
-    resultElement.innerHTML =
-      '<span class="mining-result-dot"></span><span>Удар...</span>';
+
+  const cellButton = event.target.closest("[data-mines-cell]");
+  if (cellButton) {
+    const active = appState.data?.mines?.active;
+    if (!active || busyActions.has("mines_reveal")) return;
+    runAction("mines_reveal", {
+      gameId: Number(active.id),
+      cell: Number(cellButton.dataset.minesCell),
+    });
+    return;
   }
-  runAction("mine_block");
+
+  if (event.target.closest("#mines-start")) {
+    if (!appState.data?.mines?.active) {
+      runAction("mines_start", { bet: minesRuntime.selectedBet });
+    }
+    return;
+  }
+
+  if (event.target.closest("#mines-cashout")) {
+    const gameId = appState.data?.mines?.active?.id;
+    if (gameId) runAction("mines_cashout", { gameId: Number(gameId) });
+  }
 });
 
 $("#refresh-button").addEventListener("click", loadState);

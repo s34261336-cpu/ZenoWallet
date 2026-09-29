@@ -71,6 +71,8 @@ const $ = (selector) => document.querySelector(selector);
 const minesRuntime = {
   selectedBet: 10,
   markupReady: false,
+  pendingCell: null,
+  pendingGameId: null,
 };
 
 if (telegram) {
@@ -942,6 +944,8 @@ function renderMining(data) {
   const busyReveal = busyActions.has("mines_reveal");
   const busyCashout = busyActions.has("mines_cashout");
   const opened = new Set((active?.openedCells || []).map(Number));
+  const pendingCell =
+    minesRuntime.pendingGameId === active?.id ? minesRuntime.pendingCell : null;
   const revealedMines = lastAction?.minePositions || [];
   const ended = !active && lastAction?.type === "mines_reveal" && lastAction.result === "lost";
 
@@ -971,11 +975,13 @@ function renderMining(data) {
       const isOpen = opened.has(index);
       const isMine = revealedMines.includes(index);
       const isClickedMine = lastAction?.type === "mines_reveal" && lastAction.cell === index && lastAction.mine;
+      const isPending = pendingCell === index;
       const classes = ["mines-cell"];
       if (isOpen) classes.push("safe");
       if (isMine) classes.push("mine");
       if (isClickedMine) classes.push("explode");
-      return `<button class="${classes.join(" ")}" data-mines-cell="${index}" type="button" role="gridcell" aria-label="Клетка ${index + 1}" ${!active || isOpen || busyReveal ? "disabled" : ""}>${isOpen ? "✦" : isMine ? "✹" : ""}</button>`;
+      if (isPending) classes.push("pending");
+      return `<button class="${classes.join(" ")}" data-mines-cell="${index}" type="button" role="gridcell" aria-label="Клетка ${index + 1}" ${!active || isOpen || busyReveal || isPending ? "disabled" : ""}>${isPending ? "…" : isOpen ? "✦" : isMine ? "✹" : ""}</button>`;
     }).join("");
   }
 
@@ -1318,6 +1324,30 @@ async function runAction(action, body = {}, options = {}) {
           active: actionResult.active,
         },
       };
+    } else if (
+      action === "mines_reveal" &&
+      actionResult?.type === "mines_reveal" &&
+      !actionResult.mine &&
+      appState.data.mines?.active
+    ) {
+      const currentMines = appState.data.mines;
+      const currentActive = currentMines.active;
+      appState.data = {
+        ...appState.data,
+        lastAction: actionResult,
+        mines: {
+          ...currentMines,
+          active: {
+            ...currentActive,
+            cellsOpened: Number(actionResult.cellsOpened),
+            multiplier: Number(actionResult.multiplier),
+            openedCells: [
+              ...(currentActive.openedCells || []),
+              Number(actionResult.cell),
+            ],
+          },
+        },
+      };
     } else {
       appState.data = result;
     }
@@ -1402,6 +1432,10 @@ async function runAction(action, body = {}, options = {}) {
       $("#crash-stage")?.classList.remove("launching");
     }
     busyActions.delete(action);
+    if (action === "mines_reveal") {
+      minesRuntime.pendingCell = null;
+      minesRuntime.pendingGameId = null;
+    }
     buttons.forEach((button) => {
       button.classList.remove("working");
       button.setAttribute("aria-busy", "false");
@@ -1605,10 +1639,20 @@ document.addEventListener("click", (event) => {
   const cellButton = event.target.closest("[data-mines-cell]");
   if (cellButton) {
     const active = appState.data?.mines?.active;
-    if (!active || busyActions.has("mines_reveal")) return;
+    if (
+      !active ||
+      busyActions.has("mines_reveal") ||
+      minesRuntime.pendingGameId === active.id
+    ) return;
+    const cell = Number(cellButton.dataset.minesCell);
+    minesRuntime.pendingCell = cell;
+    minesRuntime.pendingGameId = active.id;
+    cellButton.classList.add("pending");
+    cellButton.disabled = true;
+    cellButton.textContent = "…";
     runAction("mines_reveal", {
       gameId: Number(active.id),
-      cell: Number(cellButton.dataset.minesCell),
+      cell,
     });
     return;
   }

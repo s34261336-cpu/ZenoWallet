@@ -5575,6 +5575,12 @@ body.nested-screen .back-link {
   animation: mines-explode .58s cubic-bezier(.2, .9, .3, 1.2) both;
 }
 
+.mines-cell.pending {
+  animation: mines-pending 1s ease-in-out infinite;
+  border-color: rgba(128, 227, 209, .75);
+  color: #80e3d1;
+}
+
 .mines-multiplier-row {
   color: rgba(227, 235, 255, .62);
   font-size: 12px;
@@ -5747,6 +5753,11 @@ body.nested-screen .back-link {
   0% { box-shadow: 0 0 0 rgba(255, 98, 122, 0); transform: scale(.8); }
   35% { box-shadow: 0 0 28px rgba(255, 98, 122, .9); transform: scale(1.12) rotate(-5deg); }
   100% { box-shadow: 0 0 9px rgba(255, 98, 122, .3); transform: scale(1); }
+}
+
+@keyframes mines-pending {
+  0%, 100% { box-shadow: 0 0 0 rgba(128, 227, 209, 0); transform: scale(.95); }
+  50% { box-shadow: 0 0 20px rgba(128, 227, 209, .52); transform: scale(1.03); }
 }
 
 @media (max-width: 680px) {

@@ -2397,8 +2397,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     ):
                         raise ValueError("Некорректная клетка")
                     revealed = self.supabase.reveal_mines_cell(user_id, game_id, cell)
-                    result = web_app_state(self.bot, user)
-                    result["lastAction"] = {
+                    last_action = {
                         "type": "mines_reveal",
                         "gameId": game_id,
                         "cell": cell,
@@ -2412,6 +2411,18 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                             else None
                         ),
                     }
+                    # A safe reveal cannot change the wallet, history, season,
+                    # or daily counters. Avoid rebuilding the whole mini-app
+                    # state on every click; the client merges this tiny response
+                    # into its current authoritative round.
+                    if revealed.get("mine"):
+                        result = web_app_state(self.bot, user)
+                    else:
+                        result = {
+                            "ok": True,
+                            "serverNow": datetime.now(timezone.utc).isoformat(),
+                        }
+                    result["lastAction"] = last_action
                     self.send_json(result)
                     return
 

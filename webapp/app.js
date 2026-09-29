@@ -1190,15 +1190,34 @@ function animateMiningHit() {
   const miningBlock = $("#mining-block");
   const miningSpark = $("#mining-hit-spark");
   const miningPickaxe = $("#mining-pickaxe");
+  const referenceVideo = $("#mining-reference-video");
+  const hitOverlay = $("#mining-hit-overlay");
   miningBlock?.classList.remove("hit", "broken");
   miningPickaxe?.classList.remove("swing");
   miningSpark?.classList.remove("show");
+  hitOverlay?.classList.remove("show");
   void miningBlock?.offsetWidth;
   void miningPickaxe?.offsetWidth;
-  miningBlock?.classList.add("hit");
-  miningPickaxe?.classList.add("swing");
-  miningSpark?.classList.add("show");
-  window.setTimeout(() => miningSpark?.classList.remove("show"), 420);
+  void hitOverlay?.offsetWidth;
+  hitOverlay?.classList.add("show");
+  if (referenceVideo) {
+    window.clearTimeout(animateMiningHit.timer);
+    referenceVideo.pause();
+    try {
+      referenceVideo.currentTime = 0.12;
+    } catch {
+      // The first tap can happen before video metadata is ready.
+    }
+    referenceVideo.play().catch(() => {});
+    animateMiningHit.timer = window.setTimeout(() => {
+      referenceVideo.pause();
+      try {
+        referenceVideo.currentTime = 0.12;
+      } catch {
+        // Keep the poster frame if the browser has not loaded metadata yet.
+      }
+    }, 820);
+  }
 }
 
 async function runAction(action, body = {}, options = {}) {

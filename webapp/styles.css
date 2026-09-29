@@ -1996,6 +1996,72 @@ body::before {
   }
 }
 
+/* Reference scene: use the supplied gameplay capture instead of a CSS illustration. */
+.mining-scene {
+  background: #080d16;
+  border: 1px solid rgba(180, 195, 219, .18);
+  border-radius: 12px;
+  height: 560px;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.mining-reference-video {
+  background: #080d16;
+  display: block;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  object-position: center center;
+  position: absolute;
+  width: 100%;
+  z-index: 1;
+}
+
+.mining-hit-overlay {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .7) 0 3px, transparent 4px),
+    radial-gradient(circle at 50% 50%, transparent 0 25px, rgba(255, 255, 255, .2) 26px 27px, transparent 28px);
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 20;
+}
+
+.mining-hit-overlay.show {
+  animation: mining-reference-hit .16s ease-out;
+}
+
+.mining-scene > .mining-sky-glow,
+.mining-scene > .mining-particles,
+.mining-scene > .mining-moon,
+.mining-scene > .mining-water,
+.mining-scene > .mining-terrain,
+.mining-scene > .mining-block-shadow,
+.mining-scene > .mining-block-wrap,
+.mining-scene > .mining-pickaxe,
+.mining-scene > .mining-block-price,
+.mining-scene > .mining-hit-spark {
+  display: none !important;
+}
+
+.mining-panel {
+  border-radius: 14px;
+}
+
+@keyframes mining-reference-hit {
+  0% { opacity: 0; transform: scale(.9); }
+  26% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@media (max-width: 390px) {
+  .mining-scene {
+    height: 545px;
+  }
+}
+
 /* Mining scene v2: closer to the reference frame */
 .mining-scene {
   background:

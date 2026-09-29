@@ -2510,6 +2510,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
             ".svg": "image/svg+xml",
             ".png": "image/png",
             ".jpg": "image/jpeg",
+            ".mp4": "video/mp4",
             ".ico": "image/x-icon",
         }
         body = candidate.read_bytes()

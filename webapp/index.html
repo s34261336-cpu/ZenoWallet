@@ -223,7 +223,7 @@
               <span class="eyebrow">Игровая зона</span>
               <h2>Игры</h2>
             </div>
-            <span class="section-counter">01 / 02</span>
+            <span class="section-counter">01 / 03</span>
           </div>
           <p class="games-intro">
             Выбирай игру и забирай выигрыш вовремя. Новые режимы будут появляться здесь.
@@ -245,6 +245,16 @@
               <span class="eyebrow">LIVE · удача и риск</span>
               <strong>Рулетка <span class="crash-title-mark">50X</span></strong>
               <small>Три бесплатных прокрута в сутки. Дальше — 1 ZT за прокрут.</small>
+            </span>
+            <span class="game-launch-arrow" aria-hidden="true">↗</span>
+          </button>
+
+          <button class="game-launch-card mining-launch-card" data-view="mining" type="button">
+            <span class="game-launch-icon mining-launch-icon" aria-hidden="true">◆</span>
+            <span class="game-launch-copy">
+              <span class="eyebrow">LIVE · добыча и удача</span>
+              <strong>Шахта <span class="crash-title-mark">BLOCK</span></strong>
+              <small>Ломай блоки за ZT и ищи редкую награду.</small>
             </span>
             <span class="game-launch-arrow" aria-hidden="true">↗</span>
           </button>
@@ -504,6 +514,110 @@
             </div>
             <div class="crash-history" id="roulette-history">
               <div class="crash-history-empty">Игр пока нет</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view hidden" id="mining-view">
+          <button class="back-link" data-view="games" type="button">← Назад</button>
+          <div class="section-heading rocket-heading">
+            <div>
+              <span class="eyebrow">Игровая зона</span>
+              <h2>Шахта <span class="crash-title-mark mining-title-mark">BLOCK</span></h2>
+            </div>
+            <span class="season-pill mining-live-pill"><i></i> MINE</span>
+          </div>
+          <p class="crash-intro">
+            Каждый удар стоит <strong id="mining-intro-cost">5 ZT</strong>. Разбей блок и проверь, что внутри.
+          </p>
+
+          <section class="mining-game" aria-label="Игра Шахта">
+            <div class="mining-scene">
+              <div class="mining-sky-glow"></div>
+              <div class="mining-particles" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <div class="mining-moon" aria-hidden="true"></div>
+              <div class="mining-terrain mining-terrain-back" aria-hidden="true"></div>
+              <div class="mining-terrain mining-terrain-front" aria-hidden="true"></div>
+              <div class="mining-block-shadow" aria-hidden="true"></div>
+              <div class="mining-block-wrap" id="mining-block-wrap">
+                <div class="mining-block" id="mining-block">
+                  <div class="mining-block-face"></div>
+                  <div class="mining-block-edge"></div>
+                  <div class="mining-block-specks" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i><i></i><i></i>
+                  </div>
+                  <span class="mining-block-label" id="mining-block-label">Тёмный камень</span>
+                </div>
+              </div>
+              <div class="mining-pickaxe" id="mining-pickaxe" aria-hidden="true">
+                <span class="pickaxe-head"></span>
+                <span class="pickaxe-handle"></span>
+              </div>
+              <div class="mining-block-price">
+                <span>✦</span>
+                <strong id="mining-hit-cost">5</strong>
+                <small>за удар</small>
+              </div>
+              <div class="mining-hit-spark" id="mining-hit-spark" aria-hidden="true">✦</div>
+            </div>
+
+            <div class="mining-panel">
+              <div class="mining-panel-top">
+                <div>
+                  <span class="eyebrow">Текущий блок</span>
+                  <strong id="mining-block-name">Тёмный камень</strong>
+                </div>
+                <div class="mining-balance">
+                  <span>Баланс</span>
+                  <strong><b id="mining-balance">—</b> ZT</strong>
+                </div>
+              </div>
+              <div class="mining-progress-track" aria-label="Прочность блока">
+                <span id="mining-progress-fill"></span>
+              </div>
+              <div class="mining-progress-meta">
+                <span id="mining-progress-text">0 / 8 ударов</span>
+                <span id="mining-blocks-broken">Разбито: 0</span>
+              </div>
+              <button class="primary-button mining-hit-button" id="mining-hit" data-action="mine_block" type="button">
+                Ударить киркой <span>−5 ZT</span>
+              </button>
+              <div class="mining-result" id="mining-result" aria-live="polite">
+                <span class="mining-result-dot"></span>
+                <span>Блок ждёт первого удара</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="mining-rewards-card">
+            <div class="section-heading compact-heading">
+              <div>
+                <span class="eyebrow">Что может попасться</span>
+                <h3>Награды внутри блока</h3>
+              </div>
+              <span class="history-count">шанс меняется</span>
+            </div>
+            <div class="mining-reward-grid">
+              <span class="empty-reward"><i>—</i><b>Пусто</b><small>60%</small></span>
+              <span><i>◆</i><b>10–75 ZT</b><small>37,5%</small></span>
+              <span class="rare-reward"><i>✦</i><b>180 ZT</b><small>2%</small></span>
+              <span class="jackpot-reward"><i>★</i><b>500 ZT</b><small>0,5%</small></span>
+            </div>
+            <p>После разрушения появляется новый блок. Результат показывается здесь, без всплывающих плашек.</p>
+          </section>
+
+          <section class="crash-history-card mining-history-card">
+            <div class="section-heading compact-heading">
+              <div>
+                <span class="eyebrow">Последние блоки</span>
+                <h3>История добычи</h3>
+              </div>
+              <span class="history-count">8 максимум</span>
+            </div>
+            <div class="mining-history" id="mining-history">
+              <div class="crash-history-empty">Блоков пока нет</div>
             </div>
           </section>
         </section>

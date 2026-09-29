@@ -38,6 +38,23 @@ ROULETTE_BETS = (10, 50, 100, 500)
 ROULETTE_FREE_SPINS_PER_DAY = 3
 ROULETTE_ZT_COST = 1
 ROULETTE_PREMIUM_FEE = 100
+MINE_HIT_COST = 5
+MINE_BLOCK_HITS = 8
+MINE_BLOCK_TYPES = (
+    {"key": "stone", "name": "Тёмный камень", "className": "stone", "hits": 8},
+    {"key": "crystal", "name": "Кристальный блок", "className": "crystal", "hits": 7},
+    {"key": "gold", "name": "Золотая жила", "className": "gold", "hits": 6},
+    {"key": "obsidian", "name": "Обсидиан", "className": "obsidian", "hits": 10},
+)
+MINE_REWARDS = (
+    (0, 6000),
+    (10, 1900),
+    (25, 1200),
+    (75, 650),
+    (180, 200),
+    (500, 50),
+)
+MINE_REWARD_WEIGHT_TOTAL = sum(weight for _, weight in MINE_REWARDS)
 DEFAULT_CASE_SETTINGS = {
     "odds": {"0": 55, "5": 15, "10": 12, "25": 8, "50": 6, "100": 4},
     "hourly_limit": 5,
@@ -514,6 +531,123 @@ class SupabaseClient:
             return 0
         value = user.get("zenotoken", 0)
         return int(value) if isinstance(value, (int, float)) and value >= 0 else 0
+
+    def _new_mine_block(self) -> dict[str, Any]:
+        block = CRASH_RANDOM.choice(MINE_BLOCK_TYPES)
+        return {
+            "type": block["key"],
+            "name": block["name"],
+            "className": block["className"],
+            "hits": 0,
+            "hitsRequired": block["hits"],
+        }
+
+    def get_mining_state(self, user_id: int) -> dict[str, Any]:
+        state = self.get_users_state()
+        user_state = state.get(str(user_id))
+        user_state = user_state if isinstance(user_state, dict) else {}
+        raw_mining = user_state.get("mining")
+        mining = raw_mining if isinstance(raw_mining, dict) else {}
+        active = mining.get("active")
+        if not isinstance(active, dict):
+            active = self._new_mine_block()
+            next_state = dict(state)
+            next_state[str(user_id)] = {**user_state, "mining": {
+                "active": active,
+                "blocksBroken": int(mining.get("blocksBroken") or 0),
+                "history": [],
+            }}
+            self.update_users_state(next_state)
+        return {
+            "active": active,
+            "blocksBroken": max(0, int(mining.get("blocksBroken") or 0)),
+            "history": [
+                item for item in (mining.get("history") or [])
+                if isinstance(item, dict)
+            ][:8],
+            "hitCost": MINE_HIT_COST,
+        }
+
+    def mine_block(self, user_id: int) -> dict[str, Any]:
+        state = self.get_users_state()
+        user_key = str(user_id)
+        raw_user = state.get(user_key)
+        user_state = dict(raw_user) if isinstance(raw_user, dict) else {}
+        raw_mining = user_state.get("mining")
+        mining = dict(raw_mining) if isinstance(raw_mining, dict) else {}
+        active = mining.get("active")
+        if not isinstance(active, dict):
+            active = self._new_mine_block()
+
+        current_zeno = user_state.get("zenotoken", 0)
+        if not isinstance(current_zeno, (int, float)) or current_zeno < 0:
+            current_zeno = 0
+        current_zeno = int(current_zeno)
+        if current_zeno < MINE_HIT_COST:
+            raise ValueError(f"Нужно минимум {MINE_HIT_COST} ZT для удара")
+
+        hits_required = max(1, int(active.get("hitsRequired") or MINE_BLOCK_HITS))
+        hits = max(0, int(active.get("hits") or 0)) + 1
+        next_zeno = current_zeno - MINE_HIT_COST
+        broken = hits >= hits_required
+        reward = 0
+        previous_block = dict(active)
+        if broken:
+            roll = CRASH_RANDOM.randrange(MINE_REWARD_WEIGHT_TOTAL)
+            cursor = 0
+            for candidate, weight in MINE_REWARDS:
+                cursor += weight
+                if roll < cursor:
+                    reward = candidate
+                    break
+            next_zeno += reward
+            history = [
+                {
+                    "block": str(previous_block.get("name") or "Блок"),
+                    "reward": reward,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                },
+                *[
+                    item for item in (mining.get("history") or [])
+                    if isinstance(item, dict)
+                ],
+            ][:8]
+            blocks_broken = max(0, int(mining.get("blocksBroken") or 0)) + 1
+            next_active = self._new_mine_block()
+        else:
+            history = [
+                item for item in (mining.get("history") or [])
+                if isinstance(item, dict)
+            ][:8]
+            blocks_broken = max(0, int(mining.get("blocksBroken") or 0))
+            next_active = {
+                **active,
+                "hits": hits,
+                "hitsRequired": hits_required,
+            }
+
+        next_mining = {
+            "active": next_active,
+            "blocksBroken": blocks_broken,
+            "history": history,
+        }
+        next_state = dict(state)
+        next_state[user_key] = {
+            **user_state,
+            "zenotoken": next_zeno,
+            "mining": next_mining,
+        }
+        self.update_users_state(next_state)
+        return {
+            "hitCost": MINE_HIT_COST,
+            "balance": next_zeno,
+            "broken": broken,
+            "reward": reward,
+            "block": next_active,
+            "brokenBlock": previous_block if broken else None,
+            "blocksBroken": blocks_broken,
+            "history": history,
+        }
 
     def credit(self, user_id: int, amount: int) -> dict[str, Any]:
         wallet = self.ensure_wallet(user_id)
@@ -1828,6 +1962,7 @@ def web_app_state(
     user_state = users_state.get(str(user_id))
     user_state = user_state if isinstance(user_state, dict) else {}
     zeno_balance = supabase.get_zeno_balance(user_id)
+    mining = supabase.get_mining_state(user_id)
 
     settings = supabase.get_case_settings()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -1959,6 +2094,28 @@ def web_app_state(
                     "createdAt": str(row["created_at"]),
                 }
                 for row in roulette_history
+            ],
+        },
+        "mining": {
+            "available": True,
+            "hitCost": int(mining["hitCost"]),
+            "blocksBroken": int(mining["blocksBroken"]),
+            "active": {
+                "type": str(mining["active"].get("type") or "stone"),
+                "name": str(mining["active"].get("name") or "Тёмный камень"),
+                "className": str(mining["active"].get("className") or "stone"),
+                "hits": int(mining["active"].get("hits") or 0),
+                "hitsRequired": int(
+                    mining["active"].get("hitsRequired") or MINE_BLOCK_HITS
+                ),
+            },
+            "history": [
+                {
+                    "block": str(item.get("block") or "Блок"),
+                    "reward": int(item.get("reward") or 0),
+                    "createdAt": str(item.get("createdAt") or ""),
+                }
+                for item in mining["history"]
             ],
         },
         "season": {
@@ -2224,6 +2381,21 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                         "paidSpin": bool(played.get("paidSpin")),
                         "ztCost": int(played.get("ztCost") or 0),
                         "mode": mode,
+                    }
+                    self.send_json(result)
+                    return
+
+                if action == "mine_block":
+                    mined = self.supabase.mine_block(user_id)
+                    result = web_app_state(self.bot, user)
+                    result["lastAction"] = {
+                        "type": "mine_block",
+                        "hitCost": int(mined["hitCost"]),
+                        "balance": int(mined["balance"]),
+                        "broken": bool(mined["broken"]),
+                        "reward": int(mined["reward"]),
+                        "blocksBroken": int(mined["blocksBroken"]),
+                        "brokenBlock": mined["brokenBlock"],
                     }
                     self.send_json(result)
                     return

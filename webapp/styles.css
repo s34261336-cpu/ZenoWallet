@@ -1996,6 +1996,640 @@ body::before {
   }
 }
 
+/* Block mining game */
+.mining-title-mark {
+  color: var(--cyan);
+}
+
+.mining-live-pill {
+  color: var(--lime);
+  border-color: rgba(200, 243, 107, 0.28);
+}
+
+.mining-live-pill i {
+  background: var(--lime);
+  box-shadow: 0 0 12px rgba(200, 243, 107, 0.75);
+}
+
+.mining-launch-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(76, 230, 237, 0.16), transparent 44%),
+    linear-gradient(135deg, rgba(24, 44, 67, 0.95), rgba(18, 24, 46, 0.82));
+}
+
+.mining-launch-card:hover {
+  border-color: rgba(76, 230, 237, 0.48);
+}
+
+.mining-launch-icon {
+  color: var(--lime);
+  text-shadow: 0 0 18px rgba(200, 243, 107, 0.7);
+  transform: rotate(45deg);
+}
+
+.mining-game {
+  display: grid;
+  gap: 14px;
+}
+
+.mining-scene {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(76, 230, 237, 0.2), transparent 32%),
+    linear-gradient(180deg, #101a37 0%, #12182b 55%, #0b0c16 100%);
+  border: 1px solid rgba(76, 230, 237, 0.2);
+  border-radius: 28px;
+  height: 355px;
+  overflow: hidden;
+  position: relative;
+  isolation: isolate;
+}
+
+.mining-scene::after {
+  background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.06) 49%, transparent 55%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-100%);
+  animation: mining-sheen 7s ease-in-out infinite;
+  z-index: 8;
+}
+
+.mining-sky-glow {
+  background: radial-gradient(ellipse, rgba(71, 142, 190, 0.4), transparent 68%);
+  filter: blur(12px);
+  height: 210px;
+  left: 9%;
+  position: absolute;
+  top: -75px;
+  width: 82%;
+}
+
+.mining-moon {
+  background: #d5e6ec;
+  border-radius: 50%;
+  box-shadow: 0 0 28px rgba(213, 230, 236, 0.3);
+  height: 47px;
+  opacity: 0.8;
+  position: absolute;
+  right: 14%;
+  top: 42px;
+  width: 47px;
+}
+
+.mining-moon::after,
+.mining-moon::before {
+  background: rgba(68, 104, 128, 0.15);
+  border-radius: 50%;
+  content: "";
+  position: absolute;
+}
+
+.mining-moon::before {
+  height: 11px;
+  left: 10px;
+  top: 9px;
+  width: 14px;
+}
+
+.mining-moon::after {
+  bottom: 9px;
+  height: 8px;
+  right: 9px;
+  width: 10px;
+}
+
+.mining-terrain {
+  bottom: 0;
+  position: absolute;
+  transform: skewY(-5deg);
+  width: 120%;
+}
+
+.mining-terrain-back {
+  background:
+    linear-gradient(160deg, transparent 25%, rgba(90, 117, 139, 0.48) 26% 30%, transparent 31%),
+    linear-gradient(25deg, transparent 48%, rgba(40, 70, 84, 0.72) 49% 69%, transparent 70%),
+    #182a37;
+  height: 123px;
+  left: -10%;
+  opacity: 0.76;
+}
+
+.mining-terrain-front {
+  background:
+    repeating-linear-gradient(160deg, rgba(85, 139, 145, .16) 0 2px, transparent 2px 23px),
+    linear-gradient(168deg, #203e48 0 12%, #111c27 13% 100%);
+  height: 88px;
+  left: -8%;
+  opacity: 0.86;
+  transform: skewY(-8deg);
+}
+
+.mining-particles i {
+  animation: mining-dust 3.7s ease-in-out infinite;
+  background: rgba(214, 245, 239, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(214, 245, 239, 0.6);
+  height: 3px;
+  position: absolute;
+  width: 3px;
+  z-index: 2;
+}
+
+.mining-particles i:nth-child(1) { left: 13%; top: 38%; }
+.mining-particles i:nth-child(2) { animation-delay: -1.6s; left: 27%; top: 22%; }
+.mining-particles i:nth-child(3) { animation-delay: -.8s; left: 77%; top: 33%; }
+.mining-particles i:nth-child(4) { animation-delay: -2.4s; left: 84%; top: 56%; }
+.mining-particles i:nth-child(5) { animation-delay: -1.2s; left: 61%; top: 15%; }
+.mining-particles i:nth-child(6) { animation-delay: -3s; left: 9%; top: 62%; }
+
+.mining-block-shadow {
+  background: rgba(0, 0, 0, .48);
+  border-radius: 50%;
+  bottom: 65px;
+  filter: blur(14px);
+  height: 32px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 200px;
+}
+
+.mining-block-wrap {
+  height: 150px;
+  left: 50%;
+  position: absolute;
+  top: 108px;
+  transform: translateX(-50%);
+  width: 150px;
+  z-index: 5;
+}
+
+.mining-block {
+  height: 100%;
+  position: relative;
+  transform: rotate(-4deg) perspective(450px) rotateY(-5deg);
+  transform-style: preserve-3d;
+  transition: transform .16s ease, filter .2s ease, opacity .24s ease;
+  width: 100%;
+}
+
+.mining-block-face {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.1), transparent 32%),
+    repeating-linear-gradient(0deg, transparent 0 18px, rgba(255,255,255,.025) 19px 20px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0 14px, transparent 15px 31px),
+    #293c5b;
+  border: 4px solid #182641;
+  box-shadow:
+    inset 0 0 0 3px rgba(121, 154, 196, .13),
+    inset -18px -20px 36px rgba(5, 8, 21, .43),
+    0 22px 28px rgba(0,0,0,.38);
+  height: 100%;
+  position: absolute;
+  width: 100%;
+}
+
+.mining-block-edge {
+  background: #111a2d;
+  bottom: -12px;
+  clip-path: polygon(0 0, 100% 0, 87% 100%, 0 100%);
+  height: 13px;
+  left: 7px;
+  position: absolute;
+  transform: skewX(-32deg);
+  width: 100%;
+}
+
+.mining-block-specks i {
+  background: #6b85be;
+  box-shadow: 0 0 9px rgba(115, 177, 255, .22);
+  height: 8px;
+  position: absolute;
+  width: 13px;
+}
+
+.mining-block-specks i:nth-child(1) { left: 18%; top: 24%; transform: rotate(21deg); }
+.mining-block-specks i:nth-child(2) { left: 61%; top: 17%; transform: rotate(-18deg); }
+.mining-block-specks i:nth-child(3) { left: 37%; top: 47%; transform: rotate(15deg); }
+.mining-block-specks i:nth-child(4) { left: 74%; top: 61%; transform: rotate(8deg); }
+.mining-block-specks i:nth-child(5) { left: 12%; top: 73%; transform: rotate(-10deg); }
+.mining-block-specks i:nth-child(6) { left: 47%; top: 78%; transform: rotate(24deg); }
+
+.mining-block-label {
+  background: rgba(8, 11, 22, .76);
+  border: 1px solid rgba(200, 243, 107, .3);
+  bottom: 10px;
+  color: var(--lime);
+  font-size: 9px;
+  left: 50%;
+  letter-spacing: .04em;
+  padding: 5px 8px;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.mining-block.crystal .mining-block-face {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.18), transparent 30%),
+    repeating-linear-gradient(135deg, transparent 0 17px, rgba(108, 240, 238, .24) 18px 21px),
+    #245a78;
+}
+
+.mining-block.gold .mining-block-face {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.18), transparent 30%),
+    repeating-linear-gradient(30deg, transparent 0 24px, rgba(246, 210, 103, .35) 25px 29px),
+    #5a4926;
+}
+
+.mining-block.obsidian .mining-block-face {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.08), transparent 32%),
+    repeating-linear-gradient(0deg, transparent 0 16px, rgba(161, 113, 255, .14) 17px 20px),
+    #1d1d3a;
+}
+
+.mining-block.hit {
+  animation: mining-block-hit .25s ease-out;
+}
+
+.mining-block.broken {
+  animation: mining-block-break .35s ease-out forwards;
+}
+
+.mining-pickaxe {
+  bottom: 52px;
+  height: 130px;
+  left: 18%;
+  position: absolute;
+  transform: rotate(-20deg);
+  transform-origin: 75% 72%;
+  transition: transform .16s ease;
+  width: 75px;
+  z-index: 7;
+}
+
+.pickaxe-handle {
+  background: linear-gradient(90deg, #5b321a, #bf7b36 48%, #3b2116);
+  border-radius: 5px;
+  bottom: 0;
+  height: 116px;
+  left: 34px;
+  position: absolute;
+  transform: rotate(14deg);
+  width: 12px;
+}
+
+.pickaxe-head {
+  background: linear-gradient(180deg, #9be8e3, #326b78);
+  border-radius: 5px 9px 9px 4px;
+  box-shadow: 0 0 15px rgba(76, 230, 237, .3);
+  height: 14px;
+  left: 1px;
+  position: absolute;
+  top: 12px;
+  transform: rotate(-18deg);
+  width: 71px;
+}
+
+.mining-pickaxe.swing {
+  animation: mining-pickaxe-swing .42s cubic-bezier(.18,.8,.28,1);
+}
+
+.mining-block-price {
+  align-items: center;
+  background: rgba(8, 13, 25, .82);
+  border: 1px solid rgba(200, 243, 107, .48);
+  bottom: 74px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  display: flex;
+  gap: 5px;
+  left: 50%;
+  padding: 7px 10px;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 8;
+}
+
+.mining-block-price span,
+.mining-block-price strong {
+  color: var(--lime);
+}
+
+.mining-block-price strong {
+  font-size: 19px;
+  font-family: "Manrope", sans-serif;
+}
+
+.mining-block-price small {
+  color: var(--muted);
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.mining-hit-spark {
+  color: var(--lime);
+  font-size: 34px;
+  left: 51%;
+  opacity: 0;
+  position: absolute;
+  top: 142px;
+  transform: scale(.4);
+  z-index: 9;
+}
+
+.mining-hit-spark.show {
+  animation: mining-spark .5s ease-out;
+}
+
+.mining-panel,
+.mining-rewards-card {
+  background: rgba(17, 20, 39, .72);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 16px;
+}
+
+.mining-panel-top {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+}
+
+.mining-panel-top strong,
+.mining-balance strong {
+  display: block;
+  font-family: "Manrope", sans-serif;
+  margin-top: 4px;
+}
+
+.mining-balance {
+  text-align: right;
+}
+
+.mining-balance span,
+.mining-progress-meta,
+.mining-result,
+.mining-reward-grid small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.mining-balance b {
+  color: var(--lime);
+}
+
+.mining-progress-track {
+  background: rgba(255,255,255,.09);
+  border-radius: 999px;
+  height: 8px;
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.mining-progress-track span {
+  background: linear-gradient(90deg, var(--cyan), var(--lime));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width .3s ease;
+}
+
+.mining-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+}
+
+.mining-hit-button {
+  background: linear-gradient(135deg, #4bbed0, #7fd866);
+  color: #07121a;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.mining-hit-button span {
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: .78;
+}
+
+.mining-hit-button.working {
+  animation: mining-button-pulse .8s ease-in-out infinite;
+}
+
+.mining-result {
+  align-items: center;
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 38px;
+  padding: 9px 11px;
+}
+
+.mining-result-dot {
+  background: var(--cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(76,230,237,.65);
+  flex: 0 0 7px;
+  height: 7px;
+  width: 7px;
+}
+
+.mining-result.reward {
+  border-color: rgba(200,243,107,.38);
+  color: var(--lime);
+}
+
+.mining-result.reward .mining-result-dot {
+  background: var(--lime);
+  box-shadow: 0 0 11px rgba(200,243,107,.7);
+}
+
+.mining-result.empty {
+  color: var(--muted);
+}
+
+.mining-reward-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 14px;
+}
+
+.mining-reward-grid > span {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 74px;
+  padding: 9px 7px;
+}
+
+.mining-reward-grid i {
+  color: var(--cyan);
+  font-style: normal;
+  font-size: 17px;
+}
+
+.mining-reward-grid b {
+  font-size: 10px;
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.mining-reward-grid small {
+  font-size: 9px;
+  margin-top: 3px;
+}
+
+.mining-reward-grid .empty-reward i {
+  color: var(--faint);
+}
+
+.mining-reward-grid .rare-reward {
+  border-color: rgba(141,107,255,.35);
+}
+
+.mining-reward-grid .rare-reward i {
+  color: var(--violet-bright);
+}
+
+.mining-reward-grid .jackpot-reward {
+  border-color: rgba(200,243,107,.38);
+}
+
+.mining-reward-grid .jackpot-reward i {
+  color: var(--lime);
+}
+
+.mining-rewards-card p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  margin-top: 13px;
+}
+
+.mining-history {
+  display: grid;
+  gap: 8px;
+}
+
+.mining-history-row {
+  align-items: center;
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  display: flex;
+  font-size: 11px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.mining-history-row span {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+.mining-history-row span i {
+  background: var(--faint);
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+.mining-history-row.win span i {
+  background: var(--lime);
+  box-shadow: 0 0 8px rgba(200,243,107,.7);
+}
+
+.mining-history-row strong {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.mining-history-row.win strong {
+  color: var(--lime);
+}
+
+@keyframes mining-pickaxe-swing {
+  0% { transform: rotate(-20deg); }
+  42% { transform: rotate(27deg) translate(14px, 12px); }
+  100% { transform: rotate(-20deg); }
+}
+
+@keyframes mining-block-hit {
+  0%, 100% { transform: rotate(-4deg) perspective(450px) rotateY(-5deg); }
+  45% { transform: translate(5px, 2px) rotate(-7deg) perspective(450px) rotateY(-5deg); }
+}
+
+@keyframes mining-block-break {
+  0% { filter: brightness(1.7); opacity: 1; transform: rotate(-4deg) scale(1); }
+  100% { filter: brightness(2.2); opacity: 0; transform: rotate(12deg) scale(.72) translateY(24px); }
+}
+
+@keyframes mining-spark {
+  0% { opacity: 0; transform: scale(.3) rotate(-20deg); }
+  22% { opacity: 1; transform: scale(1.2) rotate(12deg); }
+  100% { opacity: 0; transform: scale(.7) translate(22px, -28px) rotate(55deg); }
+}
+
+@keyframes mining-dust {
+  0%, 100% { opacity: .18; transform: translate(0, 0); }
+  45% { opacity: 1; transform: translate(5px, -9px); }
+}
+
+@keyframes mining-sheen {
+  0%, 72% { transform: translateX(-100%); }
+  92%, 100% { transform: translateX(100%); }
+}
+
+@keyframes mining-button-pulse {
+  50% { filter: brightness(1.13); transform: translateY(-1px); }
+}
+
+@media (max-width: 390px) {
+  .mining-scene {
+    height: 330px;
+  }
+
+  .mining-block-wrap {
+    height: 134px;
+    top: 102px;
+    width: 134px;
+  }
+
+  .mining-pickaxe {
+    left: 12%;
+    transform: scale(.9) rotate(-20deg);
+    transform-origin: bottom left;
+  }
+
+  .mining-block-price {
+    bottom: 68px;
+  }
+
+  .mining-reward-grid {
+    gap: 5px;
+  }
+
+  .mining-reward-grid > span {
+    padding: 8px 5px;
+  }
+
+  .mining-reward-grid b {
+    font-size: 9px;
+  }
+}
+
 /* Video-inspired crash flight treatment */
 .crash-stage::after {
   animation: crash-space-drift 7s linear infinite;

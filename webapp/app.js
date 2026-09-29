@@ -66,6 +66,7 @@ const REQUEST_TIMEOUT_MS = 15000;
 const ROULETTE_SPIN_DURATION_MS = 3500;
 const ROULETTE_SPIN_EXTRA_TURNS = 3;
 const ROULETTE_SPIN_SPEED_DEG_PER_SEC = 720;
+const MINE_HIT_COST = 5;
 const MAIN_VIEWS = new Set(["home", "games", "season", "profile"]);
 const $ = (selector) => document.querySelector(selector);
 
@@ -867,6 +868,69 @@ function renderRoulette(data) {
   }
 }
 
+function renderMining(data) {
+  const mining = data.mining || {
+    available: true,
+    hitCost: MINE_HIT_COST,
+    blocksBroken: 0,
+    active: {
+      name: "Тёмный камень",
+      className: "stone",
+      hits: 0,
+      hitsRequired: 8,
+    },
+    history: [],
+  };
+  const active = mining.active || {};
+  const hits = Math.max(0, Number(active.hits || 0));
+  const hitsRequired = Math.max(1, Number(active.hitsRequired || 8));
+  const cost = Math.max(1, Number(mining.hitCost || MINE_HIT_COST));
+  const balance = Number(data.wallet?.zenoBalance || 0);
+  const progress = Math.max(0, Math.min(100, (hits / hitsRequired) * 100));
+  const block = $("#mining-block");
+  const hitButton = $("#mining-hit");
+  const busy = busyActions.has("mine_block");
+  const affordable = balance >= cost;
+
+  $("#mining-intro-cost").textContent = `${formatNumber(cost)} ZT`;
+  $("#mining-hit-cost").textContent = formatNumber(cost);
+  $("#mining-balance").textContent = formatNumber(balance);
+  $("#mining-block-name").textContent = active.name || "Блок";
+  $("#mining-block-label").textContent = active.name || "Блок";
+  $("#mining-progress-text").textContent = `${hits} / ${hitsRequired} ударов`;
+  $("#mining-blocks-broken").textContent = `Разбито: ${formatNumber(mining.blocksBroken || 0)}`;
+  $("#mining-progress-fill").style.width = `${progress}%`;
+  block?.classList.remove("stone", "crystal", "gold", "obsidian");
+  block?.classList.add(active.className || "stone");
+  if (hitButton) {
+    hitButton.disabled = !mining.available || busy || !affordable;
+    hitButton.classList.toggle("working", busy);
+    hitButton.innerHTML = affordable
+      ? `Ударить киркой <span>−${formatNumber(cost)} ZT</span>`
+      : `Нужно ещё ${formatNumber(cost - balance)} ZT`;
+  }
+  renderMiningHistory(mining.history);
+}
+
+function renderMiningHistory(history) {
+  const container = $("#mining-history");
+  if (!container) return;
+  if (!history?.length) {
+    container.innerHTML = '<div class="crash-history-empty">Блоков пока нет</div>';
+    return;
+  }
+  container.innerHTML = history
+    .map((item) => {
+      const reward = Number(item.reward || 0);
+      return `
+        <div class="mining-history-row ${reward > 0 ? "win" : "loss"}">
+          <span><i></i>${escapeHtml(item.block || "Блок")}</span>
+          <strong>${reward > 0 ? `+${formatNumber(reward)} ZT` : "Пусто"}</strong>
+        </div>`;
+    })
+    .join("");
+}
+
 function renderCrash(data) {
   const crash = data.crash || { active: null, history: [] };
   const active = crash.active;
@@ -1073,6 +1137,7 @@ function render() {
   renderHomeLeaders(season.top);
   renderCrash(data);
   renderRoulette(data);
+  renderMining(data);
 
   const dailyButton = document.querySelector('[data-action="daily"]');
   dailyButton.disabled = !daily.ready;
@@ -1106,6 +1171,7 @@ function setView(viewName) {
     "screen-games",
     "screen-rocket",
     "screen-roulette",
+    "screen-mining",
     "screen-season",
     "screen-profile",
     "nested-screen",
@@ -1182,6 +1248,34 @@ async function runAction(action, body = {}, options = {}) {
       showToast("+10 монет начислено");
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
+    } else if (actionResult?.type === "mine_block") {
+      const miningBlock = $("#mining-block");
+      const miningSpark = $("#mining-hit-spark");
+      const miningPickaxe = $("#mining-pickaxe");
+      miningBlock?.classList.remove("hit", "broken");
+      miningPickaxe?.classList.remove("swing");
+      miningSpark?.classList.remove("show");
+      void miningBlock?.offsetWidth;
+      void miningPickaxe?.offsetWidth;
+      if (actionResult.broken) {
+        miningBlock?.classList.add("broken");
+      } else {
+        miningBlock?.classList.add("hit");
+      }
+      miningPickaxe?.classList.add("swing");
+      miningSpark?.classList.add("show");
+      window.setTimeout(() => miningSpark?.classList.remove("show"), 520);
+      const resultElement = $("#mining-result");
+      if (resultElement) {
+        resultElement.classList.toggle("reward", actionResult.reward > 0);
+        resultElement.classList.toggle("empty", actionResult.broken && !actionResult.reward);
+        resultElement.innerHTML = actionResult.broken
+          ? actionResult.reward > 0
+            ? `<span class="mining-result-dot"></span><span>Блок разрушен · <strong>+${formatNumber(actionResult.reward)} ZT</strong></span>`
+            : '<span class="mining-result-dot"></span><span>Блок разрушен · внутри ничего нет</span>'
+          : `<span class="mining-result-dot"></span><span>Удар принят · продолжай ломать</span>`;
+      }
+      telegram?.HapticFeedback?.impactOccurred("medium");
     } else if (
       !options.suppressSuccessToast &&
       (actionResult?.type === "crash_cashout" ||
@@ -1425,6 +1519,13 @@ $("#roulette-spin").addEventListener("click", () => {
   }
   startRouletteSpin();
   runAction("roulette_play", { bet, mode: selectedRouletteMode });
+});
+
+$("#mining-hit").addEventListener("click", () => {
+  if (busyActions.has("mine_block") || Number(appState.data?.wallet?.zenoBalance || 0) < MINE_HIT_COST) {
+    return;
+  }
+  runAction("mine_block");
 });
 
 $("#refresh-button").addEventListener("click", loadState);

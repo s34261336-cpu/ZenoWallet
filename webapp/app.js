@@ -895,6 +895,7 @@ function renderMining(data) {
   $("#mining-intro-cost").textContent = `${formatNumber(cost)} ZT`;
   $("#mining-hit-cost").textContent = formatNumber(cost);
   $("#mining-balance").textContent = formatNumber(balance);
+  $("#mining-hud-zeno").textContent = formatNumber(balance);
   $("#mining-block-name").textContent = active.name || "Блок";
   $("#mining-block-label").textContent = active.name || "Блок";
   $("#mining-progress-text").textContent = `${hits} / ${hitsRequired} ударов`;

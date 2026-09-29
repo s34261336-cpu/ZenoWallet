@@ -2494,6 +2494,76 @@ body::before {
   z-index: 1;
 }
 
+.mining-voxel-hud {
+  align-items: flex-start;
+  display: flex;
+  inset: 14px 14px auto;
+  justify-content: space-between;
+  pointer-events: none;
+  position: absolute;
+  z-index: 7;
+}
+
+.mining-referral-pill,
+.mining-hud-wallet span {
+  backdrop-filter: blur(10px);
+  background: rgba(13, 19, 34, 0.78);
+  border: 1px solid rgba(232, 246, 255, 0.22);
+  border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+  color: #edf7ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
+.mining-hud-wallet {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.mining-hud-wallet span:first-child {
+  background: rgba(22, 190, 153, 0.92);
+  border-color: rgba(148, 255, 225, 0.45);
+}
+
+.mining-hud-wallet b {
+  font-size: 11px;
+}
+
+.mining-hud-wallet .mining-hud-stars {
+  background: rgba(244, 166, 37, 0.93);
+  border-color: rgba(255, 232, 157, 0.48);
+  color: #fff8df;
+}
+
+.mining-inventory {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: -2px;
+  min-width: 48px;
+}
+
+.mining-inventory span {
+  color: #f4c84d;
+  font-size: 24px;
+  filter: drop-shadow(0 0 10px rgba(244, 200, 77, 0.48));
+  line-height: 1;
+}
+
+.mining-inventory small {
+  color: rgba(244, 249, 255, 0.82);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
 .mining-scene.three-ready::after {
   display: none;
 }
@@ -2511,6 +2581,18 @@ body::before {
 .mining-scene.three-ready > .mining-block-price,
 .mining-scene.three-ready > .mining-hit-spark {
   display: none;
+}
+
+@media (min-width: 391px) {
+  .mining-scene {
+    height: 470px;
+  }
+}
+
+@media (max-width: 390px) {
+  .mining-scene {
+    height: 430px;
+  }
 }
 
 .mining-scene::after {

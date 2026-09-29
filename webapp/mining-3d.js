@@ -49,10 +49,11 @@ if (root && canvas) {
     };
 
     const palette = {
-      stone: { base: "#293958", dark: "#121b2e", glow: "#7898d1", accent: "#a7c7ff" },
-      crystal: { base: "#25677d", dark: "#0d344f", glow: "#65edec", accent: "#c2ffff" },
+      stone: { base: "#596671", dark: "#202832", glow: "#7da4b4", accent: "#d1e6ea" },
+      crystal: { base: "#737a7e", dark: "#292e35", glow: "#bd3d3f", accent: "#f2ad9f" },
       gold: { base: "#695226", dark: "#261a0b", glow: "#f6d267", accent: "#fff1a3" },
       obsidian: { base: "#211d42", dark: "#0a0a1d", glow: "#9d79ff", accent: "#dfceff" },
+      path: { base: "#4f5a61", dark: "#1e252c", glow: "#8e3f3f", accent: "#d8d2c7" },
     };
 
     function makePixelTexture(className) {
@@ -106,8 +107,8 @@ if (root && canvas) {
     const moonLight = new THREE.DirectionalLight(0xbad9ff, 2.6);
     moonLight.position.set(-4, 8, 5);
     scene.add(moonLight);
-    const blockLight = new THREE.PointLight(0x6bf0ec, 1.5, 5, 2);
-    blockLight.position.set(0, 1.25, 0.5);
+    const blockLight = new THREE.PointLight(0xbd3d3f, 1.7, 5, 2);
+    blockLight.position.set(0, 1.25, -1.0);
     scene.add(blockLight);
 
     const stars = [];
@@ -164,6 +165,53 @@ if (root && canvas) {
       scene.add(rock);
     }
 
+    const pathGroup = new THREE.Group();
+    scene.add(pathGroup);
+    const pathMaterials = [
+      makeMaterial("path"),
+      new THREE.MeshStandardMaterial({ color: 0x657078, roughness: 0.92 }),
+      new THREE.MeshStandardMaterial({ color: 0x37434c, roughness: 0.95 }),
+    ];
+    for (let index = 0; index < 16; index += 1) {
+      const tile = new THREE.Mesh(
+        new THREE.BoxGeometry(0.82 + (index % 3) * 0.1, 0.12, 0.55 + (index % 4) * 0.07),
+        pathMaterials[index % pathMaterials.length],
+      );
+      tile.position.set(
+        Math.sin(index * 1.7) * 0.1,
+        0.11 + (index % 2) * 0.015,
+        1.28 - index * 0.48,
+      );
+      tile.rotation.y = Math.sin(index * 3.2) * 0.08;
+      pathGroup.add(tile);
+    }
+
+    const cloudMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9ea9b6,
+      emissive: 0x1a2237,
+      emissiveIntensity: 0.22,
+      roughness: 1,
+    });
+    const cloudPositions = [
+      [-2.8, 3.3, -3.8, 1.25],
+      [2.2, 3.55, -3.0, 1.05],
+      [-0.4, 4.05, -5.0, 0.92],
+    ];
+    cloudPositions.forEach(([x, y, z, scale], cloudIndex) => {
+      const cloud = new THREE.Group();
+      cloud.position.set(x, y, z);
+      for (let index = 0; index < 4; index += 1) {
+        const puff = new THREE.Mesh(
+          new THREE.BoxGeometry((0.75 + (index % 2) * 0.35) * scale, 0.12, 0.4 * scale),
+          cloudMaterial,
+        );
+        puff.position.set((index - 1.5) * 0.38 * scale, (index % 2) * 0.07, (index % 3) * 0.08);
+        cloud.add(puff);
+      }
+      cloud.rotation.y = cloudIndex * 0.3;
+      scene.add(cloud);
+    });
+
     const waterGeometry = new THREE.PlaneGeometry(13, 13, 64, 64);
     const waterMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -219,7 +267,7 @@ if (root && canvas) {
     scene.add(waterReflection);
 
     const blockGroup = new THREE.Group();
-    blockGroup.position.set(0, 1.2, -0.05);
+    blockGroup.position.set(0, 1.06, -1.65);
     blockGroup.rotation.y = -0.12;
     scene.add(blockGroup);
     const block = new THREE.Mesh(new THREE.BoxGeometry(1.72, 1.72, 1.72), makeMaterial("stone"));
@@ -251,6 +299,65 @@ if (root && canvas) {
     ]);
     blockGroup.add(new THREE.Line(crackGeometry, crackMaterial));
 
+    const labelCanvas = document.createElement("canvas");
+    labelCanvas.width = 256;
+    labelCanvas.height = 76;
+    const labelContext = labelCanvas.getContext("2d");
+    labelContext.fillStyle = "rgba(14, 16, 17, 0.88)";
+    labelContext.fillRect(10, 8, 236, 60);
+    labelContext.strokeStyle = "#e7d52d";
+    labelContext.lineWidth = 4;
+    labelContext.strokeRect(10, 8, 236, 60);
+    labelContext.fillStyle = "#f4ec45";
+    labelContext.font = "700 34px sans-serif";
+    labelContext.textAlign = "center";
+    labelContext.textBaseline = "middle";
+    labelContext.fillText("★ 876", 128, 39);
+    const labelTexture = new THREE.CanvasTexture(labelCanvas);
+    labelTexture.colorSpace = THREE.SRGBColorSpace;
+    const blockLabel = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: labelTexture, transparent: true, depthTest: false }),
+    );
+    blockLabel.position.set(0, -0.1, 0.9);
+    blockLabel.scale.set(0.9, 0.27, 1);
+    blockGroup.add(blockLabel);
+
+    const miner = new THREE.Group();
+    miner.position.set(-1.72, 0.1, 0.72);
+    const minerBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.56, 0.32),
+      new THREE.MeshStandardMaterial({ color: 0xa77a47, roughness: 0.85 }),
+    );
+    minerBody.position.y = 0.45;
+    miner.add(minerBody);
+    const minerHead = new THREE.Mesh(
+      new THREE.BoxGeometry(0.38, 0.38, 0.36),
+      new THREE.MeshStandardMaterial({ color: 0xe3a676, roughness: 0.8 }),
+    );
+    minerHead.position.y = 0.94;
+    miner.add(minerHead);
+    const minerHair = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 0.12, 0.38),
+      new THREE.MeshStandardMaterial({ color: 0x4c2c20, roughness: 1 }),
+    );
+    minerHair.position.y = 1.17;
+    miner.add(minerHair);
+    const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xf7dc45 });
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.025), eyeMaterial);
+      eye.position.set(side * 0.095, 0.96, 0.185);
+      miner.add(eye);
+    }
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.3, 0.18),
+        new THREE.MeshStandardMaterial({ color: 0x8d6b3d, roughness: 1 }),
+      );
+      leg.position.set(side * 0.12, 0.03, 0);
+      miner.add(leg);
+    }
+    scene.add(miner);
+
     for (let index = 0; index < 30; index += 1) {
       const piece = new THREE.Mesh(particleGeometry, particleMaterial.clone());
       piece.visible = false;
@@ -260,8 +367,8 @@ if (root && canvas) {
     }
 
     const pickaxe = new THREE.Group();
-    pickaxe.position.set(0.78, -0.78, -1.48);
-    pickaxe.rotation.set(-0.37, 0.08, -0.24);
+    pickaxe.position.set(0.96, -0.73, -1.28);
+    pickaxe.rotation.set(-0.32, -0.08, -0.58);
     camera.add(pickaxe);
     scene.add(camera);
     const woodMaterial = new THREE.MeshStandardMaterial({
@@ -276,23 +383,23 @@ if (root && canvas) {
       metalness: 0.8,
       roughness: 0.26,
     });
-    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.13, 2.45, 10), woodMaterial);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.11, 2.15, 10), woodMaterial);
     handle.rotation.z = -0.19;
-    handle.position.set(0.12, -0.35, 0);
+    handle.position.set(0.1, -0.27, 0);
     pickaxe.add(handle);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.18, 0.22), steelMaterial);
-    head.rotation.z = 0.13;
-    head.position.set(-0.12, 0.72, 0);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.15, 0.18), steelMaterial);
+    head.rotation.z = 0.17;
+    head.position.set(-0.08, 0.64, 0);
     pickaxe.add(head);
     for (const side of [-1, 1]) {
-      const point = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.5, 8), steelMaterial);
+      const point = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.34, 8), steelMaterial);
       point.rotation.z = side * Math.PI / 2;
-      point.position.set(side * 0.98, 0.72, 0);
+      point.position.set(side * 0.66, 0.64, 0);
       pickaxe.add(point);
     }
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.28, 10), steelMaterial);
     grip.rotation.z = -0.19;
-    grip.position.set(0.28, -1.42, 0);
+    grip.position.set(0.25, -1.25, 0);
     pickaxe.add(grip);
     const pickaxeBase = {
       position: pickaxe.position.clone(),
@@ -384,22 +491,22 @@ if (root && canvas) {
       pointer.x += (pointer.targetX - pointer.x) * Math.min(1, delta * 5);
       pointer.y += (pointer.targetY - pointer.y) * Math.min(1, delta * 5);
 
-      const radius = 6.35;
+      const radius = 5.6;
       const cameraX = Math.sin(orbitAngle) * 0.58 + pointer.x * 0.6;
       const cameraZ = Math.cos(orbitAngle) * 0.16 + radius;
       const shake = state.cameraShake;
       state.cameraShake = Math.max(0, state.cameraShake - delta * 1.65);
       camera.position.set(
         cameraX + Math.sin(elapsed * 48) * shake * 0.05,
-        2.25 + pointer.y * 0.24 + Math.cos(elapsed * 44) * shake * 0.035,
+        2.02 + pointer.y * 0.24 + Math.cos(elapsed * 44) * shake * 0.035,
         cameraZ,
       );
-      cameraTarget.set(pointer.x * 0.12, 1.02 + pointer.y * 0.06, 0);
+      cameraTarget.set(pointer.x * 0.12, 0.88 + pointer.y * 0.06, -0.45);
       cameraLookAt.lerp(cameraTarget, Math.min(1, delta * 5));
       camera.lookAt(cameraLookAt);
 
       blockGroup.rotation.y = -0.12 + Math.sin(elapsed * 0.24) * 0.08;
-      blockGroup.position.y = 1.2 + Math.sin(elapsed * 1.2) * 0.045;
+      blockGroup.position.y = 1.06 + Math.sin(elapsed * 1.2) * 0.045;
       block.rotation.x = Math.sin(elapsed * 0.33) * 0.025;
       moon.position.x = 2.65 + Math.sin(elapsed * 0.08) * 0.1;
 

@@ -1186,6 +1186,21 @@ function setView(viewName) {
   if (telegram?.HapticFeedback) telegram.HapticFeedback.selectionChanged();
 }
 
+function animateMiningHit() {
+  const miningBlock = $("#mining-block");
+  const miningSpark = $("#mining-hit-spark");
+  const miningPickaxe = $("#mining-pickaxe");
+  miningBlock?.classList.remove("hit", "broken");
+  miningPickaxe?.classList.remove("swing");
+  miningSpark?.classList.remove("show");
+  void miningBlock?.offsetWidth;
+  void miningPickaxe?.offsetWidth;
+  miningBlock?.classList.add("hit");
+  miningPickaxe?.classList.add("swing");
+  miningSpark?.classList.add("show");
+  window.setTimeout(() => miningSpark?.classList.remove("show"), 420);
+}
+
 async function runAction(action, body = {}, options = {}) {
   if (busyActions.has(action) || !appState.data) return;
   const buttons = document.querySelectorAll(`[data-action="${action}"]`);
@@ -1249,22 +1264,6 @@ async function runAction(action, body = {}, options = {}) {
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
     } else if (actionResult?.type === "mine_block") {
-      const miningBlock = $("#mining-block");
-      const miningSpark = $("#mining-hit-spark");
-      const miningPickaxe = $("#mining-pickaxe");
-      miningBlock?.classList.remove("hit", "broken");
-      miningPickaxe?.classList.remove("swing");
-      miningSpark?.classList.remove("show");
-      void miningBlock?.offsetWidth;
-      void miningPickaxe?.offsetWidth;
-      if (actionResult.broken) {
-        miningBlock?.classList.add("broken");
-      } else {
-        miningBlock?.classList.add("hit");
-      }
-      miningPickaxe?.classList.add("swing");
-      miningSpark?.classList.add("show");
-      window.setTimeout(() => miningSpark?.classList.remove("show"), 520);
       const resultElement = $("#mining-result");
       if (resultElement) {
         resultElement.classList.toggle("reward", actionResult.reward > 0);
@@ -1524,6 +1523,13 @@ $("#roulette-spin").addEventListener("click", () => {
 $("#mining-hit").addEventListener("click", () => {
   if (busyActions.has("mine_block") || Number(appState.data?.wallet?.zenoBalance || 0) < MINE_HIT_COST) {
     return;
+  }
+  animateMiningHit();
+  const resultElement = $("#mining-result");
+  if (resultElement) {
+    resultElement.classList.remove("reward", "empty");
+    resultElement.innerHTML =
+      '<span class="mining-result-dot"></span><span>Удар...</span>';
   }
   runAction("mine_block");
 });

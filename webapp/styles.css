@@ -2483,6 +2483,36 @@ body::before {
   isolation: isolate;
 }
 
+.mining-canvas {
+  background: #080d1c;
+  display: block;
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  touch-action: none;
+  width: 100%;
+  z-index: 1;
+}
+
+.mining-scene.three-ready::after {
+  display: none;
+}
+
+.mining-scene.three-ready > .mining-reference-frame,
+.mining-scene.three-ready > .mining-hit-overlay,
+.mining-scene.three-ready > .mining-sky-glow,
+.mining-scene.three-ready > .mining-particles,
+.mining-scene.three-ready > .mining-moon,
+.mining-scene.three-ready > .mining-water,
+.mining-scene.three-ready > .mining-terrain,
+.mining-scene.three-ready > .mining-block-shadow,
+.mining-scene.three-ready > .mining-block-wrap,
+.mining-scene.three-ready > .mining-pickaxe,
+.mining-scene.three-ready > .mining-block-price,
+.mining-scene.three-ready > .mining-hit-spark {
+  display: none;
+}
+
 .mining-scene::after {
   background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.06) 49%, transparent 55%);
   content: "";

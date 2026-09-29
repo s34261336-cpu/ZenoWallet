@@ -533,6 +533,11 @@
 
           <section class="mining-game" aria-label="Игра Шахта">
             <div class="mining-scene">
+              <canvas
+                id="mining-canvas"
+                class="mining-canvas"
+                aria-label="Интерактивная 3D-сцена шахты"
+              ></canvas>
               <div
                 class="mining-reference-frame"
                 aria-hidden="true"
@@ -720,5 +725,13 @@
     </div>
 
     <script src="./app.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" src="./mining-3d.js"></script>
   </body>
 </html>

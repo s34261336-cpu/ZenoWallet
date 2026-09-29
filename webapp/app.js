@@ -902,6 +902,12 @@ function renderMining(data) {
   $("#mining-progress-fill").style.width = `${progress}%`;
   block?.classList.remove("stone", "crystal", "gold", "obsidian");
   block?.classList.add(active.className || "stone");
+  window.miningScene3D?.setState({
+    className: active.className || "stone",
+    hits,
+    hitsRequired,
+    broken: false,
+  });
   if (hitButton) {
     hitButton.disabled = !mining.available || busy || !affordable;
     hitButton.classList.toggle("working", busy);
@@ -1178,6 +1184,7 @@ function setView(viewName) {
   );
   document.body.classList.add(`screen-${normalizedView}`);
   document.body.classList.toggle("nested-screen", !MAIN_VIEWS.has(normalizedView));
+  window.miningScene3D?.setVisible(normalizedView === "mining");
   const navView = MAIN_VIEWS.has(normalizedView) ? normalizedView : null;
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === navView);
@@ -1199,6 +1206,7 @@ function animateMiningHit() {
   void miningPickaxe?.offsetWidth;
   void hitOverlay?.offsetWidth;
   hitOverlay?.classList.add("show");
+  window.miningScene3D?.hit();
 }
 
 async function runAction(action, body = {}, options = {}) {
@@ -1264,6 +1272,7 @@ async function runAction(action, body = {}, options = {}) {
     } else if (actionResult?.type === "withdraw") {
       showToast(`${formatNumber(actionResult.amount)} монет переведено`);
     } else if (actionResult?.type === "mine_block") {
+      window.miningScene3D?.resolveHit(actionResult);
       const resultElement = $("#mining-result");
       if (resultElement) {
         resultElement.classList.toggle("reward", actionResult.reward > 0);

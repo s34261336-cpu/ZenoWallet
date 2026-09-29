@@ -2368,13 +2368,25 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     if isinstance(raw_bet, bool) or not isinstance(raw_bet, int):
                         raise ValueError("Ставка должна быть целым числом")
                     started = self.supabase.start_mines_game(user_id, raw_bet)
-                    result = web_app_state(self.bot, user)
+                    result = {
+                        "ok": True,
+                        "serverNow": datetime.now(timezone.utc).isoformat(),
+                        "wallet": {
+                            "earnBalance": int(started.get("balance") or 0),
+                            "zenoBalance": int(started.get("zenoBalance") or 0),
+                        },
+                    }
                     result["lastAction"] = {
                         "type": "mines_start",
                         "gameId": int(started["gameId"]),
                         "bet": int(started["bet"]),
                         "freeGame": bool(started.get("freeGame")),
                         "ztCost": int(started.get("ztCost") or 0),
+                        "balance": int(started.get("balance") or 0),
+                        "freeGamesRemaining": int(
+                            started.get("freeGamesRemaining") or 0
+                        ),
+                        "nextZtCost": int(started.get("nextZtCost") or 5),
                         "active": {
                             "id": int(started["gameId"]),
                             "bet": int(started["bet"]),
@@ -2415,13 +2427,10 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     # or daily counters. Avoid rebuilding the whole mini-app
                     # state on every click; the client merges this tiny response
                     # into its current authoritative round.
-                    if revealed.get("mine"):
-                        result = web_app_state(self.bot, user)
-                    else:
-                        result = {
-                            "ok": True,
-                            "serverNow": datetime.now(timezone.utc).isoformat(),
-                        }
+                    result = {
+                        "ok": True,
+                        "serverNow": datetime.now(timezone.utc).isoformat(),
+                    }
                     result["lastAction"] = last_action
                     self.send_json(result)
                     return
@@ -2431,7 +2440,13 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     if isinstance(game_id, bool) or not isinstance(game_id, int):
                         raise ValueError("Некорректная игра")
                     cashed_out = self.supabase.cashout_mines_game(user_id, game_id)
-                    result = web_app_state(self.bot, user)
+                    result = {
+                        "ok": True,
+                        "serverNow": datetime.now(timezone.utc).isoformat(),
+                        "wallet": {
+                            "earnBalance": int(cashed_out.get("balance") or 0),
+                        },
+                    }
                     result["lastAction"] = {
                         "type": "mines_cashout",
                         "gameId": game_id,
@@ -2440,6 +2455,7 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                         "multiplier": float(cashed_out.get("multiplier") or 1),
                         "payout": int(cashed_out.get("payout") or 0),
                         "bet": int(cashed_out.get("bet") or 0),
+                        "balance": int(cashed_out.get("balance") or 0),
                     }
                     self.send_json(result)
                     return

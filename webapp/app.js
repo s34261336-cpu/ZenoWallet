@@ -73,6 +73,7 @@ const minesRuntime = {
   markupReady: false,
   pendingCell: null,
   pendingGameId: null,
+  pendingAction: null,
 };
 
 if (telegram) {
@@ -940,9 +941,13 @@ function renderMining(data) {
   const lastAction = data.lastAction?.type?.startsWith("mines_") ? data.lastAction : null;
   const balance = Number(data.wallet?.earnBalance || 0);
   const selectedBet = active ? Number(active.bet) : Number(minesRuntime.selectedBet);
-  const busyStart = busyActions.has("mines_start");
+  const busyStart =
+    busyActions.has("mines_start") ||
+    minesRuntime.pendingAction === "mines_start";
   const busyReveal = busyActions.has("mines_reveal");
-  const busyCashout = busyActions.has("mines_cashout");
+  const busyCashout =
+    busyActions.has("mines_cashout") ||
+    minesRuntime.pendingAction === "mines_cashout";
   const opened = new Set((active?.openedCells || []).map(Number));
   const pendingCell =
     minesRuntime.pendingGameId === active?.id ? minesRuntime.pendingCell : null;
@@ -991,11 +996,18 @@ function renderMining(data) {
   startButton.disabled = !canStart;
   startButton.innerHTML = mines.available === false
     ? "Игра не настроена"
-    : balance < selectedBet ? `Нужно ещё ${formatNumber(selectedBet - balance)} монет` : "Начать игру <span>↗</span>";
+    : minesRuntime.pendingAction === "mines_start"
+      ? "Запускаем…"
+      : balance < selectedBet
+        ? `Нужно ещё ${formatNumber(selectedBet - balance)} монет`
+        : "Начать игру <span>↗</span>";
   cashoutButton.disabled = !active || active.cellsOpened < 1 || busyCashout || busyReveal;
-  $("#mines-cashout-value").textContent = active
+  const cashoutValue = active
     ? `${formatNumber(Math.floor(active.bet * active.multiplier))} монет`
     : "0 монет";
+  cashoutButton.innerHTML = minesRuntime.pendingAction === "mines_cashout"
+    ? "Забираем…"
+    : `Забрать <strong id="mines-cashout-value">${cashoutValue}</strong>`;
   $("#mines-hint").textContent = mines.available === false
     ? "Администратору нужно выполнить обновлённый supabase/schema.sql в Supabase."
     : active
@@ -1325,27 +1337,97 @@ async function runAction(action, body = {}, options = {}) {
         },
       };
     } else if (
+      action === "mines_start" &&
+      actionResult?.type === "mines_start"
+    ) {
+      appState.data = {
+        ...appState.data,
+        lastAction: actionResult,
+        wallet: {
+          ...appState.data.wallet,
+          earnBalance: Number(
+            result.wallet?.earnBalance ?? actionResult.balance ?? appState.data.wallet.earnBalance,
+          ),
+          zenoBalance: Number(
+            result.wallet?.zenoBalance ?? appState.data.wallet.zenoBalance,
+          ),
+        },
+        mines: {
+          ...appState.data.mines,
+          active: actionResult.active,
+          freeGamesRemaining: Number(
+            actionResult.freeGamesRemaining ?? appState.data.mines.freeGamesRemaining,
+          ),
+          nextZtCost: Number(
+            actionResult.nextZtCost ?? appState.data.mines.nextZtCost,
+          ),
+        },
+      };
+    } else if (
       action === "mines_reveal" &&
       actionResult?.type === "mines_reveal" &&
-      !actionResult.mine &&
       appState.data.mines?.active
     ) {
       const currentMines = appState.data.mines;
       const currentActive = currentMines.active;
+      const historyItem = {
+        id: Number(actionResult.gameId),
+        bet: Number(currentActive.bet),
+        cellsOpened: Number(actionResult.cellsOpened),
+        multiplier: Number(actionResult.multiplier),
+        result: actionResult.mine ? "lost" : "active",
+        payout: 0,
+        createdAt: new Date().toISOString(),
+      };
       appState.data = {
         ...appState.data,
         lastAction: actionResult,
         mines: {
           ...currentMines,
-          active: {
-            ...currentActive,
-            cellsOpened: Number(actionResult.cellsOpened),
-            multiplier: Number(actionResult.multiplier),
-            openedCells: [
-              ...(currentActive.openedCells || []),
-              Number(actionResult.cell),
-            ],
-          },
+          active: actionResult.mine
+            ? null
+            : {
+                ...currentActive,
+                cellsOpened: Number(actionResult.cellsOpened),
+                multiplier: Number(actionResult.multiplier),
+                openedCells: [
+                  ...(currentActive.openedCells || []),
+                  Number(actionResult.cell),
+                ],
+              },
+          history: actionResult.mine
+            ? [historyItem, ...(currentMines.history || [])].slice(0, 10)
+            : currentMines.history,
+        },
+      };
+    } else if (
+      action === "mines_cashout" &&
+      actionResult?.type === "mines_cashout"
+    ) {
+      const currentMines = appState.data.mines;
+      const currentActive = currentMines?.active;
+      const historyItem = {
+        id: Number(actionResult.gameId),
+        bet: Number(actionResult.bet || currentActive?.bet || 0),
+        cellsOpened: Number(actionResult.cellsOpened || currentActive?.cellsOpened || 0),
+        multiplier: Number(actionResult.multiplier || currentActive?.multiplier || 1),
+        result: "won",
+        payout: Number(actionResult.payout || 0),
+        createdAt: new Date().toISOString(),
+      };
+      appState.data = {
+        ...appState.data,
+        lastAction: actionResult,
+        wallet: {
+          ...appState.data.wallet,
+          earnBalance: Number(
+            result.wallet?.earnBalance ?? actionResult.balance ?? appState.data.wallet.earnBalance,
+          ),
+        },
+        mines: {
+          ...currentMines,
+          active: null,
+          history: [historyItem, ...(currentMines.history || [])].slice(0, 10),
         },
       };
     } else {
@@ -1435,6 +1517,9 @@ async function runAction(action, body = {}, options = {}) {
     if (action === "mines_reveal") {
       minesRuntime.pendingCell = null;
       minesRuntime.pendingGameId = null;
+    }
+    if (action.startsWith("mines_")) {
+      minesRuntime.pendingAction = null;
     }
     buttons.forEach((button) => {
       button.classList.remove("working");
@@ -1659,6 +1744,10 @@ document.addEventListener("click", (event) => {
 
   if (event.target.closest("#mines-start")) {
     if (!appState.data?.mines?.active) {
+      minesRuntime.pendingAction = "mines_start";
+      const startButton = event.target.closest("#mines-start");
+      startButton.disabled = true;
+      startButton.textContent = "Запускаем…";
       runAction("mines_start", { bet: minesRuntime.selectedBet });
     }
     return;
@@ -1666,7 +1755,13 @@ document.addEventListener("click", (event) => {
 
   if (event.target.closest("#mines-cashout")) {
     const gameId = appState.data?.mines?.active?.id;
-    if (gameId) runAction("mines_cashout", { gameId: Number(gameId) });
+    if (gameId) {
+      minesRuntime.pendingAction = "mines_cashout";
+      const cashoutButton = event.target.closest("#mines-cashout");
+      cashoutButton.disabled = true;
+      cashoutButton.textContent = "Забираем…";
+      runAction("mines_cashout", { gameId: Number(gameId) });
+    }
   }
 });
 

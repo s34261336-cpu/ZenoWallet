@@ -1578,12 +1578,6 @@ function closeCrashBetSheet() {
   document.body.classList.remove("crash-sheet-open");
 }
 
-document.querySelectorAll(".nav-item, [data-view]").forEach((button) => {
-  button.addEventListener("click", () => {
-    if (button.dataset.view) setView(button.dataset.view);
-  });
-});
-
 document.querySelectorAll(".nav-item[data-action]").forEach((button) => {
   button.addEventListener("click", () => {
     setView("home");
@@ -1714,6 +1708,12 @@ $("#roulette-spin").addEventListener("click", () => {
 });
 
 document.addEventListener("click", (event) => {
+  const viewButton = event.target.closest(".nav-item, [data-view]");
+  if (viewButton?.dataset.view) {
+    setView(viewButton.dataset.view);
+    return;
+  }
+
   const betButton = event.target.closest("[data-mines-bet]");
   if (betButton) {
     minesRuntime.selectedBet = Number(betButton.dataset.minesBet);

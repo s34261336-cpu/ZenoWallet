@@ -1248,12 +1248,12 @@ function render() {
   if (homeRouletteAttempts) {
     homeRouletteAttempts.textContent = `${Number(
       rouletteData.freeSpinsRemaining || 0,
-    )} спина сегодня`;
+    )}/${Number(rouletteData.freeSpinsPerDay || 0)} спинов`;
   }
   if (homeMinesAttempts) {
     homeMinesAttempts.textContent = `${Number(
       minesData.freeGamesRemaining || 0,
-    )} игр сегодня`;
+    )} игр`;
   }
   const caseButton = document.querySelector('[data-action="case"]');
   caseButton.disabled = !busyActions.has("case") && Number(caseData.remaining) <= 0;

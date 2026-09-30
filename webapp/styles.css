@@ -6116,6 +6116,10 @@ body::before {
   transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
+.home-game-preview-card > * {
+  min-width: 0;
+}
+
 .home-game-preview-card::after {
   background: linear-gradient(115deg, rgba(255, 255, 255, 0.17), transparent 28%);
   content: "";
@@ -6273,8 +6277,81 @@ body::before {
 .game-preview-copy {
   align-self: center;
   min-width: 0;
+  overflow: hidden;
   position: relative;
   z-index: 1;
+}
+
+.game-attempts {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-attempts > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-preview-copy strong,
+.game-preview-copy small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-preview-copy strong {
+  white-space: nowrap;
+}
+
+.game-preview-copy small {
+  overflow-wrap: anywhere;
+}
+
+.home-game-preview-card .arrow {
+  flex-shrink: 0;
+}
+
+/* Keep the copy readable when Telegram gives the mini-app a narrow viewport. */
+@media (max-width: 520px) {
+  .home-game-preview-card {
+    grid-template-columns: 56px minmax(0, 1fr) 28px;
+  }
+
+  .game-attempts {
+    font-size: 7px;
+    gap: 4px;
+    letter-spacing: 0;
+  }
+
+  .game-preview-copy strong {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .home-game-preview-card {
+    gap: 6px;
+    grid-template-columns: 48px minmax(0, 1fr) 26px;
+    padding: 8px;
+  }
+
+  .game-preview-copy strong {
+    font-size: 13px;
+  }
+
+  .game-preview-copy small {
+    font-size: 8px;
+  }
+}
+
+/* Keep the original alignment rules below from widening the text column. */
+.game-preview-copy {
+  align-self: center;
+  min-width: 0;
 }
 
 .game-preview-copy strong {
@@ -6388,5 +6465,65 @@ body::before {
 
   .game-preview-copy small {
     font-size: 9px;
+  }
+}
+
+/* Final narrow-card guardrails: keep every game label inside its grid cell. */
+.home-game-preview-card > *,
+.game-preview-copy,
+.game-attempts,
+.game-attempts > span {
+  min-width: 0;
+}
+
+.game-preview-copy {
+  overflow: hidden;
+}
+
+.game-attempts {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-attempts > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-preview-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-preview-copy small {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.home-game-preview-card .arrow {
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .home-game-preview-card {
+    grid-template-columns: 56px minmax(0, 1fr) 28px;
+  }
+
+  .game-attempts {
+    font-size: 7px;
+    gap: 4px;
+    letter-spacing: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .home-game-preview-card {
+    gap: 6px;
+    grid-template-columns: 48px minmax(0, 1fr) 26px;
+    padding: 8px;
   }
 }

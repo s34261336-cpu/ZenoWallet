@@ -158,18 +158,19 @@
           <section class="home-game-preview" aria-label="Превью игр">
             <button class="home-game-preview-card home-game-preview-crash" data-view="rocket" type="button">
               <span class="game-preview-art game-preview-art-crash" aria-hidden="true">
-                <svg class="preview-rocket-icon" viewBox="0 0 100 100" focusable="false">
-                  <defs>
-                    <linearGradient id="rocket-diamond-gradient" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0" stop-color="#ffffff" />
-                      <stop offset="1" stop-color="#77f3ff" />
-                    </linearGradient>
-                  </defs>
-                  <path class="rocket-diamond" d="M50 9 91 50 50 91 9 50Z" />
-                  <path class="rocket-arrow" d="M50 22 69 43H58v35H42V43H31Z" />
-                </svg>
-                <span class="preview-orbit"></span>
-                <span class="preview-chart"></span>
+                <span class="game-art-scene crash-art-scene">
+                  <strong class="crash-art-multiplier">1.68x</strong>
+                  <svg class="crash-art-trajectory" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <path d="M5 88 C25 88 53 72 94 16"></path>
+                  </svg>
+                  <span class="crash-art-coin"></span>
+                  <span class="crash-art-stars"><i></i><i></i><i></i><i></i></span>
+                  <span class="crash-art-pills">
+                    <i>2.33x</i><i>14.8x</i><i>17.8x</i><i>1.09x</i>
+                  </span>
+                  <span class="crash-art-label">РАКЕТКА</span>
+                  <span class="crash-art-count"><i></i>4</span>
+                </span>
               </span>
               <span class="game-preview-copy">
                 <span class="game-attempts"><i></i><span id="home-crash-attempts">LIVE · раунды</span></span>
@@ -180,14 +181,13 @@
             </button>
             <button class="home-game-preview-card home-game-preview-roulette" data-view="roulette" type="button">
               <span class="game-preview-art game-preview-art-roulette" aria-hidden="true">
-                <span class="preview-wheel-icon">
-                  <i class="wheel-slice wheel-slice-one"></i>
-                  <i class="wheel-slice wheel-slice-two"></i>
-                  <i class="wheel-slice wheel-slice-three"></i>
-                  <i class="wheel-slice wheel-slice-four"></i>
-                  <b></b>
+                <span class="game-art-scene roulette-art-scene">
+                  <strong class="roulette-art-multiplier">10x</strong>
+                  <span class="roulette-art-wheel"><i></i><i></i><i></i><i></i><b></b></span>
+                  <span class="roulette-art-ball"></span>
+                  <span class="roulette-art-pills"><i>2x</i><i>5x</i><i>10x</i></span>
+                  <span class="roulette-art-label">РУЛЕТКА</span>
                 </span>
-                <span class="preview-pulse"></span>
               </span>
               <span class="game-preview-copy">
                 <span class="game-attempts"><i></i><span id="home-roulette-attempts">—/— спинов</span></span>
@@ -198,13 +198,18 @@
             </button>
             <button class="home-game-preview-card home-game-preview-mining" data-view="mining" type="button">
               <span class="game-preview-art game-preview-art-mining" aria-hidden="true">
-                <svg class="preview-mines-icon" viewBox="0 0 100 150" focusable="false">
-                  <rect class="mine-bar mine-bar-green" x="22" y="8" width="22" height="58" rx="11" />
-                  <rect class="mine-bar mine-bar-cyan" x="56" y="8" width="22" height="58" rx="11" />
-                  <rect class="mine-bar mine-bar-cyan" x="22" y="84" width="22" height="58" rx="11" />
-                  <rect class="mine-bar mine-bar-green" x="56" y="84" width="22" height="58" rx="11" />
-                  <circle class="mine-dot" cx="50" cy="75" r="6" />
-                </svg>
+                <span class="game-art-scene mines-art-scene">
+                  <strong class="mines-art-progress">3/5</strong>
+                  <span class="mines-art-grid">
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                  </span>
+                  <span class="mines-art-label">МИНЫ</span>
+                  <span class="mines-art-safe"></span>
+                </span>
               </span>
               <span class="game-preview-copy">
                 <span class="game-attempts"><i></i><span id="home-mines-attempts">— игр</span></span>
@@ -305,18 +310,19 @@
           <div class="games-preview-grid">
             <button class="game-launch-card game-launch-crash" data-view="rocket" type="button">
               <span class="game-launch-art game-preview-art game-preview-art-crash" aria-hidden="true">
-                <svg class="preview-rocket-icon" viewBox="0 0 100 100" focusable="false">
-                  <defs>
-                    <linearGradient id="rocket-diamond-gradient" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0" stop-color="#ffffff" />
-                      <stop offset="1" stop-color="#77f3ff" />
-                    </linearGradient>
-                  </defs>
-                  <path class="rocket-diamond games-rocket-diamond" d="M50 9 91 50 50 91 9 50Z" />
-                  <path class="rocket-arrow" d="M50 22 69 43H58v35H42V43H31Z" />
-                </svg>
-                <span class="preview-orbit"></span>
-                <span class="preview-chart"></span>
+                <span class="game-art-scene crash-art-scene">
+                  <strong class="crash-art-multiplier">1.68x</strong>
+                  <svg class="crash-art-trajectory" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <path d="M5 88 C25 88 53 72 94 16"></path>
+                  </svg>
+                  <span class="crash-art-coin"></span>
+                  <span class="crash-art-stars"><i></i><i></i><i></i><i></i></span>
+                  <span class="crash-art-pills">
+                    <i>2.33x</i><i>14.8x</i><i>17.8x</i><i>1.09x</i>
+                  </span>
+                  <span class="crash-art-label">РАКЕТКА</span>
+                  <span class="crash-art-count"><i></i>4</span>
+                </span>
               </span>
               <span class="game-launch-copy">
                 <span class="game-launch-status">LIVE · раунды</span>
@@ -328,14 +334,13 @@
 
             <button class="game-launch-card game-launch-roulette" data-view="roulette" type="button">
               <span class="game-launch-art game-preview-art game-preview-art-roulette" aria-hidden="true">
-                <span class="preview-wheel-icon">
-                  <i class="wheel-slice wheel-slice-one"></i>
-                  <i class="wheel-slice wheel-slice-two"></i>
-                  <i class="wheel-slice wheel-slice-three"></i>
-                  <i class="wheel-slice wheel-slice-four"></i>
-                  <b></b>
+                <span class="game-art-scene roulette-art-scene">
+                  <strong class="roulette-art-multiplier">10x</strong>
+                  <span class="roulette-art-wheel"><i></i><i></i><i></i><i></i><b></b></span>
+                  <span class="roulette-art-ball"></span>
+                  <span class="roulette-art-pills"><i>2x</i><i>5x</i><i>10x</i></span>
+                  <span class="roulette-art-label">РУЛЕТКА</span>
                 </span>
-                <span class="preview-pulse"></span>
               </span>
               <span class="game-launch-copy">
                 <span class="game-launch-status">3 спина сегодня</span>
@@ -347,13 +352,18 @@
 
             <button class="game-launch-card game-launch-mining" data-view="mining" type="button">
               <span class="game-launch-art game-preview-art game-preview-art-mining" aria-hidden="true">
-                <svg class="preview-mines-icon" viewBox="0 0 100 150" focusable="false">
-                  <rect class="mine-bar mine-bar-green" x="22" y="8" width="22" height="58" rx="11" />
-                  <rect class="mine-bar mine-bar-cyan" x="56" y="8" width="22" height="58" rx="11" />
-                  <rect class="mine-bar mine-bar-cyan" x="22" y="84" width="22" height="58" rx="11" />
-                  <rect class="mine-bar mine-bar-green" x="56" y="84" width="22" height="58" rx="11" />
-                  <circle class="mine-dot" cx="50" cy="75" r="6" />
-                </svg>
+                <span class="game-art-scene mines-art-scene">
+                  <strong class="mines-art-progress">3/5</strong>
+                  <span class="mines-art-grid">
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                    <i></i><i></i><i></i><i></i><i></i>
+                  </span>
+                  <span class="mines-art-label">МИНЫ</span>
+                  <span class="mines-art-safe"></span>
+                </span>
               </span>
               <span class="game-launch-copy">
                 <span class="game-launch-status">5 игр сегодня</span>

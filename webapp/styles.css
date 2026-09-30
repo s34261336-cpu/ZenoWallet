@@ -6216,18 +6216,29 @@ body::before {
 }
 
 .preview-wheel {
-  align-items: center;
   animation: preview-spin 9s linear infinite;
   background: conic-gradient(#ff63d8 0 12%, #ffd1f3 12% 19%, #8c58ff 19% 33%, #20134a 33% 46%, #ff63d8 46% 59%, #25114f 59% 76%, #8c58ff 76% 88%, #ffd1f3 88%);
   border: 5px solid rgba(255, 255, 255, 0.72);
   border-radius: 50%;
   box-shadow: 0 0 22px rgba(255, 99, 216, 0.6);
-  color: #fff;
-  display: flex;
-  font-size: 19px;
+  display: block;
   height: 65px;
-  justify-content: center;
+  position: relative;
   width: 65px;
+}
+
+.preview-wheel::after {
+  background: #f8eaff;
+  border: 3px solid rgba(34, 18, 63, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  content: "";
+  height: 14px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
 }
 
 .preview-pulse {
@@ -6530,24 +6541,45 @@ body::before {
 
 /* Animated game icons */
 .preview-rocket {
-  align-items: center;
   animation: preview-rocket-flight 2.8s ease-in-out infinite;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(100, 245, 255, 0.72));
   border: 1px solid rgba(255, 255, 255, 0.82);
-  border-radius: 16px;
+  border-radius: 12px 12px 12px 4px;
   box-shadow:
     0 0 18px rgba(100, 245, 255, 0.92),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  display: flex;
-  font-size: 23px;
-  height: 45px;
-  justify-content: center;
-  padding: 0;
+  height: 40px;
   position: absolute;
-  right: 7px;
-  top: 12px;
-  transform: rotate(-18deg);
-  width: 45px;
+  right: 13px;
+  top: 20px;
+  transform: rotate(45deg);
+  width: 40px;
+  z-index: 1;
+}
+
+.preview-rocket::after {
+  background: #071326;
+  clip-path: polygon(50% 0, 100% 38%, 66% 38%, 66% 100%, 34% 100%, 34% 38%, 0 38%);
+  content: "";
+  height: 25px;
+  left: 7px;
+  position: absolute;
+  top: 7px;
+  transform: rotate(-45deg);
+  width: 25px;
+}
+
+.preview-rocket::before {
+  background: rgba(100, 245, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(100, 245, 255, 0.9);
+  content: "";
+  height: 5px;
+  left: 18px;
+  position: absolute;
+  top: 18px;
+  transform: rotate(-45deg);
+  width: 5px;
   z-index: 1;
 }
 
@@ -6557,15 +6589,17 @@ body::before {
 
 .preview-mine-icon {
   animation: preview-mine-pulse 2.2s ease-in-out infinite;
-  color: #e7ffc8;
-  font-size: 27px;
+  border: 2px solid rgba(225, 255, 176, 0.9);
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px rgba(184, 255, 120, 0.95),
+    inset 0 0 5px rgba(255, 255, 255, 0.55);
+  height: 12px;
   left: 50%;
   position: absolute;
-  text-shadow:
-    0 0 8px rgba(184, 255, 120, 0.95),
-    0 0 22px rgba(100, 245, 255, 0.58);
   top: 50%;
   transform: translate(-50%, -50%);
+  width: 12px;
   z-index: 1;
 }
 
@@ -6576,11 +6610,11 @@ body::before {
 @keyframes preview-rocket-flight {
   0%, 100% {
     margin-top: 3px;
-    transform: rotate(-18deg) translate3d(0, 0, 0);
+    transform: rotate(45deg) translate3d(0, 0, 0);
   }
   50% {
     margin-top: -5px;
-    transform: rotate(-12deg) translate3d(-3px, -3px, 0);
+    transform: rotate(45deg) translate3d(-3px, -3px, 0);
   }
 }
 

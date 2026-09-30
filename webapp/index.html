@@ -69,6 +69,38 @@
           </div>
         </section>
 
+        <section class="gift-path" aria-label="Путь подарков">
+          <div class="gift-path-heading">
+            <div>
+              <span class="eyebrow">СЕЗОННЫЕ НАГРАДЫ</span>
+              <h2>Путь подарков</h2>
+            </div>
+            <span class="gift-progress-label" id="gift-progress-label">0 / 300</span>
+          </div>
+          <div class="gift-progress-track" aria-hidden="true">
+            <div class="gift-progress-fill" id="gift-progress-fill"></div>
+            <span class="gift-progress-spark"></span>
+          </div>
+          <div class="gift-rewards" role="list" aria-label="Награды сезона">
+            <div class="gift-reward unlocked" data-gift-points="0" role="listitem">
+              <span class="gift-reward-icon">✦</span>
+              <span><b>СТАРТ</b><small>Открыто</small></span>
+            </div>
+            <div class="gift-reward" data-gift-points="75" role="listitem">
+              <span class="gift-reward-icon">Z</span>
+              <span><b>75 XP</b><small>Буст</small></span>
+            </div>
+            <div class="gift-reward" data-gift-points="150" role="listitem">
+              <span class="gift-reward-icon">◈</span>
+              <span><b>150 XP</b><small>Кейс</small></span>
+            </div>
+            <div class="gift-reward" data-gift-points="300" role="listitem">
+              <span class="gift-reward-icon">★</span>
+              <span><b>300 XP</b><small>Джекпот</small></span>
+            </div>
+          </div>
+        </section>
+
         <div class="toast" id="toast" role="status" aria-live="polite"></div>
         <div class="error-panel" id="error-panel"></div>
         <div class="loading-state" id="loading-state">
@@ -125,18 +157,39 @@
 
           <section class="home-game-preview" aria-label="Превью игр">
             <button class="home-game-preview-card home-game-preview-crash" data-view="rocket" type="button">
-              <span class="home-game-preview-icon">🚀</span>
-              <span>
+              <span class="game-preview-art game-preview-art-crash" aria-hidden="true">
+                <span class="preview-rocket">↗</span>
+                <span class="preview-orbit"></span>
+                <span class="preview-chart"></span>
+              </span>
+              <span class="game-preview-copy">
+                <span class="game-attempts"><i></i><span id="home-crash-attempts">LIVE · раунды</span></span>
                 <strong>Ракетка</strong>
                 <small>Забери вовремя</small>
               </span>
               <span class="arrow">↗</span>
             </button>
             <button class="home-game-preview-card home-game-preview-roulette" data-view="roulette" type="button">
-              <span class="home-game-preview-icon">◉</span>
-              <span>
+              <span class="game-preview-art game-preview-art-roulette" aria-hidden="true">
+                <span class="preview-wheel">◉</span>
+                <span class="preview-pulse"></span>
+              </span>
+              <span class="game-preview-copy">
+                <span class="game-attempts"><i></i><span id="home-roulette-attempts">— спина</span></span>
                 <strong>Рулетка</strong>
                 <small>До 50x за прокрут</small>
+              </span>
+              <span class="arrow">↗</span>
+            </button>
+            <button class="home-game-preview-card home-game-preview-mining" data-view="mining" type="button">
+              <span class="game-preview-art game-preview-art-mining" aria-hidden="true">
+                <span class="preview-mine-grid"><i></i><i></i><i></i><i></i></span>
+                <span class="preview-mine-glow"></span>
+              </span>
+              <span class="game-preview-copy">
+                <span class="game-attempts"><i></i><span id="home-mines-attempts">— игр</span></span>
+                <strong>Мины</strong>
+                <small>Открой безопасные клетки</small>
               </span>
               <span class="arrow">↗</span>
             </button>

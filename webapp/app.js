@@ -1217,6 +1217,44 @@ function render() {
   $("#screen-balance").textContent = `${formatNumber(wallet.earnBalance)} ZT`;
   $("#case-remaining").textContent = caseData.remaining;
   $("#case-limit").textContent = `${caseData.hourlyLimit} в час`;
+  const seasonPoints = Math.max(0, Number(season.points || 0));
+  const giftPathTarget = 300;
+  const giftPathProgress = Math.max(
+    0,
+    Math.min(100, (seasonPoints / giftPathTarget) * 100),
+  );
+  const giftProgressFill = $("#gift-progress-fill");
+  const giftProgressLabel = $("#gift-progress-label");
+  const giftProgressTrack = document.querySelector(".gift-progress-track");
+  if (giftProgressFill) giftProgressFill.style.width = `${giftPathProgress}%`;
+  if (giftProgressTrack) {
+    giftProgressTrack.style.setProperty("--gift-progress", `${giftPathProgress}%`);
+  }
+  if (giftProgressLabel) {
+    giftProgressLabel.textContent = `${formatNumber(
+      Math.min(seasonPoints, giftPathTarget),
+    )} / ${giftPathTarget}`;
+  }
+  document.querySelectorAll("[data-gift-points]").forEach((reward) => {
+    reward.classList.toggle(
+      "unlocked",
+      seasonPoints >= Number(reward.dataset.giftPoints || 0),
+    );
+  });
+  const rouletteData = data.roulette || {};
+  const minesData = data.mines || {};
+  const homeRouletteAttempts = $("#home-roulette-attempts");
+  const homeMinesAttempts = $("#home-mines-attempts");
+  if (homeRouletteAttempts) {
+    homeRouletteAttempts.textContent = `${Number(
+      rouletteData.freeSpinsRemaining || 0,
+    )} спина сегодня`;
+  }
+  if (homeMinesAttempts) {
+    homeMinesAttempts.textContent = `${Number(
+      minesData.freeGamesRemaining || 0,
+    )} игр сегодня`;
+  }
   const caseButton = document.querySelector('[data-action="case"]');
   caseButton.disabled = !busyActions.has("case") && Number(caseData.remaining) <= 0;
   caseButton.setAttribute("aria-busy", busyActions.has("case") ? "true" : "false");

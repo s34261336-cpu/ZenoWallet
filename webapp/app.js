@@ -1222,21 +1222,19 @@ function updateArenaCountdown() {
   if (!countdown) return;
 
   if (!round) {
-    countdown.textContent = "--:--";
+    countdown.textContent = "--";
     if (track) track.style.width = "0%";
     return;
   }
 
   if (round.status !== "open") {
-    countdown.textContent = "ИТОГ";
+    countdown.textContent = "0";
     if (track) track.style.width = "100%";
     return;
   }
 
   const seconds = getArenaSecondsRemaining(round);
-  countdown.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
-    seconds % 60,
-  ).padStart(2, "0")}`;
+  countdown.textContent = String(seconds);
 
   const startedAt = Date.parse(round.startedAt || "");
   const endsAt = Date.parse(round.endsAt || "");
@@ -1315,61 +1313,35 @@ function maybeAnimateArenaRound(round) {
   }, 2600);
 }
 
-function renderArenaRace(round, participants) {
+function renderArenaRace(round) {
   const stage = $("#arena-race-stage");
   const lanes = $("#arena-race-lanes");
   if (!stage || !lanes) return;
 
-  const winnerId = Number(round?.winner?.id || 0);
-  const visibleParticipants = [...participants]
-    .sort((left, right) => {
-      if (Number(right.id) === winnerId) return 1;
-      if (Number(left.id) === winnerId) return -1;
-      return Number(right.bet || 0) - Number(left.bet || 0);
-    })
-    .slice(0, 3);
+  const sections = [
+    { letter: "С", color: "coral" },
+    { letter: "М", color: "mint" },
+    { letter: "И", color: "blue" },
+  ];
 
   stage.classList.toggle("is-finished", round?.status === "finished");
   stage.classList.toggle("is-animating", arenaRuntime.raceAnimating);
   stage.dataset.state = round?.status || "waiting";
-  if (!visibleParticipants.length) {
-    lanes.innerHTML = '<div class="arena-race-empty">Состав раунда появится здесь</div>';
-    return;
-  }
-
-  lanes.innerHTML = visibleParticipants
-    .map((participant, index) => {
-      const isWinner = Number(participant.id) === winnerId || Boolean(participant.isWinner);
-      const name = participant.isBot
-        ? `Бот «${escapeHtml(participant.name || "Участник")}»`
-        : participant.isMe
-          ? `${escapeHtml(participant.name || "Игрок")} · ты`
-          : escapeHtml(participant.name || "Игрок");
-      return `
-        <div class="arena-race-lane ${isWinner ? "is-winner" : ""}" style="--lane-delay: ${index * 90}ms">
-          <div class="arena-race-lane-heading">
-            <span class="arena-race-avatar">${escapeHtml(
-              participant.avatar || getInitials(participant.name),
-            )}</span>
-            <span class="arena-race-lane-name">${name}</span>
-            <strong>${formatNumber(participant.bet || 0)} <small>ZT</small></strong>
-          </div>
-          <div class="arena-race-track">
-            <span class="arena-race-track-fill"></span>
-            <span class="arena-race-orb">${escapeHtml(
-              participant.avatar || getInitials(participant.name),
-            )}</span>
-          </div>
-          <small class="arena-race-lane-status">${
-            round?.status === "finished"
-              ? isWinner
-                ? "победитель"
-                : "раунд завершён"
-              : "ставка принята"
-          }</small>
-        </div>`;
-    })
+  stage.style.setProperty("--arena-orb-x", "50%");
+  lanes.innerHTML = sections
+    .map(
+      (section, index) => `
+        <div class="arena-race-lane arena-lane-${section.color}" data-lane="${section.letter}" aria-label="Секция ${section.letter}">
+          <span class="arena-lane-glow" aria-hidden="true"></span>
+          <span class="arena-lane-letter">${section.letter}</span>
+        </div>`,
+    )
     .join("");
+  const orb = document.createElement("span");
+  orb.className = "arena-race-orb";
+  orb.setAttribute("aria-hidden", "true");
+  stage.querySelector(".arena-race-orb")?.remove();
+  stage.append(orb);
 }
 
 function renderArena(data) {
@@ -1387,6 +1359,7 @@ function renderArena(data) {
   const secondsRemaining = open ? getArenaSecondsRemaining(round) : 0;
   const minBet = Math.max(1, Number(arena.minBet || 1));
   const maxBet = Math.max(minBet, Number(arena.maxBet || 10_000));
+  if (!input.value.trim()) input.value = String(minBet);
   const rawBet = input.value.trim();
   const parsedBet = rawBet === "" ? 0 : Number(rawBet);
   const validBet =
@@ -1404,17 +1377,55 @@ function renderArena(data) {
       : 0;
   const numberFormat = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
 
-  $("#arena-round-id").textContent = round?.id ? `Раунд #${formatNumber(round.id)}` : "Ожидаем раунд";
+  $("#arena-round-id").textContent = round?.id ? `Игра #${formatNumber(round.id)}` : "Игра ожидается";
   $("#arena-round-state").textContent = !available
     ? "Недоступна"
     : round?.status === "finished"
       ? "Завершён"
       : round?.status === "open"
-        ? "Приём ставок"
+        ? "Ставки открыты"
         : "Подготовка";
-  $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>ZT</small>`;
-  $("#arena-balance").textContent = `${formatNumber(walletBalance)} ZT`;
-  renderArenaRace(round, participants);
+  $("#arena-min-bet").textContent = formatNumber(minBet);
+  $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>✦</small>`;
+  $("#arena-balance").textContent = `${formatNumber(walletBalance)} ✦`;
+  $("#arena-bank").textContent = `${formatNumber(round?.totalPot || 0)} ✦`;
+  renderArenaRace(round);
+
+  const betChips = $("#arena-bet-chips");
+  if (betChips) {
+    const participantBets = participants
+      .slice(-4)
+      .map((participant) => Number(participant.bet || 0))
+      .filter((bet) => Number.isSafeInteger(bet) && bet > 0);
+    const presets = [
+      minBet,
+      Math.min(maxBet, minBet * 2),
+      Math.min(maxBet, minBet * 5),
+      Math.min(maxBet, 15),
+    ];
+    const amounts = participantBets.length ? participantBets : [...new Set(presets)];
+    betChips.innerHTML = amounts
+      .map((amount, index) => {
+        const disabled =
+          !available ||
+          !open ||
+          secondsRemaining <= 0 ||
+          busyActions.has("arena_join") ||
+          amount > walletBalance ||
+          amount > maxBet;
+        const selected = amount === parsedBet;
+        return `
+          <button
+            class="${selected ? "is-selected" : ""}"
+            type="button"
+            data-arena-bet="${amount}"
+            style="--chip-index:${index}"
+            ${disabled ? "disabled" : ""}
+            aria-pressed="${selected}"
+          >${formatNumber(amount)} <i aria-hidden="true">✦</i></button>`;
+      })
+      .join("");
+  }
 
   const participantCount = document.querySelector(".arena-participant-count");
   if (participantCount) {
@@ -1480,6 +1491,7 @@ function renderArena(data) {
       )}</span>
       <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>${resultText} · ${winnerName}</strong></span>
       <span class="arena-winner-prize">${formatNumber(winner.payout || round.payout || 0)}<small>ZT</small></span>`;
+    $("#arena-winner-panel").classList.remove("hidden");
   } else {
     $("#arena-winner-panel").innerHTML = `
       <span class="arena-winner-symbol" aria-hidden="true">01</span>
@@ -1487,6 +1499,7 @@ function renderArena(data) {
         round?.myEntry ? "Ты в раунде. Итог будет после таймера." : "Определится после окончания таймера"
       }</strong></span>
       <span class="arena-winner-prize">90%<small>пула</small></span>`;
+    $("#arena-winner-panel").classList.add("hidden");
   }
 
   if (!available) {
@@ -1511,6 +1524,15 @@ function renderArena(data) {
   input.max = String(Math.min(maxBet, walletBalance));
   input.disabled =
     !available || !open || secondsRemaining <= 0 || busyActions.has("arena_join");
+  const allInButton = document.querySelector("[data-arena-all-in]");
+  if (allInButton) {
+    allInButton.disabled =
+      !available ||
+      !open ||
+      secondsRemaining <= 0 ||
+      busyActions.has("arena_join") ||
+      walletBalance < minBet;
+  }
   const canJoin =
     available &&
     open &&
@@ -1520,7 +1542,7 @@ function renderArena(data) {
   joinButton.disabled = !canJoin;
   joinButton.setAttribute("aria-busy", String(busyActions.has("arena_join")));
   joinButton.querySelector("span").textContent = busyActions.has("arena_join")
-    ? "Отправляем ставку…"
+    ? "Ставим…"
     : !available
       ? "Арена недоступна"
       : !round || round.status !== "open"
@@ -1528,8 +1550,8 @@ function renderArena(data) {
         : secondsRemaining <= 0
           ? "Приём закрыт"
           : round.myEntry
-            ? "Добавить ставку"
-            : "Войти в раунд";
+            ? "Поставить ещё"
+            : "Поставить";
   $("#arena-bet-summary").innerHTML = `
     <div><span>Твой шанс победы</span><strong>${
       projectedChance > 0 ? `${numberFormat.format(projectedChance)}%` : "—%"
@@ -1729,6 +1751,7 @@ function setView(viewName) {
   );
   document.body.classList.add(`screen-${normalizedView}`);
   document.body.classList.toggle("nested-screen", !MAIN_VIEWS.has(normalizedView));
+  document.body.classList.toggle("arena-active", normalizedView === "arena");
   const navView = MAIN_VIEWS.has(normalizedView) ? normalizedView : null;
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === navView);
@@ -2080,8 +2103,10 @@ $("#arena-join-button")?.addEventListener("click", () => {
   }
   runAction("arena_join", { bet });
 });
-document.querySelectorAll("[data-arena-bet]").forEach((button) => {
-  button.addEventListener("click", () => {
+$("#arena-bet-chips")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-arena-bet]");
+  if (!button || button.disabled) return;
+  {
     const input = $("#arena-bet-input");
     const amount = Number(button.dataset.arenaBet || 0);
     const balance = Number(appState.data?.wallet?.zenoBalance || 0);
@@ -2089,17 +2114,16 @@ document.querySelectorAll("[data-arena-bet]").forEach((button) => {
     input.value = String(Math.min(amount, balance));
     arenaRuntime.notice = "";
     if (appState.data) renderArena(appState.data);
-    input.focus();
-  });
+  }
 });
 document.querySelector("[data-arena-all-in]")?.addEventListener("click", () => {
   const input = $("#arena-bet-input");
   const balance = Number(appState.data?.wallet?.zenoBalance || 0);
   if (!input) return;
-  input.value = String(Math.max(0, Math.floor(balance)));
+  const maxBet = Number(appState.data?.arena?.maxBet || 10_000);
+  input.value = String(Math.max(0, Math.floor(Math.min(balance, maxBet))));
   arenaRuntime.notice = "";
   if (appState.data) renderArena(appState.data);
-  input.focus();
 });
 document.querySelectorAll('[data-action="friends"]').forEach((button) => {
   button.addEventListener("click", copyReferral);

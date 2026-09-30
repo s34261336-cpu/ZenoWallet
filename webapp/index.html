@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260930-icons2" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body class="screen-home">
@@ -158,7 +158,16 @@
           <section class="home-game-preview" aria-label="Превью игр">
             <button class="home-game-preview-card home-game-preview-crash" data-view="rocket" type="button">
               <span class="game-preview-art game-preview-art-crash" aria-hidden="true">
-                <span class="preview-rocket"></span>
+                <svg class="preview-rocket-icon" viewBox="0 0 100 100" focusable="false">
+                  <defs>
+                    <linearGradient id="rocket-diamond-gradient" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stop-color="#ffffff" />
+                      <stop offset="1" stop-color="#77f3ff" />
+                    </linearGradient>
+                  </defs>
+                  <path class="rocket-diamond" d="M50 9 91 50 50 91 9 50Z" />
+                  <path class="rocket-arrow" d="M50 22 69 43H58v35H42V43H31Z" />
+                </svg>
                 <span class="preview-orbit"></span>
                 <span class="preview-chart"></span>
               </span>
@@ -171,7 +180,13 @@
             </button>
             <button class="home-game-preview-card home-game-preview-roulette" data-view="roulette" type="button">
               <span class="game-preview-art game-preview-art-roulette" aria-hidden="true">
-                <span class="preview-wheel"></span>
+                <span class="preview-wheel-icon">
+                  <i class="wheel-slice wheel-slice-one"></i>
+                  <i class="wheel-slice wheel-slice-two"></i>
+                  <i class="wheel-slice wheel-slice-three"></i>
+                  <i class="wheel-slice wheel-slice-four"></i>
+                  <b></b>
+                </span>
                 <span class="preview-pulse"></span>
               </span>
               <span class="game-preview-copy">
@@ -183,9 +198,13 @@
             </button>
             <button class="home-game-preview-card home-game-preview-mining" data-view="mining" type="button">
               <span class="game-preview-art game-preview-art-mining" aria-hidden="true">
-                <span class="preview-mine-grid"><i></i><i></i><i></i><i></i></span>
-                <span class="preview-mine-icon"></span>
-                <span class="preview-mine-glow"></span>
+                <svg class="preview-mines-icon" viewBox="0 0 100 150" focusable="false">
+                  <rect class="mine-bar mine-bar-green" x="22" y="8" width="22" height="58" rx="11" />
+                  <rect class="mine-bar mine-bar-cyan" x="56" y="8" width="22" height="58" rx="11" />
+                  <rect class="mine-bar mine-bar-cyan" x="22" y="84" width="22" height="58" rx="11" />
+                  <rect class="mine-bar mine-bar-green" x="56" y="84" width="22" height="58" rx="11" />
+                  <circle class="mine-dot" cx="50" cy="75" r="6" />
+                </svg>
               </span>
               <span class="game-preview-copy">
                 <span class="game-attempts"><i></i><span id="home-mines-attempts">— игр</span></span>

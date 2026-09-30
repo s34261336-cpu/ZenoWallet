@@ -80,6 +80,9 @@ const arenaRuntime = {
   countdownTimer: null,
   pollInFlight: false,
   notice: "",
+  raceTimer: null,
+  raceAnimating: false,
+  lastAnimatedRoundId: null,
 };
 const ARENA_POLL_INTERVAL_MS = 3000;
 
@@ -1289,11 +1292,92 @@ function renderArenaHistory(history) {
     .join("");
 }
 
+function maybeAnimateArenaRound(round) {
+  if (
+    !round ||
+    round.status !== "finished" ||
+    !round.id ||
+    arenaRuntime.lastAnimatedRoundId === round.id
+  ) {
+    return;
+  }
+  arenaRuntime.lastAnimatedRoundId = round.id;
+  arenaRuntime.raceAnimating = true;
+  if (arenaRuntime.raceTimer !== null) {
+    window.clearTimeout(arenaRuntime.raceTimer);
+  }
+  arenaRuntime.raceTimer = window.setTimeout(() => {
+    arenaRuntime.raceAnimating = false;
+    arenaRuntime.raceTimer = null;
+    if (appState.data?.arena?.round?.id === round.id) {
+      renderArena(appState.data);
+    }
+  }, 2600);
+}
+
+function renderArenaRace(round, participants) {
+  const stage = $("#arena-race-stage");
+  const lanes = $("#arena-race-lanes");
+  if (!stage || !lanes) return;
+
+  const winnerId = Number(round?.winner?.id || 0);
+  const visibleParticipants = [...participants]
+    .sort((left, right) => {
+      if (Number(right.id) === winnerId) return 1;
+      if (Number(left.id) === winnerId) return -1;
+      return Number(right.bet || 0) - Number(left.bet || 0);
+    })
+    .slice(0, 3);
+
+  stage.classList.toggle("is-finished", round?.status === "finished");
+  stage.classList.toggle("is-animating", arenaRuntime.raceAnimating);
+  stage.dataset.state = round?.status || "waiting";
+  if (!visibleParticipants.length) {
+    lanes.innerHTML = '<div class="arena-race-empty">Состав раунда появится здесь</div>';
+    return;
+  }
+
+  lanes.innerHTML = visibleParticipants
+    .map((participant, index) => {
+      const isWinner = Number(participant.id) === winnerId || Boolean(participant.isWinner);
+      const name = participant.isBot
+        ? `Бот «${escapeHtml(participant.name || "Участник")}»`
+        : participant.isMe
+          ? `${escapeHtml(participant.name || "Игрок")} · ты`
+          : escapeHtml(participant.name || "Игрок");
+      return `
+        <div class="arena-race-lane ${isWinner ? "is-winner" : ""}" style="--lane-delay: ${index * 90}ms">
+          <div class="arena-race-lane-heading">
+            <span class="arena-race-avatar">${escapeHtml(
+              participant.avatar || getInitials(participant.name),
+            )}</span>
+            <span class="arena-race-lane-name">${name}</span>
+            <strong>${formatNumber(participant.bet || 0)} <small>ZT</small></strong>
+          </div>
+          <div class="arena-race-track">
+            <span class="arena-race-track-fill"></span>
+            <span class="arena-race-orb">${escapeHtml(
+              participant.avatar || getInitials(participant.name),
+            )}</span>
+          </div>
+          <small class="arena-race-lane-status">${
+            round?.status === "finished"
+              ? isWinner
+                ? "победитель"
+                : "раунд завершён"
+              : "ставка принята"
+          }</small>
+        </div>`;
+    })
+    .join("");
+}
+
 function renderArena(data) {
   const arena = data.arena || {};
   const round = arena.round;
   const participants = Array.isArray(round?.participants) ? round.participants : [];
-  const walletBalance = Math.max(0, Number(data.wallet?.earnBalance || 0));
+  maybeAnimateArenaRound(round);
+  const walletBalance = Math.max(0, Number(data.wallet?.zenoBalance || 0));
   const input = $("#arena-bet-input");
   const joinButton = $("#arena-join-button");
   if (!input || !joinButton) return;
@@ -1330,6 +1414,7 @@ function renderArena(data) {
         : "Подготовка";
   $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>ZT</small>`;
   $("#arena-balance").textContent = `${formatNumber(walletBalance)} ZT`;
+  renderArenaRace(round, participants);
 
   const participantCount = document.querySelector(".arena-participant-count");
   if (participantCount) {
@@ -1735,6 +1820,9 @@ async function runAction(action, body = {}, options = {}) {
           earnBalance: Number(
             result.wallet?.earnBalance ?? appState.data.wallet.earnBalance,
           ),
+          zenoBalance: Number(
+            result.wallet?.zenoBalance ?? appState.data.wallet.zenoBalance,
+          ),
         },
         arena: result.arena || appState.data.arena,
       };
@@ -1838,7 +1926,7 @@ async function runAction(action, body = {}, options = {}) {
       );
       telegram?.HapticFeedback?.notificationOccurred("success");
     } else if (actionResult?.type === "arena_join") {
-      showToast(`Ставка ${formatNumber(actionResult.bet)} ZT добавлена в раунд`);
+      showToast(`Ставка ${formatNumber(actionResult.bet)} ZenoToken добавлена в раунд`);
       telegram?.HapticFeedback?.notificationOccurred("success");
     } else if (
       !options.suppressSuccessToast &&
@@ -1986,11 +2074,32 @@ $("#arena-join-button")?.addEventListener("click", () => {
     input?.focus();
     return;
   }
-  if (bet > Number(appState.data?.wallet?.earnBalance || 0)) {
-    showToast("Недостаточно монет для этой ставки", "danger");
+  if (bet > Number(appState.data?.wallet?.zenoBalance || 0)) {
+    showToast("Недостаточно ZenoToken для этой ставки", "danger");
     return;
   }
   runAction("arena_join", { bet });
+});
+document.querySelectorAll("[data-arena-bet]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = $("#arena-bet-input");
+    const amount = Number(button.dataset.arenaBet || 0);
+    const balance = Number(appState.data?.wallet?.zenoBalance || 0);
+    if (!input || !Number.isFinite(amount)) return;
+    input.value = String(Math.min(amount, balance));
+    arenaRuntime.notice = "";
+    if (appState.data) renderArena(appState.data);
+    input.focus();
+  });
+});
+document.querySelector("[data-arena-all-in]")?.addEventListener("click", () => {
+  const input = $("#arena-bet-input");
+  const balance = Number(appState.data?.wallet?.zenoBalance || 0);
+  if (!input) return;
+  input.value = String(Math.max(0, Math.floor(balance)));
+  arenaRuntime.notice = "";
+  if (appState.data) renderArena(appState.data);
+  input.focus();
 });
 document.querySelectorAll('[data-action="friends"]').forEach((button) => {
   button.addEventListener("click", copyReferral);

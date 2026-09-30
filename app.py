@@ -597,7 +597,7 @@ class SupabaseClient:
         self, user_id: int, bet: int, display_name: str
     ) -> dict[str, Any]:
         if bet < 1 or bet > 10_000:
-            raise ValueError("Ставка должна быть от 1 до 10000 монет")
+            raise ValueError("Ставка должна быть от 1 до 10000 ZenoToken")
         return self._rpc_object(
             self._rpc(
                 "arena_join",
@@ -2510,7 +2510,10 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                             "ok": True,
                             "serverNow": datetime.now(timezone.utc).isoformat(),
                             "wallet": {
-                                "earnBalance": int(joined.get("balance") or 0),
+                                "earnBalance": int(joined.get("earnBalance") or 0),
+                                "zenoBalance": int(
+                                    joined.get("zenoBalance", joined.get("balance") or 0)
+                                ),
                             },
                             "arena": joined.get("arena") or {},
                             "lastAction": {
@@ -2664,8 +2667,8 @@ class MiniAppHandler(BaseHTTPRequestHandler):
             if action == "arena_join":
                 error_message = str(error)
                 known_gameplay_errors = {
-                    "Ставка должна быть от 1 до 10000 монет",
-                    "Недостаточно монет для этой ставки",
+                    "Ставка должна быть от 1 до 10000 ZenoToken",
+                    "Недостаточно ZenoToken для этой ставки",
                     "Приём ставок закрыт — дождись следующего раунда",
                     "Слишком много участников в раунде",
                 }

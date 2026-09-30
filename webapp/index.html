@@ -449,6 +449,15 @@
                   </div>
                 </div>
                 <div class="arena-round-track" aria-hidden="true"><span></span></div>
+                <div class="arena-race-stage" id="arena-race-stage" aria-live="polite">
+                  <div class="arena-race-stage-topline">
+                    <span>ПОЛЕ АРЕНЫ</span>
+                    <strong>Участники двигаются к победе</strong>
+                  </div>
+                  <div class="arena-race-lanes" id="arena-race-lanes">
+                    <div class="arena-race-empty">Состав раунда появится здесь</div>
+                  </div>
+                </div>
                 <div class="arena-round-foot">
                   <span>Раунд общий для всех участников</span>
                   <span>Остаток пула · 10%</span>
@@ -516,6 +525,12 @@
                 <input id="arena-bet-input" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" aria-describedby="arena-bet-summary arena-notice" />
                 <span>ZT</span>
               </div>
+               <div class="arena-presets" aria-label="Быстрый выбор ставки">
+                 <button type="button" data-arena-bet="1">1 ZT</button>
+                 <button type="button" data-arena-bet="5">5 ZT</button>
+                 <button type="button" data-arena-bet="10">10 ZT</button>
+                 <button type="button" data-arena-all-in>Всё сразу</button>
+               </div>
               <div class="arena-balance-row">
                 <span>Доступно</span>
                 <strong id="arena-balance">— ZT</strong>

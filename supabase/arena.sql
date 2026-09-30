@@ -74,6 +74,11 @@ declare
   v_pool bigint;
   v_roll numeric;
   v_payout bigint;
+  v_users_state jsonb;
+  v_user_state jsonb;
+  v_user_key text;
+  v_current_zeno bigint;
+  v_next_zeno bigint;
 begin
   select *
     into v_round
@@ -127,8 +132,37 @@ begin
        set bankroll = bankroll + v_payout
      where id = v_winner.bot_id;
   else
+    select state_value
+      into v_users_state
+      from public.bot_state
+     where state_key = 'users'
+     for update;
+
+    if not found or v_users_state is null
+       or jsonb_typeof(v_users_state) <> 'object' then
+      raise exception 'Supabase bot_state row state_key=users was not found or is invalid';
+    end if;
+
+    v_user_key := v_winner.user_id::text;
+    v_user_state := coalesce(v_users_state -> v_user_key, '{}'::jsonb);
+    if coalesce(v_user_state ->> 'zenotoken', '') ~ '^[0-9]+$' then
+      v_current_zeno := (v_user_state ->> 'zenotoken')::bigint;
+    else
+      v_current_zeno := 0;
+    end if;
+    v_next_zeno := v_current_zeno + v_payout;
+    v_users_state := jsonb_set(
+      v_users_state,
+      array[v_user_key, 'zenotoken']::text[],
+      to_jsonb(v_next_zeno),
+      true
+    );
+    update public.bot_state
+       set state_value = v_users_state
+     where state_key = 'users';
+
     update public.wallet
-       set earn_balance = earn_balance + v_payout,
+       set zeno_balance = v_next_zeno,
            updated_at = now()
      where user_id = v_winner.user_id;
   end if;
@@ -195,7 +229,7 @@ begin
      for update;
 
     if not found or v_round.finished_at <= clock_timestamp() - interval '4 seconds' then
-      v_bot_count := 2 + floor(random() * 2)::integer;
+       v_bot_count := 3 + floor(random() * 3)::integer;
       insert into public.arena_rounds (closes_at)
       values (clock_timestamp() + interval '25 seconds')
       returning * into v_round;
@@ -337,6 +371,7 @@ begin
     'round', jsonb_build_object(
       'id', v_round.id,
       'status', v_round.status,
+      'startedAt', v_round.created_at,
       'endsAt', v_round.closes_at,
       'finishedAt', v_round.finished_at,
       'totalPot', v_round.total_pot,
@@ -373,6 +408,10 @@ declare
   v_entry public.arena_entries%rowtype;
   v_participant_count integer;
   v_balance bigint;
+  v_zt_balance bigint;
+  v_users_state jsonb;
+  v_user_state jsonb;
+  v_user_key text := p_user_id::text;
   v_name text;
   v_avatar text;
   v_arena jsonb;
@@ -381,7 +420,7 @@ begin
     raise exception 'Некорректный пользователь';
   end if;
   if p_bet is null or p_bet < 1 or p_bet > 10000 then
-    raise exception 'Ставка должна быть от 1 до 10000 монет';
+    raise exception 'Ставка должна быть от 1 до 10000 ZenoToken';
   end if;
 
   perform pg_advisory_xact_lock(816184092026);
@@ -411,10 +450,42 @@ begin
       into v_participant_count
       from public.arena_entries
      where round_id = v_round.id;
-    if v_participant_count >= 6 then
+     if v_participant_count >= 8 then
       raise exception 'Слишком много участников в раунде';
     end if;
   end if;
+
+  select state_value
+    into v_users_state
+    from public.bot_state
+   where state_key = 'users'
+   for update;
+
+  if not found or v_users_state is null
+     or jsonb_typeof(v_users_state) <> 'object' then
+    raise exception 'Supabase bot_state row state_key=users was not found or is invalid';
+  end if;
+
+  v_user_state := coalesce(v_users_state -> v_user_key, '{}'::jsonb);
+  if coalesce(v_user_state ->> 'zenotoken', '') ~ '^[0-9]+$' then
+    v_zt_balance := (v_user_state ->> 'zenotoken')::bigint;
+  else
+    v_zt_balance := 0;
+  end if;
+
+  if v_zt_balance < p_bet then
+    raise exception 'Недостаточно ZenoToken для этой ставки';
+  end if;
+
+  v_users_state := jsonb_set(
+    v_users_state,
+    array[v_user_key, 'zenotoken']::text[],
+    to_jsonb(v_zt_balance - p_bet),
+    true
+  );
+  update public.bot_state
+     set state_value = v_users_state
+   where state_key = 'users';
 
   insert into public.wallet (user_id, earn_balance, zeno_balance)
   values (p_user_id, 0, 0)
@@ -426,15 +497,11 @@ begin
    where user_id = p_user_id
    for update;
 
-  if v_wallet.earn_balance < p_bet then
-    raise exception 'Недостаточно монет для этой ставки';
-  end if;
-
   update public.wallet
-     set earn_balance = earn_balance - p_bet,
+     set zeno_balance = v_zt_balance - p_bet,
          updated_at = now()
    where user_id = p_user_id
-   returning earn_balance into v_balance;
+   returning zeno_balance into v_balance;
 
   v_name := left(coalesce(nullif(trim(p_display_name), ''), 'Игрок'), 48);
   v_avatar := upper(left(v_name, 1));
@@ -464,6 +531,8 @@ begin
 
   return jsonb_build_object(
     'balance', v_balance,
+    'zenoBalance', v_balance,
+    'earnBalance', v_wallet.earn_balance,
     'arena', v_arena
   );
 end;

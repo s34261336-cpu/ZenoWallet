@@ -75,6 +75,13 @@ const minesRuntime = {
   pendingGameId: null,
   pendingAction: null,
 };
+const arenaRuntime = {
+  pollTimer: null,
+  countdownTimer: null,
+  pollInFlight: false,
+  notice: "",
+};
+const ARENA_POLL_INTERVAL_MS = 3000;
 
 if (telegram) {
   telegram.ready();
@@ -1196,6 +1203,258 @@ async function loadState() {
   }
 }
 
+function getArenaSecondsRemaining(round) {
+  if (!round?.endsAt || round.status !== "open") return 0;
+  const endAt = Date.parse(round.endsAt);
+  if (!Number.isFinite(endAt)) return 0;
+  return Math.max(0, Math.ceil((endAt - (Date.now() + serverClockOffsetMs)) / 1000));
+}
+
+function updateArenaCountdown() {
+  const arena = appState.data?.arena;
+  const round = arena?.round;
+  const countdown = $("#arena-countdown");
+  const joinButton = $("#arena-join-button");
+  const track = document.querySelector(".arena-round-track > span");
+  if (!countdown) return;
+
+  if (!round) {
+    countdown.textContent = "--:--";
+    if (track) track.style.width = "0%";
+    return;
+  }
+
+  if (round.status !== "open") {
+    countdown.textContent = "ИТОГ";
+    if (track) track.style.width = "100%";
+    return;
+  }
+
+  const seconds = getArenaSecondsRemaining(round);
+  countdown.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
+    seconds % 60,
+  ).padStart(2, "0")}`;
+
+  const startedAt = Date.parse(round.startedAt || "");
+  const endsAt = Date.parse(round.endsAt || "");
+  if (track && Number.isFinite(startedAt) && Number.isFinite(endsAt)) {
+    const duration = Math.max(1, endsAt - startedAt);
+    const elapsed = Math.max(0, Math.min(duration, Date.now() + serverClockOffsetMs - startedAt));
+    track.style.width = `${Math.round((elapsed / duration) * 100)}%`;
+  }
+
+  if (seconds === 0 && joinButton && !busyActions.has("arena_join")) {
+    joinButton.disabled = true;
+    joinButton.querySelector("span").textContent = "Приём закрыт";
+  }
+}
+
+function renderArenaHistory(history) {
+  const container = $("#arena-history");
+  if (!container) return;
+  const rounds = Array.isArray(history) ? history : [];
+  if (!rounds.length) {
+    container.innerHTML = `
+      <div class="arena-history-empty">
+        <span class="arena-history-empty-mark" aria-hidden="true">—</span>
+        <span><strong>История появится здесь</strong><small>Завершённые раунды и их победители</small></span>
+      </div>`;
+    return;
+  }
+  container.innerHTML = rounds
+    .map((round) => {
+      const winner = round.winnerIsBot
+        ? `Бот «${escapeHtml(round.winnerName || "Участник")}»`
+        : escapeHtml(round.winnerName || "Участник");
+      const finishedAt = round.finishedAt
+        ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(
+            new Date(round.finishedAt),
+          )
+        : "";
+      return `
+        <div class="arena-history-row">
+          <span class="arena-history-row-mark" aria-hidden="true">${escapeHtml(
+            round.winnerAvatar || getInitials(round.winnerName),
+          )}</span>
+          <span class="arena-history-row-copy">
+            <strong>${winner}</strong>
+            <small>Раунд #${formatNumber(round.id)}${finishedAt ? ` · ${finishedAt}` : ""}</small>
+          </span>
+          <span class="arena-history-row-prize">
+            <strong>${formatNumber(round.payout || 0)}</strong>
+            <small>из ${formatNumber(round.totalPot || 0)} ZT</small>
+          </span>
+        </div>`;
+    })
+    .join("");
+}
+
+function renderArena(data) {
+  const arena = data.arena || {};
+  const round = arena.round;
+  const participants = Array.isArray(round?.participants) ? round.participants : [];
+  const walletBalance = Math.max(0, Number(data.wallet?.earnBalance || 0));
+  const input = $("#arena-bet-input");
+  const joinButton = $("#arena-join-button");
+  if (!input || !joinButton) return;
+
+  const available = arena.available !== false;
+  const open = available && round?.status === "open";
+  const secondsRemaining = open ? getArenaSecondsRemaining(round) : 0;
+  const minBet = Math.max(1, Number(arena.minBet || 1));
+  const maxBet = Math.max(minBet, Number(arena.maxBet || 10_000));
+  const rawBet = input.value.trim();
+  const parsedBet = rawBet === "" ? 0 : Number(rawBet);
+  const validBet =
+    Number.isSafeInteger(parsedBet) &&
+    parsedBet >= minBet &&
+    parsedBet <= maxBet &&
+    parsedBet <= walletBalance;
+  const currentBet = Number(round?.myEntry?.bet || 0);
+  const additionalBet = validBet ? parsedBet : 0;
+  const projectedBet = currentBet + additionalBet;
+  const projectedPot = Number(round?.totalPot || 0) + additionalBet;
+  const projectedChance =
+    projectedPot > 0 && projectedBet > 0
+      ? Math.min(100, (projectedBet / projectedPot) * 100)
+      : 0;
+  const numberFormat = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
+
+  $("#arena-round-id").textContent = round?.id ? `Раунд #${formatNumber(round.id)}` : "Ожидаем раунд";
+  $("#arena-round-state").textContent = !available
+    ? "Недоступна"
+    : round?.status === "finished"
+      ? "Завершён"
+      : round?.status === "open"
+        ? "Приём ставок"
+        : "Подготовка";
+  $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>ZT</small>`;
+  $("#arena-balance").textContent = `${formatNumber(walletBalance)} ZT`;
+
+  const participantCount = document.querySelector(".arena-participant-count");
+  if (participantCount) {
+    participantCount.textContent = `${participants.length} ${
+      participants.length === 1 ? "участник" : "участников"
+    }`;
+  }
+  $("#arena-contestants").innerHTML = participants.length
+    ? participants
+        .map((participant) => {
+          const isBot = Boolean(participant.isBot);
+          const name = escapeHtml(participant.name || "Участник");
+          const label = isBot
+            ? `Бот «${name}»`
+            : participant.isMe
+              ? `${name} · ты`
+              : name;
+          const classes = [
+            "arena-contestant",
+            isBot ? "arena-contestant-bot" : "",
+            participant.isMe ? "arena-contestant-me" : "",
+            participant.isWinner ? "arena-contestant-winner" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return `
+            <article class="${classes}">
+              <span class="arena-contestant-mark" aria-hidden="true">${escapeHtml(
+                participant.avatar || getInitials(participant.name),
+              )}</span>
+              <span class="arena-contestant-name">
+                <strong>${label}</strong>
+                <small>${isBot ? "Автоучастник" : participant.isMe ? "Твоя ставка" : "Игрок"}</small>
+              </span>
+              ${isBot ? '<span class="arena-bot-tag">БОТ</span>' : '<span class="arena-human-tag">ИГРОК</span>'}
+              <span class="arena-contestant-stake">
+                <strong>${formatNumber(participant.bet)} ZT</strong><small>ставка</small>
+              </span>
+              <span class="arena-contestant-chance">
+                <strong>${numberFormat.format(Number(participant.chance || 0))}%</strong><small>шанс</small>
+              </span>
+            </article>`;
+        })
+        .join("")
+    : '<div class="arena-contestants-hint">В этом раунде пока нет участников.</div>';
+
+  const winner = round?.winner;
+  if (round?.status === "finished" && winner) {
+    const winnerName = winner.isBot
+      ? `Бот «${escapeHtml(winner.name || "Участник")}»`
+      : escapeHtml(winner.name || "Участник");
+    const resultText =
+      round.myResult === "won"
+        ? `Ты победил и получил ${formatNumber(winner.payout || round.payout || 0)} ZT`
+        : round.myResult === "lost"
+          ? "В этот раз победил другой участник"
+          : `Ставка ${formatNumber(winner.bet || 0)} ZT · шанс ${numberFormat.format(
+              Number(winner.chance || 0),
+            )}%`;
+    $("#arena-winner-panel").innerHTML = `
+      <span class="arena-winner-symbol" aria-hidden="true">${escapeHtml(
+        winner.avatar || getInitials(winner.name),
+      )}</span>
+      <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>${resultText} · ${winnerName}</strong></span>
+      <span class="arena-winner-prize">${formatNumber(winner.payout || round.payout || 0)}<small>ZT</small></span>`;
+  } else {
+    $("#arena-winner-panel").innerHTML = `
+      <span class="arena-winner-symbol" aria-hidden="true">01</span>
+      <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>${
+        round?.myEntry ? "Ты в раунде. Итог будет после таймера." : "Определится после окончания таймера"
+      }</strong></span>
+      <span class="arena-winner-prize">90%<small>пула</small></span>`;
+  }
+
+  if (!available) {
+    $("#arena-notice").textContent =
+      "Арена пока не настроена. Администратору нужно выполнить supabase/arena.sql.";
+  } else if (!round) {
+    $("#arena-notice").textContent = "Ожидаем новый общий раунд.";
+  } else if (round.status === "finished") {
+    $("#arena-notice").textContent = round.myResult
+      ? "Раунд завершён. Следующий откроется автоматически."
+      : "Раунд завершён. Можно войти в следующий раунд.";
+  } else if (round.myEntry) {
+    $("#arena-notice").textContent = `Твоя ставка: ${formatNumber(
+      currentBet,
+    )} ZT. Можешь добавить ставку до закрытия входа.`;
+  } else {
+    $("#arena-notice").textContent = "Вход открыт. Ставка будет списана с баланса сразу.";
+  }
+  if (arenaRuntime.notice) $("#arena-notice").textContent = arenaRuntime.notice;
+
+  input.min = String(minBet);
+  input.max = String(Math.min(maxBet, walletBalance));
+  input.disabled =
+    !available || !open || secondsRemaining <= 0 || busyActions.has("arena_join");
+  const canJoin =
+    available &&
+    open &&
+    secondsRemaining > 0 &&
+    validBet &&
+    !busyActions.has("arena_join");
+  joinButton.disabled = !canJoin;
+  joinButton.setAttribute("aria-busy", String(busyActions.has("arena_join")));
+  joinButton.querySelector("span").textContent = busyActions.has("arena_join")
+    ? "Отправляем ставку…"
+    : !available
+      ? "Арена недоступна"
+      : !round || round.status !== "open"
+        ? "Ожидаем раунд"
+        : secondsRemaining <= 0
+          ? "Приём закрыт"
+          : round.myEntry
+            ? "Добавить ставку"
+            : "Войти в раунд";
+  $("#arena-bet-summary").innerHTML = `
+    <div><span>Твой шанс победы</span><strong>${
+      projectedChance > 0 ? `${numberFormat.format(projectedChance)}%` : "—%"
+    }</strong></div>
+    <div><span>Приз победителю</span><strong>90% пула</strong></div>`;
+
+  renderArenaHistory(arena.history);
+  updateArenaCountdown();
+}
+
 function render() {
   const currentData = appState.data;
   if (!currentData) return;
@@ -1282,6 +1541,7 @@ function render() {
   renderCrash(data);
   renderRoulette(data);
   renderMining(data);
+  renderArena(data);
 
   const dailyButton = document.querySelector('[data-action="daily"]');
   dailyButton.disabled = !daily.ready;
@@ -1303,9 +1563,71 @@ function render() {
     : '<div class="empty-leaderboard">Пока никто не набрал очков.</div>';
 }
 
+async function refreshArenaState({ silent = true } = {}) {
+  if (
+    appState.activeView !== "arena" ||
+    !appState.data ||
+    arenaRuntime.pollInFlight
+  ) {
+    return;
+  }
+  arenaRuntime.pollInFlight = true;
+  try {
+    const payload = await request("/webapp/api/arena/state");
+    appState.data = { ...appState.data, arena: payload.arena };
+    arenaRuntime.notice = "";
+    render();
+  } catch (error) {
+    if (error.code === "arena_setup_required") {
+      appState.data = {
+        ...appState.data,
+        arena: {
+          ...(appState.data.arena || {}),
+          available: false,
+        },
+      };
+      arenaRuntime.notice = error.message;
+      render();
+    } else {
+      arenaRuntime.notice = "Не удалось обновить раунд. Повторяем подключение…";
+      const notice = $("#arena-notice");
+      if (notice) notice.textContent = arenaRuntime.notice;
+      if (!silent) showToast(error.message, "danger");
+    }
+  } finally {
+    arenaRuntime.pollInFlight = false;
+  }
+}
+
+function startArenaLiveUpdates() {
+  if (arenaRuntime.pollTimer === null) {
+    arenaRuntime.pollTimer = window.setInterval(
+      () => refreshArenaState(),
+      ARENA_POLL_INTERVAL_MS,
+    );
+  }
+  if (arenaRuntime.countdownTimer === null) {
+    arenaRuntime.countdownTimer = window.setInterval(updateArenaCountdown, 250);
+  }
+  void refreshArenaState();
+}
+
+function stopArenaLiveUpdates() {
+  if (arenaRuntime.pollTimer !== null) {
+    window.clearInterval(arenaRuntime.pollTimer);
+    arenaRuntime.pollTimer = null;
+  }
+  if (arenaRuntime.countdownTimer !== null) {
+    window.clearInterval(arenaRuntime.countdownTimer);
+    arenaRuntime.countdownTimer = null;
+  }
+}
+
 function setView(viewName) {
   const normalizedView = viewName === "more" ? "profile" : viewName;
   appState.activeView = normalizedView;
+  if (normalizedView === "arena") startArenaLiveUpdates();
+  else stopArenaLiveUpdates();
   if (normalizedView !== "rocket") closeCrashBetSheet();
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("hidden", view.id !== `${normalizedView}-view`);
@@ -1401,6 +1723,22 @@ async function runAction(action, body = {}, options = {}) {
           ),
         },
       };
+    } else if (
+      action === "arena_join" &&
+      actionResult?.type === "arena_join"
+    ) {
+      appState.data = {
+        ...appState.data,
+        lastAction: actionResult,
+        wallet: {
+          ...appState.data.wallet,
+          earnBalance: Number(
+            result.wallet?.earnBalance ?? appState.data.wallet.earnBalance,
+          ),
+        },
+        arena: result.arena || appState.data.arena,
+      };
+      arenaRuntime.notice = "";
     } else if (
       action === "mines_reveal" &&
       actionResult?.type === "mines_reveal" &&
@@ -1499,6 +1837,9 @@ async function runAction(action, body = {}, options = {}) {
         `Забрано ${formatNumber(actionResult.payout)} монет на ${formatMultiplier(actionResult.multiplier)}`,
       );
       telegram?.HapticFeedback?.notificationOccurred("success");
+    } else if (actionResult?.type === "arena_join") {
+      showToast(`Ставка ${formatNumber(actionResult.bet)} ZT добавлена в раунд`);
+      telegram?.HapticFeedback?.notificationOccurred("success");
     } else if (
       !options.suppressSuccessToast &&
       (actionResult?.type === "crash_cashout" ||
@@ -1531,6 +1872,10 @@ async function runAction(action, body = {}, options = {}) {
     if (action === "roulette_play") {
       stopRouletteSpin();
       renderRoulette(appState.data);
+    }
+    if (action === "arena_join") {
+      arenaRuntime.notice = error.message;
+      void refreshArenaState();
     }
     if (!options.silent) {
       if (error.code === "daily_cooldown" && error.nextAt) {
@@ -1626,6 +1971,27 @@ document.querySelectorAll(".nav-item[data-action]").forEach((button) => {
 document.querySelector('[data-action="case"]').addEventListener("click", () => runAction("case"));
 document.querySelector('[data-action="daily"]').addEventListener("click", () => runAction("daily"));
 document.querySelector('[data-action="withdraw"]').addEventListener("click", openWithdraw);
+$("#arena-bet-input")?.addEventListener("input", () => {
+  arenaRuntime.notice = "";
+  if (appState.data) renderArena(appState.data);
+});
+$("#arena-bet-input")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") $("#arena-join-button")?.click();
+});
+$("#arena-join-button")?.addEventListener("click", () => {
+  const input = $("#arena-bet-input");
+  const bet = Number(input?.value);
+  if (!Number.isSafeInteger(bet) || bet <= 0) {
+    showToast("Введи целую сумму ставки", "danger");
+    input?.focus();
+    return;
+  }
+  if (bet > Number(appState.data?.wallet?.earnBalance || 0)) {
+    showToast("Недостаточно монет для этой ставки", "danger");
+    return;
+  }
+  runAction("arena_join", { bet });
+});
 document.querySelectorAll('[data-action="friends"]').forEach((button) => {
   button.addEventListener("click", copyReferral);
 });
@@ -1804,6 +2170,12 @@ document.addEventListener("click", (event) => {
 });
 
 $("#refresh-button").addEventListener("click", loadState);
+document.addEventListener("visibilitychange", () => {
+  if (appState.activeView === "arena") {
+    if (document.visibilityState === "hidden") stopArenaLiveUpdates();
+    else startArenaLiveUpdates();
+  }
+});
 document.addEventListener("visibilitychange", () => {
   const activeGame = appState.data?.crash?.active;
   if (!activeGame) return;

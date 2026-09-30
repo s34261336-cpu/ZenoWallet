@@ -585,6 +585,30 @@ class SupabaseClient:
             )
         )
 
+    def get_arena_state(self, user_id: int, display_name: str) -> dict[str, Any]:
+        return self._rpc_object(
+            self._rpc(
+                "arena_get_state",
+                {"p_user_id": user_id, "p_display_name": display_name[:48]},
+            )
+        )
+
+    def join_arena(
+        self, user_id: int, bet: int, display_name: str
+    ) -> dict[str, Any]:
+        if bet < 1 or bet > 10_000:
+            raise ValueError("Ставка должна быть от 1 до 10000 монет")
+        return self._rpc_object(
+            self._rpc(
+                "arena_join",
+                {
+                    "p_user_id": user_id,
+                    "p_bet": bet,
+                    "p_display_name": display_name[:48],
+                },
+            )
+        )
+
     def credit(self, user_id: int, amount: int) -> dict[str, Any]:
         wallet = self.ensure_wallet(user_id)
         return self.update_wallet(
@@ -1864,6 +1888,22 @@ def is_mines_schema_error(error: Exception) -> bool:
     )
 
 
+def is_arena_schema_error(error: Exception) -> bool:
+    error_text = str(error).lower()
+    return (
+        "public.arena_" in error_text
+        or (
+            "arena_get_state" in error_text or "arena_join" in error_text
+        )
+        and (
+            "could not find the function" in error_text
+            or "schema cache" in error_text
+            or "does not exist" in error_text
+            or "undefined" in error_text
+        )
+    )
+
+
 def web_app_state(
     bot: WalletBot,
     user: dict[str, Any],
@@ -1920,6 +1960,25 @@ def web_app_state(
             "freeGamesRemaining": MINES_FREE_GAMES_PER_DAY,
             "paidGamesUsed": 0,
             "nextZtCost": MINES_ZT_COSTS[0],
+        }
+    arena_available = True
+    try:
+        arena_state = supabase.get_arena_state(
+            user_id,
+            str(user.get("first_name") or user.get("username") or "Игрок"),
+        )
+    except RuntimeError as error:
+        if not is_arena_schema_error(error):
+            raise
+        log.warning("Arena schema is not ready; keeping wallet available")
+        arena_available = False
+        arena_state = {
+            "available": False,
+            "minBet": 1,
+            "maxBet": 10_000,
+            "rakePercent": 10,
+            "round": None,
+            "history": [],
         }
 
     users_state = supabase.get_users_state()
@@ -2096,6 +2155,10 @@ def web_app_state(
                 for row in mines_history
             ],
         },
+        "arena": {
+            **arena_state,
+            "available": arena_available and arena_state.get("available") is not False,
+        },
         "season": {
             "number": int(season["season_number"]),
             "startsAt": str(season["starts_at"]),
@@ -2148,6 +2211,41 @@ class MiniAppHandler(BaseHTTPRequestHandler):
             self.send_response(301)
             self.send_header("Location", "/webapp/")
             self.end_headers()
+            return
+        if path in (
+            "/api/arena/state",
+            "/wallet-api/arena/state",
+            "/webapp/api/arena/state",
+        ):
+            try:
+                user = self.authorized_user()
+                with self.bot.operation_lock:
+                    arena = self.supabase.get_arena_state(
+                        int(user["id"]),
+                        str(user.get("first_name") or user.get("username") or "Игрок"),
+                    )
+                self.send_json(
+                    {
+                        "ok": True,
+                        "serverNow": datetime.now(timezone.utc).isoformat(),
+                        "arena": arena,
+                    }
+                )
+            except ValueError as error:
+                self.error_json(str(error), 401, "unauthorized")
+            except RuntimeError as error:
+                if is_arena_schema_error(error):
+                    self.error_json(
+                        "Арена пока не настроена. Выполните supabase/arena.sql в Supabase.",
+                        503,
+                        "arena_setup_required",
+                    )
+                else:
+                    log.exception("Arena state request failed")
+                    self.error_json("Не удалось загрузить состояние арены.", 503)
+            except Exception:
+                log.exception("Arena state request failed")
+                self.error_json("Не удалось загрузить состояние арены.", 503)
             return
         if path in ("/api/state", "/wallet-api/state", "/webapp/api/state"):
             try:
@@ -2398,6 +2496,36 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     self.send_json(result)
                     return
 
+                if action == "arena_join":
+                    raw_bet = body.get("bet")
+                    if isinstance(raw_bet, bool) or not isinstance(raw_bet, int):
+                        raise ValueError("Ставка должна быть целым числом")
+                    joined = self.supabase.join_arena(
+                        user_id,
+                        raw_bet,
+                        str(user.get("first_name") or user.get("username") or "Игрок"),
+                    )
+                    self.send_json(
+                        {
+                            "ok": True,
+                            "serverNow": datetime.now(timezone.utc).isoformat(),
+                            "wallet": {
+                                "earnBalance": int(joined.get("balance") or 0),
+                            },
+                            "arena": joined.get("arena") or {},
+                            "lastAction": {
+                                "type": "arena_join",
+                                "bet": raw_bet,
+                                "roundId": (
+                                    (joined.get("arena") or {})
+                                    .get("round", {})
+                                    .get("id")
+                                ),
+                            },
+                        }
+                    )
+                    return
+
                 if action == "mines_reveal":
                     game_id = body.get("gameId")
                     cell = body.get("cell")
@@ -2524,6 +2652,31 @@ class MiniAppHandler(BaseHTTPRequestHandler):
                     "Игра «Мины» пока не настроена. Выполните обновлённый supabase/schema.sql.",
                     503,
                     "mines_setup_required",
+                )
+                return
+            if action == "arena_join" and is_arena_schema_error(error):
+                self.error_json(
+                    "Арена пока не настроена. Выполните supabase/arena.sql в Supabase.",
+                    503,
+                    "arena_setup_required",
+                )
+                return
+            if action == "arena_join":
+                error_message = str(error)
+                known_gameplay_errors = {
+                    "Ставка должна быть от 1 до 10000 монет",
+                    "Недостаточно монет для этой ставки",
+                    "Приём ставок закрыт — дождись следующего раунда",
+                    "Слишком много участников в раунде",
+                }
+                if error_message in known_gameplay_errors:
+                    self.error_json(error_message, 400, "arena_rejected")
+                    return
+                log.exception("Arena action failed")
+                self.error_json(
+                    "Арена временно недоступна. Попробуйте ещё раз.",
+                    503,
+                    "arena_unavailable",
                 )
                 return
             if action and str(action).startswith("mines_"):

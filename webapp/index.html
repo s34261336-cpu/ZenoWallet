@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260930-icons2" />
+    <link rel="stylesheet" href="./styles.css?v=20261028-arena" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body class="screen-home">
@@ -218,6 +218,21 @@
               </span>
               <span class="arrow">↗</span>
             </button>
+            <button class="home-game-preview-card home-game-preview-arena" data-view="arena" type="button" aria-label="Открыть Арену — общий раунд с таймером">
+              <span class="arena-entry-art" aria-hidden="true">
+                <span class="arena-entry-orbit arena-entry-orbit-one"></span>
+                <span class="arena-entry-orbit arena-entry-orbit-two"></span>
+                <span class="arena-entry-core">90<small>%</small></span>
+                <span class="arena-entry-dot arena-entry-dot-one"></span>
+                <span class="arena-entry-dot arena-entry-dot-two"></span>
+              </span>
+              <span class="game-preview-copy">
+                <span class="game-attempts arena-entry-live"><i></i><span>ОБЩИЙ РАУНД</span></span>
+                <strong>Арена</strong>
+                <small>Ставка задаёт шанс. Победителю — 90% пула.</small>
+              </span>
+              <span class="arrow" aria-hidden="true">↗</span>
+            </button>
           </section>
 
           <div class="section-heading capabilities-heading">
@@ -372,6 +387,22 @@
               </span>
               <span class="game-launch-arrow" aria-hidden="true">↗</span>
             </button>
+
+            <button class="game-launch-card game-launch-arena" data-view="arena" type="button" aria-label="Открыть Арену — общий раунд с таймером">
+              <span class="game-launch-art arena-entry-art" aria-hidden="true">
+                <span class="arena-entry-orbit arena-entry-orbit-one"></span>
+                <span class="arena-entry-orbit arena-entry-orbit-two"></span>
+                <span class="arena-entry-core">90<small>%</small></span>
+                <span class="arena-entry-dot arena-entry-dot-one"></span>
+                <span class="arena-entry-dot arena-entry-dot-two"></span>
+              </span>
+              <span class="game-launch-copy">
+                <span class="game-launch-status">ОБЩИЙ РАУНД · LIVE</span>
+                <strong>Арена</strong>
+                <small>Войди в раунд с игроками и ботами. Ставка задаёт шанс, победитель получает 90% пула.</small>
+              </span>
+              <span class="game-launch-arrow" aria-hidden="true">↗</span>
+            </button>
           </div>
 
           <div class="game-odds-card">
@@ -380,6 +411,125 @@
               <strong>Джекпот 50x — максимум раз в сутки</strong>
             </div>
             <span>50x · 0.5%</span>
+          </div>
+        </section>
+
+        <section class="view hidden" id="arena-view">
+          <button class="back-link" data-view="games" type="button" aria-label="Вернуться к списку игр">← Назад</button>
+          <div class="section-heading arena-heading">
+            <div>
+              <span class="eyebrow">Общий раунд по таймеру</span>
+              <h2>Арена <span class="arena-title-mark">90%</span></h2>
+            </div>
+            <span class="arena-live-pill"><i></i> РАУНД ПО ТАЙМЕРУ</span>
+          </div>
+          <p class="arena-intro">
+            Входи в общий раунд вместе с игроками и ботами. Чем выше ставка, тем больше твой шанс на победу. Победитель забирает 90% общего пула.
+          </p>
+
+          <div class="arena-layout">
+            <div class="arena-round-column">
+              <section class="arena-round-card" aria-label="Текущий раунд Арены">
+                <div class="arena-round-topline">
+                  <div>
+                    <span class="arena-kicker">ТЕКУЩИЙ РАУНД</span>
+                    <strong id="arena-round-id">Ожидаем раунд</strong>
+                  </div>
+                  <span class="arena-state-pill" id="arena-round-state">Подготовка</span>
+                </div>
+                <div class="arena-round-main">
+                  <div class="arena-countdown-block">
+                    <span>До закрытия входа</span>
+                    <strong id="arena-countdown" aria-label="Время до окончания раунда">--:--</strong>
+                  </div>
+                  <div class="arena-pool-block">
+                    <span>Общий пул</span>
+                    <strong id="arena-pool">— <small>ZT</small></strong>
+                    <small class="arena-pool-note">Победителю <b>90%</b></small>
+                  </div>
+                </div>
+                <div class="arena-round-track" aria-hidden="true"><span></span></div>
+                <div class="arena-round-foot">
+                  <span>Раунд общий для всех участников</span>
+                  <span>Остаток пула · 10%</span>
+                </div>
+              </section>
+
+              <section class="arena-contestants-card">
+                <div class="arena-section-heading">
+                  <div>
+                    <span class="eyebrow">СОСТАВ РАУНДА</span>
+                    <h3>Участники</h3>
+                  </div>
+                  <span class="arena-participant-count" aria-label="Количество участников">— мест</span>
+                </div>
+                <div class="arena-contestants-list" id="arena-contestants" aria-label="Участники и их шансы">
+                  <article class="arena-contestant arena-contestant-bot">
+                    <span class="arena-contestant-mark" aria-hidden="true">О</span>
+                    <span class="arena-contestant-name"><strong>Бот «Орион»</strong><small>Автоучастник</small></span>
+                    <span class="arena-bot-tag">БОТ</span>
+                    <span class="arena-contestant-stake"><strong>— ZT</strong><small>ставка</small></span>
+                    <span class="arena-contestant-chance"><strong>—%</strong><small>шанс</small></span>
+                  </article>
+                  <article class="arena-contestant arena-contestant-bot">
+                    <span class="arena-contestant-mark arena-contestant-mark-alt" aria-hidden="true">Н</span>
+                    <span class="arena-contestant-name"><strong>Бот «Нова»</strong><small>Автоучастник</small></span>
+                    <span class="arena-bot-tag">БОТ</span>
+                    <span class="arena-contestant-stake"><strong>— ZT</strong><small>ставка</small></span>
+                    <span class="arena-contestant-chance"><strong>—%</strong><small>шанс</small></span>
+                  </article>
+                  <div class="arena-contestants-hint">Ставки и шансы обновятся после загрузки раунда</div>
+                </div>
+                <div class="arena-winner-panel" id="arena-winner-panel" aria-live="polite">
+                  <span class="arena-winner-symbol" aria-hidden="true">01</span>
+                  <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>Определится после окончания таймера</strong></span>
+                  <span class="arena-winner-prize">90%<small>пула</small></span>
+                </div>
+              </section>
+
+              <section class="arena-history-card">
+                <div class="arena-section-heading arena-history-heading">
+                  <div>
+                    <span class="eyebrow">ПРОШЛЫЕ ИГРЫ</span>
+                    <h3>История Арены</h3>
+                  </div>
+                  <span class="arena-history-caption">Последние раунды</span>
+                </div>
+                <div class="arena-history-list" id="arena-history" aria-live="polite">
+                  <div class="arena-history-empty">
+                    <span class="arena-history-empty-mark" aria-hidden="true">—</span>
+                    <span><strong>История появится здесь</strong><small>Завершённые раунды и их победители</small></span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="arena-entry-card" aria-label="Вход в раунд Арены">
+              <div class="arena-entry-card-heading">
+                <span class="arena-kicker">ТВОЙ ВХОД</span>
+                <span class="arena-entry-index">01 <i>/ 01</i></span>
+              </div>
+              <h3>Поставь на шанс</h3>
+              <p>Твоя доля шанса зависит от ставки относительно общего пула.</p>
+              <label class="arena-input-label" for="arena-bet-input">Размер ставки</label>
+              <div class="arena-input-wrap">
+                <input id="arena-bet-input" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" aria-describedby="arena-bet-summary arena-notice" />
+                <span>ZT</span>
+              </div>
+              <div class="arena-balance-row">
+                <span>Доступно</span>
+                <strong id="arena-balance">— ZT</strong>
+              </div>
+              <div class="arena-bet-summary" id="arena-bet-summary" aria-live="polite">
+                <div><span>Твой шанс победы</span><strong>—%</strong></div>
+                <div><span>Приз победителю</span><strong>90% пула</strong></div>
+              </div>
+              <button class="arena-join-button" id="arena-join-button" type="button" disabled aria-label="Войти в раунд Арены с указанной ставкой">
+                <span>Ожидаем раунд</span><b aria-hidden="true">↗</b>
+              </button>
+              <p class="arena-notice" id="arena-notice" role="status" aria-live="polite">Вход станет доступен после начала раунда.</p>
+              <div class="arena-fair-note"><span aria-hidden="true">i</span><span>Один победитель получает 90% пула. Остальные 10% остаются в резерве игры.</span></div>
+            </aside>
           </div>
         </section>
 

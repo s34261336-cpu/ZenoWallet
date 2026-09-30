@@ -48,7 +48,7 @@ begin
   v_users_state := jsonb_set(
     v_users_state,
     array[v_user_key, 'zenotoken']::text[],
-    to_jsonb(v_next),
+    v_next::text::jsonb,
     true
   );
 

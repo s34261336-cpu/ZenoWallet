@@ -422,16 +422,16 @@
                 <strong id="arena-round-id">Игра ожидается</strong>
                 <span class="arena-min-bet">от <b id="arena-min-bet">1</b> <i aria-hidden="true">✦</i></span>
               </div>
-              <div class="arena-timer" aria-label="Время до закрытия ставок">
-                <span>Ставки:</span>
+              <div class="arena-timer" id="arena-timer" aria-label="Время до закрытия ставок">
+                <span id="arena-timer-label">Ставки:</span>
                 <strong id="arena-countdown">--</strong>
-                <small>с</small>
+                <small id="arena-timer-unit">с</small>
               </div>
               <span class="sr-only" id="arena-round-state">Подготовка</span>
             </header>
 
             <div class="arena-bank-head">
-              <span>Ставки в раунде</span>
+              <span class="sr-only">Ставки в раунде</span>
               <strong id="arena-pool" aria-label="Общая сумма ставок в ZenoToken">0 <small>✦</small></strong>
             </div>
 
@@ -467,7 +467,7 @@
             />
             <div class="arena-actions">
               <button class="arena-join-button" id="arena-join-button" type="button" disabled aria-label="Поставить выбранную сумму">
-                <span>Ожидаем раунд</span><b aria-hidden="true">↗</b>
+                <span>Ожидаем раунд</span>
               </button>
               <button class="arena-all-in-button" type="button" data-arena-all-in>Всё сразу</button>
             </div>

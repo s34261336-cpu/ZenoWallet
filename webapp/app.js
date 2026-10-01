@@ -88,6 +88,7 @@ const arenaRuntime = {
   dismissedRoundId: null,
 };
 const ARENA_POLL_INTERVAL_MS = 1000;
+const ARENA_RESULT_HOLD_MS = 2500;
 
 if (telegram) {
   telegram.ready();
@@ -1375,14 +1376,23 @@ function maybeAnimateArenaRound(round) {
   if (arenaRuntime.raceTimer !== null) {
     window.clearTimeout(arenaRuntime.raceTimer);
   }
+  const animationDuration = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+    .matches
+    ? 350
+    : 2600;
   arenaRuntime.raceTimer = window.setTimeout(() => {
     arenaRuntime.raceAnimating = false;
     arenaRuntime.raceTimer = null;
-    arenaRuntime.dismissedRoundId = round.id;
-    if (appState.data?.arena?.round?.id === round.id) {
+    if (appState.data?.arena?.round?.id !== round.id) return;
+
+    renderArena(appState.data);
+    arenaRuntime.raceTimer = window.setTimeout(() => {
+      arenaRuntime.raceTimer = null;
+      if (appState.data?.arena?.round?.id !== round.id) return;
+      arenaRuntime.dismissedRoundId = round.id;
       renderArena(appState.data);
-    }
-  }, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 350 : 2600);
+    }, ARENA_RESULT_HOLD_MS);
+  }, animationDuration);
 }
 
 function renderArenaAvatarContents(photoUrl, fallbackText) {

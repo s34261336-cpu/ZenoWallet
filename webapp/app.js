@@ -85,8 +85,9 @@ const arenaRuntime = {
   lastAnimatedRoundId: null,
   lastObservedRoundId: null,
   lastObservedRoundStatus: null,
+  dismissedRoundId: null,
 };
-const ARENA_POLL_INTERVAL_MS = 3000;
+const ARENA_POLL_INTERVAL_MS = 1000;
 
 if (telegram) {
   telegram.ready();
@@ -1223,9 +1224,18 @@ function getArenaSecondsRemaining(round) {
   return Math.max(0, Math.ceil((endAt - (Date.now() + serverClockOffsetMs)) / 1000));
 }
 
+function isArenaRoundDismissed(round) {
+  return (
+    round?.status === "finished" &&
+    arenaRuntime.dismissedRoundId === round.id &&
+    !arenaRuntime.raceAnimating
+  );
+}
+
 function updateArenaCountdown() {
   const arena = appState.data?.arena;
-  const round = arena?.round;
+  const serverRound = arena?.round;
+  const round = isArenaRoundDismissed(serverRound) ? null : serverRound;
   const countdown = $("#arena-countdown");
   const timer = $("#arena-timer");
   const timerLabel = $("#arena-timer-label");
@@ -1237,21 +1247,24 @@ function updateArenaCountdown() {
   const setTimerMode = (mode, value) => {
     timer?.classList.toggle("is-resolving", mode === "resolving");
     timer?.classList.toggle("is-finished", mode === "finished");
+    timer?.classList.toggle("is-waiting", mode === "waiting");
     if (timerLabel) timerLabel.hidden = mode !== "countdown";
     if (timerUnit) timerUnit.hidden = mode !== "countdown";
     countdown.textContent = value;
     timer?.setAttribute(
       "aria-label",
-      mode === "resolving"
-        ? "Определяем победителя"
-        : mode === "finished"
-          ? "Раунд завершён"
-          : "Время до закрытия ставок",
+      mode === "waiting"
+        ? "Ждём новых игроков"
+        : mode === "resolving"
+          ? "Определяем победителя"
+          : mode === "finished"
+            ? "Раунд завершён"
+            : "Время до закрытия ставок",
     );
   };
 
   if (!round) {
-    setTimerMode("countdown", "--");
+    setTimerMode("waiting", "Ждём игроков");
     if (track) track.style.width = "0%";
     return;
   }
@@ -1327,6 +1340,12 @@ function renderArenaHistory(history) {
 
 function maybeAnimateArenaRound(round) {
   if (!round?.id) {
+    if (arenaRuntime.raceTimer !== null) {
+      window.clearTimeout(arenaRuntime.raceTimer);
+      arenaRuntime.raceTimer = null;
+    }
+    arenaRuntime.raceAnimating = false;
+    arenaRuntime.dismissedRoundId = null;
     arenaRuntime.lastObservedRoundId = null;
     arenaRuntime.lastObservedRoundStatus = null;
     return;
@@ -1340,6 +1359,8 @@ function maybeAnimateArenaRound(round) {
     arenaRuntime.raceAnimating = false;
     arenaRuntime.lastObservedRoundId = round.id;
     arenaRuntime.lastObservedRoundStatus = round.status;
+    arenaRuntime.dismissedRoundId =
+      round.status === "finished" ? round.id : null;
     return;
   }
 
@@ -1350,12 +1371,14 @@ function maybeAnimateArenaRound(round) {
 
   arenaRuntime.lastAnimatedRoundId = round.id;
   arenaRuntime.raceAnimating = true;
+  arenaRuntime.dismissedRoundId = null;
   if (arenaRuntime.raceTimer !== null) {
     window.clearTimeout(arenaRuntime.raceTimer);
   }
   arenaRuntime.raceTimer = window.setTimeout(() => {
     arenaRuntime.raceAnimating = false;
     arenaRuntime.raceTimer = null;
+    arenaRuntime.dismissedRoundId = round.id;
     if (appState.data?.arena?.round?.id === round.id) {
       renderArena(appState.data);
     }
@@ -1463,9 +1486,10 @@ window.addEventListener("resize", () => updateArenaRaceCamera($("#arena-race-sta
 
 function renderArena(data) {
   const arena = data.arena || {};
-  const round = arena.round;
+  const serverRound = arena.round;
+  maybeAnimateArenaRound(serverRound);
+  const round = isArenaRoundDismissed(serverRound) ? null : serverRound;
   const participants = Array.isArray(round?.participants) ? round.participants : [];
-  maybeAnimateArenaRound(round);
   const walletBalance = Math.max(0, Number(data.wallet?.earnBalance || 0));
   const roundCurrency = getArenaCurrencyLabel(
     round?.balanceCurrency || arena.balanceCurrency,
@@ -1475,7 +1499,8 @@ function renderArena(data) {
     round?.status === "open" ? roundCurrency : betCurrency;
   const currencyReady = arena.balanceCurrency === "coins";
   const legacyRound =
-    round?.status === "open" && round.balanceCurrency !== arena.balanceCurrency;
+    serverRound?.status === "open" &&
+    serverRound.balanceCurrency !== arena.balanceCurrency;
   const input = $("#arena-bet-input");
   const joinButton = $("#arena-join-button");
   if (!input || !joinButton) return;
@@ -1483,7 +1508,7 @@ function renderArena(data) {
   const available = arena.available !== false && currencyReady;
   const open = available && round?.status === "open";
   const secondsRemaining = open ? getArenaSecondsRemaining(round) : 0;
-  const canStartRound = !round || round.status === "finished";
+  const canStartRound = !serverRound || serverRound.status === "finished";
   const canAddToRound = open && secondsRemaining > 0;
   const canPlaceBet =
     available && !legacyRound && (canStartRound || canAddToRound);
@@ -1507,7 +1532,7 @@ function renderArena(data) {
       : 0;
   const numberFormat = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
 
-  $("#arena-round-id").textContent = round?.id ? `Игра #${round.id}` : "Ожидание ставки";
+  $("#arena-round-id").textContent = round?.id ? `Игра #${round.id}` : "Ждём игроков";
   $("#arena-round-state").textContent = !available
     ? "Недоступна"
     : round?.status === "finished" && arenaRuntime.raceAnimating
@@ -1516,7 +1541,7 @@ function renderArena(data) {
         ? "Завершено"
       : round?.status === "open"
         ? "Ставки открыты"
-        : "Ожидание ставки";
+        : "Ждём игроков";
   $("#arena-min-bet").textContent = formatNumber(minBet);
   $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>${
     roundCurrency === "ZT" ? "ZT" : "✦"
@@ -1662,7 +1687,8 @@ function renderArena(data) {
     $("#arena-notice").textContent =
       "Завершается старый раунд в ZT. Следующий раунд будет за основной баланс.";
   } else if (!round) {
-    $("#arena-notice").textContent = "Поставь, чтобы запустить арену.";
+    $("#arena-notice").textContent =
+      "Ждём новых игроков. Сделай ставку, чтобы начать следующий раунд.";
   } else if (resolvingWinner) {
     $("#arena-notice").textContent = "Ставки закрыты. Определяем победителя…";
   } else if (round.status === "finished" && roundCurrency !== betCurrency) {
@@ -1928,6 +1954,9 @@ async function runAction(action, body = {}, options = {}) {
     button.classList.add("working");
     button.setAttribute("aria-busy", "true");
   });
+  if (action === "arena_join" && appState.data?.arena) {
+    renderArena(appState.data);
+  }
   try {
     const result = await request("/webapp/api/action", {
       method: "POST",

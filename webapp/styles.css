@@ -8725,6 +8725,17 @@ body.arena-active #arena-view:not(.hidden) {
   padding: 8px 10px;
 }
 
+.arena-timer.is-waiting {
+  min-width: 112px;
+}
+
+.arena-timer.is-waiting strong {
+  color: #c9c2ff;
+  font-size: 12px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .arena-timer span {
   font-size: 13px;
   font-weight: 600;
@@ -9263,11 +9274,12 @@ body.arena-active #arena-view:not(.hidden) {
     top: 30%;
     transform: translate(-50%, -50%) scale(0.9);
   }
-  74% {
-    left: calc(var(--arena-orb-x) + 7%);
+  70% {
+    left: 88%;
     top: 25%;
     transform: translate(-50%, -50%) scale(1.04);
   }
+  82%,
   100% {
     left: var(--arena-orb-x);
     top: 53%;
@@ -9276,7 +9288,7 @@ body.arena-active #arena-view:not(.hidden) {
 }
 
 @keyframes arena-camera-zoom {
-  0%, 54% {
+  0%, 82% {
     transform: translateX(0) scale(1);
   }
   100% {
@@ -9300,11 +9312,12 @@ body.arena-active #arena-view:not(.hidden) {
     top: calc(30% + 25px);
     transform: translateX(-50%) scale(0.9);
   }
-  74% {
-    left: 87%;
+  70% {
+    left: 88%;
     top: calc(25% + 25px);
     transform: translateX(-50%) scale(1.04);
   }
+  82%,
   100% {
     left: var(--arena-orb-x);
     top: calc(53% + 25px);

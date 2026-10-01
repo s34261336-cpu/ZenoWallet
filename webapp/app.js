@@ -1417,6 +1417,13 @@ function renderArenaRace(round) {
   if (!stage || !lanes) return;
 
   const participants = Array.isArray(round?.participants) ? round.participants : [];
+  const roundId = round?.id == null ? "" : String(round.id);
+  // State polling rerenders this area; don't restart the winner animation on each poll.
+  const keepRunningAnimation =
+    arenaRuntime.raceAnimating &&
+    round?.status === "finished" &&
+    stage.dataset.roundId === roundId &&
+    stage.dataset.state === "finished";
   const colors = ["coral", "mint", "blue"];
   const stakeCurrency = getArenaCurrencyLabel(round?.balanceCurrency);
   const averageStake =
@@ -1441,9 +1448,15 @@ function renderArenaRace(round) {
   stage.classList.toggle("is-finished", round?.status === "finished");
   stage.classList.toggle("is-animating", arenaRuntime.raceAnimating);
   stage.classList.toggle("has-winner", winnerIndex >= 0);
+  stage.dataset.roundId = roundId;
   stage.dataset.state = round?.status || "waiting";
   stage.dataset.winnerCenter = String(winnerCenter);
   stage.style.setProperty("--arena-orb-x", `${winnerCenter}%`);
+  if (keepRunningAnimation) {
+    updateArenaRaceCamera(stage);
+    return;
+  }
+
   const sections = participants.length
     ? participants.map((participant, index) => {
         const photoUrl = participant.isMe ? getTelegramPhotoUrl() : "";
@@ -1461,17 +1474,15 @@ function renderArenaRace(round) {
           <span class="arena-lane-stake">${formatNumber(participant.bet)} <i aria-hidden="true">✦</i></span>
         </div>`;
       })
-    : [
-        { letter: "С", color: "coral" },
-        { letter: "М", color: "mint" },
-        { letter: "И", color: "blue" },
-      ].map(
-        (section) =>
-          `<div class="arena-race-lane arena-lane-${section.color}"><span class="arena-lane-glow"></span><span class="arena-lane-letter">${section.letter}</span></div>`,
-      );
-  lanes.innerHTML =
-    sections.join("") +
-    '<span class="arena-race-orb" aria-hidden="true"></span><span class="arena-race-pointer" aria-hidden="true">◆</span>';
+    : [];
+  lanes.innerHTML = participants.length
+    ? sections.join("") +
+      '<span class="arena-race-orb" aria-hidden="true"></span><span class="arena-race-pointer" aria-hidden="true">◆</span>'
+    : `<div class="arena-race-waiting">
+        <span class="arena-race-waiting-mark" aria-hidden="true">···</span>
+        <strong>Ждём игроков</strong>
+        <small>Ставка откроет следующий раунд</small>
+      </div>`;
   updateArenaRaceCamera(stage);
 }
 

@@ -8915,6 +8915,45 @@ body.arena-active #arena-view:not(.hidden) {
   z-index: 3;
 }
 
+.arena-race-waiting {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  text-align: center;
+}
+
+.arena-race-waiting-mark {
+  align-items: center;
+  background: rgba(145, 129, 255, 0.1);
+  border: 1px solid rgba(177, 164, 255, 0.2);
+  border-radius: 50%;
+  color: #a89cff;
+  display: flex;
+  font-size: 19px;
+  font-weight: 800;
+  height: 38px;
+  justify-content: center;
+  letter-spacing: 2px;
+  padding: 0 0 7px 2px;
+  width: 38px;
+}
+
+.arena-race-waiting strong {
+  color: #f5f2ff;
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.arena-race-waiting small {
+  color: #9290a6;
+  font-size: 11px;
+}
+
 .arena-race-lane {
   align-items: center;
   display: flex;
@@ -8969,18 +9008,6 @@ body.arena-active #arena-view:not(.hidden) {
 
 .arena-race-lane:nth-child(3) .arena-lane-glow {
   background: rgba(58, 72, 204, 0.38);
-}
-
-.arena-lane-letter {
-  color: #fff;
-  font-family: "Manrope", sans-serif;
-  font-size: clamp(62px, 17vw, 104px);
-  font-weight: 800;
-  letter-spacing: -0.09em;
-  line-height: 1;
-  position: relative;
-  text-shadow: 0 8px 24px rgba(14, 10, 38, 0.18);
-  z-index: 1;
 }
 
 .arena-field-player {

@@ -1673,7 +1673,7 @@ function renderArena(data) {
   } else if (round.myEntry) {
     $("#arena-notice").textContent = `Твоя ставка: ${formatNumber(
       currentBet,
-    )} ${currency}. Можешь добавить ставку до закрытия входа.`;
+    )} ${roundCurrency}. Можешь добавить ставку до закрытия входа.`;
   } else {
     $("#arena-notice").textContent = "Вход открыт. Ставка будет списана с основного баланса.";
   }

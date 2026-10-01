@@ -1,6 +1,6 @@
 -- Минимальная миграция для уже установленной арены.
--- Выполнить один раз ПОСЛЕ supabase/arena.sql.
--- Таблицы заново создавать не нужно.
+-- Выполнить после supabase/arena.sql. Можно повторно запускать после обновления:
+-- скрипт заменяет функции и не пересоздаёт таблицы или записи раундов.
 
 create or replace function public.arena_change_zenotoken(
   p_user_id bigint,
@@ -164,6 +164,9 @@ declare
   v_avatar text;
   v_arena jsonb;
   v_earn_balance bigint;
+  v_has_round boolean;
+  v_round_started_at timestamptz;
+  v_round_duration_seconds integer;
 begin
   if p_user_id is null or p_user_id <= 0 then
     raise exception 'Некорректный пользователь';
@@ -183,8 +186,21 @@ begin
    limit 1
    for update;
 
-  if not found or v_round.closes_at <= clock_timestamp() then
-    raise exception 'Приём ставок закрыт — дождись следующего раунда';
+  v_has_round := found;
+  if v_has_round and v_round.closes_at <= clock_timestamp() then
+    perform public.arena_resolve_round(v_round.id);
+    v_has_round := false;
+  end if;
+
+  if not v_has_round then
+    v_round_started_at := clock_timestamp();
+    v_round_duration_seconds := 20 + floor(random() * 11)::integer;
+    insert into public.arena_rounds (created_at, closes_at)
+    values (
+      v_round_started_at,
+      v_round_started_at + make_interval(secs => v_round_duration_seconds)
+    )
+    returning * into v_round;
   end if;
 
   select *
@@ -248,9 +264,245 @@ begin
 end;
 $$;
 
+create or replace function public.arena_get_state(
+  p_user_id bigint,
+  p_display_name text default 'Игрок'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_round public.arena_rounds%rowtype;
+  v_bot record;
+  v_bot_count integer;
+  v_stake bigint;
+  v_pool bigint := 0;
+  v_roll_index integer;
+  v_round_id bigint;
+  v_has_round boolean := false;
+  v_participants jsonb := '[]'::jsonb;
+  v_my_entry jsonb := null;
+  v_winner jsonb := null;
+  v_history jsonb := '[]'::jsonb;
+begin
+  if p_user_id is null or p_user_id <= 0 then
+    raise exception 'Некорректный пользователь';
+  end if;
+
+  perform pg_advisory_xact_lock(816184092026);
+
+  select *
+    into v_round
+    from public.arena_rounds
+   where status = 'open'
+   order by id desc
+   limit 1
+   for update;
+
+  v_has_round := found;
+  if v_has_round then
+    v_round_id := v_round.id;
+    if v_round.closes_at <= clock_timestamp() then
+      perform public.arena_resolve_round(v_round.id);
+      select *
+        into v_round
+        from public.arena_rounds
+       where id = v_round_id;
+      v_has_round := found;
+    end if;
+  else
+    select *
+      into v_round
+      from public.arena_rounds
+     order by id desc
+     limit 1
+     for update;
+    v_has_round := found;
+  end if;
+
+  if v_has_round
+     and v_round.status = 'open'
+     and clock_timestamp() >= v_round.created_at
+       + make_interval(
+           secs => (2 + mod(abs(hashtext(v_round.id::text)::bigint), 7000) / 1000.0)::double precision
+         )
+     and not exists (
+       select 1
+         from public.arena_entries
+        where round_id = v_round.id
+          and is_bot
+     ) then
+    v_bot_count := 3 + floor(random() * 3)::integer;
+
+    for v_bot in
+      select id, display_name, avatar, bankroll
+        from public.arena_bot_profiles
+       where active and bankroll >= 25
+       order by random()
+       limit v_bot_count
+       for update
+    loop
+      v_roll_index := 1 + floor(random() * 6)::integer;
+      v_stake := (array[1, 2, 3, 5, 10, 15]::bigint[])[v_roll_index];
+      v_stake := least(v_stake, v_bot.bankroll);
+
+      update public.arena_bot_profiles
+         set bankroll = bankroll - v_stake
+       where id = v_bot.id;
+
+      insert into public.arena_entries (
+        round_id, bot_id, display_name, avatar, is_bot, stake
+      )
+      values (
+        v_round.id, v_bot.id, v_bot.display_name, v_bot.avatar, true, v_stake
+      );
+      v_pool := v_pool + v_stake;
+    end loop;
+
+    if v_pool > 0 then
+      update public.arena_rounds
+         set total_pot = total_pot + v_pool
+       where id = v_round.id;
+    end if;
+
+    select *
+      into v_round
+      from public.arena_rounds
+     where id = v_round.id;
+  end if;
+
+  if v_has_round then
+    select coalesce(
+             jsonb_agg(
+               jsonb_build_object(
+                 'id', entry.id,
+                 'name', entry.display_name,
+                 'avatar', entry.avatar,
+                 'isBot', entry.is_bot,
+                 'bet', entry.stake,
+                 'chance', case
+                   when v_round.total_pot > 0
+                     then round(entry.stake::numeric * 100 / v_round.total_pot, 1)
+                   else 0
+                 end,
+                 'isMe', (not entry.is_bot and entry.user_id = p_user_id),
+                 'isWinner', entry.is_winner,
+                 'payout', entry.payout
+               )
+               order by entry.created_at, entry.id
+             ),
+             '[]'::jsonb
+           )
+      into v_participants
+      from public.arena_entries as entry
+     where entry.round_id = v_round.id;
+
+    select jsonb_build_object(
+             'id', entry.id,
+             'name', entry.display_name,
+             'avatar', entry.avatar,
+             'bet', entry.stake,
+             'chance', case
+               when v_round.total_pot > 0
+                 then round(entry.stake::numeric * 100 / v_round.total_pot, 1)
+               else 0
+             end,
+             'isWinner', entry.is_winner,
+             'payout', entry.payout
+           )
+      into v_my_entry
+      from public.arena_entries as entry
+     where entry.round_id = v_round.id
+       and not entry.is_bot
+       and entry.user_id = p_user_id;
+
+    if v_round.status = 'finished' then
+      select jsonb_build_object(
+               'id', entry.id,
+               'name', entry.display_name,
+               'avatar', entry.avatar,
+               'isBot', entry.is_bot,
+               'isMe', (not entry.is_bot and entry.user_id = p_user_id),
+               'bet', entry.stake,
+               'chance', case
+                 when v_round.total_pot > 0
+                   then round(entry.stake::numeric * 100 / v_round.total_pot, 1)
+                 else 0
+               end,
+               'payout', entry.payout
+             )
+        into v_winner
+        from public.arena_entries as entry
+       where entry.id = v_round.winner_entry_id;
+    end if;
+  end if;
+
+  select coalesce(
+           jsonb_agg(
+             jsonb_build_object(
+               'id', past.id,
+               'totalPot', past.total_pot,
+               'winnerName', winner.display_name,
+               'winnerAvatar', winner.avatar,
+               'winnerIsBot', winner.is_bot,
+               'payout', past.payout,
+               'finishedAt', past.finished_at
+             )
+             order by past.id desc
+           ),
+           '[]'::jsonb
+         )
+    into v_history
+    from (
+      select rounds.id, rounds.total_pot, rounds.winner_entry_id,
+             rounds.payout, rounds.finished_at
+        from public.arena_rounds as rounds
+       where rounds.status = 'finished'
+       order by rounds.id desc
+       limit 5
+    ) as past
+    left join public.arena_entries as winner
+      on winner.id = past.winner_entry_id;
+
+  return jsonb_build_object(
+    'available', true,
+    'minBet', 1,
+    'maxBet', 10000,
+    'rakePercent', 10,
+    'round', case
+      when v_has_round then jsonb_build_object(
+        'id', v_round.id,
+        'status', v_round.status,
+        'startedAt', v_round.created_at,
+        'endsAt', v_round.closes_at,
+        'finishedAt', v_round.finished_at,
+        'totalPot', v_round.total_pot,
+        'participantCount', jsonb_array_length(v_participants),
+        'participants', v_participants,
+        'myEntry', v_my_entry,
+        'winner', v_winner,
+        'payout', v_round.payout,
+        'myResult', case
+          when v_my_entry is null then null
+          when v_round.status <> 'finished' then 'joined'
+          when (v_my_entry ->> 'isWinner')::boolean then 'won'
+          else 'lost'
+        end
+      )
+      else null
+    end,
+    'history', v_history
+  );
+end;
+$$;
+
 revoke all on function public.arena_change_zenotoken(bigint, bigint)
   from public, anon, authenticated;
 revoke all on function public.arena_resolve_round(bigint)
+  from public, anon, authenticated;
+revoke all on function public.arena_get_state(bigint, text)
   from public, anon, authenticated;
 revoke all on function public.arena_join(bigint, bigint, text)
   from public, anon, authenticated;
@@ -258,6 +510,8 @@ revoke all on function public.arena_join(bigint, bigint, text)
 grant execute on function public.arena_change_zenotoken(bigint, bigint)
   to service_role;
 grant execute on function public.arena_resolve_round(bigint)
+  to service_role;
+grant execute on function public.arena_get_state(bigint, text)
   to service_role;
 grant execute on function public.arena_join(bigint, bigint, text)
   to service_role;

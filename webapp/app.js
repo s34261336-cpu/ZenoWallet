@@ -83,6 +83,8 @@ const arenaRuntime = {
   raceTimer: null,
   raceAnimating: false,
   lastAnimatedRoundId: null,
+  lastObservedRoundId: null,
+  lastObservedRoundStatus: null,
 };
 const ARENA_POLL_INTERVAL_MS = 3000;
 
@@ -133,17 +135,25 @@ function getInitials(name) {
     .toUpperCase() || "ZW";
 }
 
+function getTelegramPhotoUrl() {
+  const photoUrl = telegram?.initDataUnsafe?.user?.photo_url;
+  return typeof photoUrl === "string" ? photoUrl : "";
+}
+
+function applyPhotoAvatar(avatar, photoUrl) {
+  avatar.classList.toggle("has-photo", Boolean(photoUrl));
+  avatar.style.setProperty(
+    "--avatar-image",
+    photoUrl ? `url("${photoUrl.replaceAll('"', "%22")}")` : "none",
+  );
+}
+
 function setAvatars(user, progress) {
-  const telegramUser = telegram?.initDataUnsafe?.user;
-  const photoUrl = telegramUser?.photo_url || "";
+  const photoUrl = getTelegramPhotoUrl();
   const initials = getInitials(user?.firstName);
   document.querySelectorAll(".avatar-ring").forEach((avatar) => {
     avatar.style.setProperty("--ring-progress", `${Math.max(0, Math.min(100, progress))}%`);
-    avatar.classList.toggle("has-photo", Boolean(photoUrl));
-    avatar.style.setProperty(
-      "--avatar-image",
-      photoUrl ? `url("${photoUrl.replaceAll('"', "%22")}")` : "none",
-    );
+    applyPhotoAvatar(avatar, photoUrl);
     avatar.innerHTML = photoUrl ? "" : `<span>${escapeHtml(initials)}</span>`;
   });
 }
@@ -1286,9 +1296,7 @@ function renderArenaHistory(history) {
   }
   container.innerHTML = rounds
     .map((round) => {
-      const winner = round.winnerIsBot
-        ? `Бот «${escapeHtml(round.winnerName || "Участник")}»`
-        : escapeHtml(round.winnerName || "Участник");
+      const winner = escapeHtml(round.winnerName || "Участник");
       const finishedAt = round.finishedAt
         ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(
             new Date(round.finishedAt),
@@ -1313,14 +1321,28 @@ function renderArenaHistory(history) {
 }
 
 function maybeAnimateArenaRound(round) {
-  if (
-    !round ||
-    round.status !== "finished" ||
-    !round.id ||
-    arenaRuntime.lastAnimatedRoundId === round.id
-  ) {
+  if (!round?.id) {
+    arenaRuntime.lastObservedRoundId = null;
+    arenaRuntime.lastObservedRoundStatus = null;
     return;
   }
+
+  if (arenaRuntime.lastObservedRoundId !== round.id) {
+    if (arenaRuntime.raceTimer !== null) {
+      window.clearTimeout(arenaRuntime.raceTimer);
+      arenaRuntime.raceTimer = null;
+    }
+    arenaRuntime.raceAnimating = false;
+    arenaRuntime.lastObservedRoundId = round.id;
+    arenaRuntime.lastObservedRoundStatus = round.status;
+    return;
+  }
+
+  const justFinished =
+    round.status === "finished" && arenaRuntime.lastObservedRoundStatus === "open";
+  arenaRuntime.lastObservedRoundStatus = round.status;
+  if (!justFinished || arenaRuntime.lastAnimatedRoundId === round.id) return;
+
   arenaRuntime.lastAnimatedRoundId = round.id;
   arenaRuntime.raceAnimating = true;
   if (arenaRuntime.raceTimer !== null) {
@@ -1379,6 +1401,9 @@ function renderArena(data) {
   const available = arena.available !== false;
   const open = available && round?.status === "open";
   const secondsRemaining = open ? getArenaSecondsRemaining(round) : 0;
+  const canStartRound = !round || round.status === "finished";
+  const canAddToRound = open && secondsRemaining > 0;
+  const canPlaceBet = available && (canStartRound || canAddToRound);
   const minBet = Math.max(1, Number(arena.minBet || 1));
   const maxBet = Math.max(minBet, Number(arena.maxBet || 10_000));
   if (!input.value.trim()) input.value = String(minBet);
@@ -1389,17 +1414,17 @@ function renderArena(data) {
     parsedBet >= minBet &&
     parsedBet <= maxBet &&
     parsedBet <= walletBalance;
-  const currentBet = Number(round?.myEntry?.bet || 0);
+  const currentBet = open ? Number(round?.myEntry?.bet || 0) : 0;
   const additionalBet = validBet ? parsedBet : 0;
   const projectedBet = currentBet + additionalBet;
-  const projectedPot = Number(round?.totalPot || 0) + additionalBet;
+  const projectedPot = (open ? Number(round?.totalPot || 0) : 0) + additionalBet;
   const projectedChance =
     projectedPot > 0 && projectedBet > 0
       ? Math.min(100, (projectedBet / projectedPot) * 100)
       : 0;
   const numberFormat = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
 
-  $("#arena-round-id").textContent = round?.id ? `Игра #${round.id}` : "Игра ожидается";
+  $("#arena-round-id").textContent = round?.id ? `Игра #${round.id}` : "Ожидание ставки";
   $("#arena-round-state").textContent = !available
     ? "Недоступна"
     : round?.status === "finished" && arenaRuntime.raceAnimating
@@ -1408,7 +1433,7 @@ function renderArena(data) {
         ? "Завершено"
       : round?.status === "open"
         ? "Ставки открыты"
-        : "Подготовка";
+        : "Ожидание ставки";
   $("#arena-min-bet").textContent = formatNumber(minBet);
   $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>✦</small>`;
   $("#arena-balance").textContent = `${formatNumber(walletBalance)} ✦`;
@@ -1433,8 +1458,7 @@ function renderArena(data) {
       .map((amount, index) => {
         const disabled =
           !available ||
-          !open ||
-          secondsRemaining <= 0 ||
+          !canPlaceBet ||
           busyActions.has("arena_join") ||
           amount > walletBalance ||
           amount > maxBet;
@@ -1459,16 +1483,13 @@ function renderArena(data) {
       participants.length === 1 ? "участник" : "участников"
     }`;
   }
-  $("#arena-contestants").innerHTML = participants.length
+  const contestants = $("#arena-contestants");
+  contestants.innerHTML = participants.length
     ? participants
         .map((participant) => {
           const isBot = Boolean(participant.isBot);
           const name = escapeHtml(participant.name || "Участник");
-          const label = isBot
-            ? `Бот «${name}»`
-            : participant.isMe
-              ? `${name} · ты`
-              : name;
+          const photoUrl = participant.isMe ? getTelegramPhotoUrl() : "";
           const classes = [
             "arena-contestant",
             isBot ? "arena-contestant-bot" : "",
@@ -1481,14 +1502,14 @@ function renderArena(data) {
             .join(" ");
           return `
             <article class="${classes}">
-              <span class="arena-contestant-mark" aria-hidden="true">${escapeHtml(
-                participant.avatar || getInitials(participant.name),
-              )}</span>
+              <span
+                class="arena-contestant-mark${photoUrl ? " has-photo" : ""}"
+                ${photoUrl ? `data-photo-avatar="${escapeHtml(photoUrl)}"` : ""}
+                aria-hidden="true"
+              >${photoUrl ? "" : escapeHtml(participant.avatar || getInitials(participant.name))}</span>
               <span class="arena-contestant-name">
-                <strong>${label}</strong>
-                <small>${isBot ? "Автоучастник" : participant.isMe ? "Твоя ставка" : "Игрок"}</small>
+                <strong>${name}</strong>
               </span>
-              ${isBot ? '<span class="arena-bot-tag">БОТ</span>' : '<span class="arena-human-tag">ИГРОК</span>'}
               <span class="arena-contestant-stake">
                 <strong>${formatNumber(participant.bet)} ZT</strong><small>ставка</small>
               </span>
@@ -1498,15 +1519,14 @@ function renderArena(data) {
             </article>`;
         })
         .join("")
-    : '<div class="arena-contestants-hint">В этом раунде пока нет участников.</div>';
+    : '<div class="arena-contestants-hint">Поставь, чтобы начать раунд.</div>';
 
   const winner = round?.winner;
   const resolvingWinner =
     round?.status === "finished" && arenaRuntime.raceAnimating;
   if (round?.status === "finished" && winner && !resolvingWinner) {
-    const winnerName = winner.isBot
-      ? `Бот «${escapeHtml(winner.name || "Участник")}»`
-      : escapeHtml(winner.name || "Участник");
+    const winnerName = escapeHtml(winner.name || "Участник");
+    const winnerPhotoUrl = winner.isMe ? getTelegramPhotoUrl() : "";
     const resultText =
       round.myResult === "won"
         ? `Ты победил и получил ${formatNumber(winner.payout || round.payout || 0)} ZT`
@@ -1516,9 +1536,11 @@ function renderArena(data) {
               Number(winner.chance || 0),
             )}%`;
     $("#arena-winner-panel").innerHTML = `
-      <span class="arena-winner-symbol" aria-hidden="true">${escapeHtml(
-        winner.avatar || getInitials(winner.name),
-      )}</span>
+      <span
+        class="arena-winner-symbol${winnerPhotoUrl ? " has-photo" : ""}"
+        ${winnerPhotoUrl ? `data-photo-avatar="${escapeHtml(winnerPhotoUrl)}"` : ""}
+        aria-hidden="true"
+      >${winnerPhotoUrl ? "" : escapeHtml(winner.avatar || getInitials(winner.name))}</span>
       <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>${resultText} · ${winnerName}</strong></span>
       <span class="arena-winner-prize">${formatNumber(winner.payout || round.payout || 0)}<small>ZT</small></span>`;
     $("#arena-winner-panel").classList.remove("hidden");
@@ -1536,17 +1558,19 @@ function renderArena(data) {
     $("#arena-winner-panel").classList.add("hidden");
   }
 
+  document
+    .querySelectorAll("#arena-contestants [data-photo-avatar], #arena-winner-panel [data-photo-avatar]")
+    .forEach((avatar) => applyPhotoAvatar(avatar, avatar.dataset.photoAvatar || ""));
+
   if (!available) {
     $("#arena-notice").textContent =
       "Арена пока не настроена. Администратору нужно выполнить supabase/arena.sql.";
   } else if (!round) {
-    $("#arena-notice").textContent = "Ожидаем новый общий раунд.";
+    $("#arena-notice").textContent = "Поставь, чтобы запустить арену.";
   } else if (resolvingWinner) {
     $("#arena-notice").textContent = "Ставки закрыты. Определяем победителя…";
   } else if (round.status === "finished") {
-    $("#arena-notice").textContent = round.myResult
-      ? "Раунд завершён. Следующий откроется автоматически."
-      : "Раунд завершён. Можно войти в следующий раунд.";
+    $("#arena-notice").textContent = "Раунд завершён. Поставь, чтобы начать следующий.";
   } else if (round.myEntry) {
     $("#arena-notice").textContent = `Твоя ставка: ${formatNumber(
       currentBet,
@@ -1559,20 +1583,17 @@ function renderArena(data) {
   input.min = String(minBet);
   input.max = String(Math.min(maxBet, walletBalance));
   input.disabled =
-    !available || !open || secondsRemaining <= 0 || busyActions.has("arena_join");
+    !canPlaceBet || busyActions.has("arena_join");
   const allInButton = document.querySelector("[data-arena-all-in]");
   if (allInButton) {
     allInButton.disabled =
       !available ||
-      !open ||
-      secondsRemaining <= 0 ||
+      !canPlaceBet ||
       busyActions.has("arena_join") ||
       walletBalance < minBet;
   }
   const canJoin =
-    available &&
-    open &&
-    secondsRemaining > 0 &&
+    canPlaceBet &&
     validBet &&
     !busyActions.has("arena_join");
   joinButton.disabled = !canJoin;
@@ -1581,13 +1602,13 @@ function renderArena(data) {
     ? "Ставим…"
     : !available
       ? "Арена недоступна"
-      : !round || round.status !== "open"
-        ? "Ожидаем раунд"
-        : secondsRemaining <= 0
-          ? "Приём закрыт"
-          : round.myEntry
-            ? "Поставить ещё"
-            : "Поставить";
+      : open && secondsRemaining <= 0
+        ? "Приём закрыт"
+        : open && round.myEntry
+          ? "Поставить ещё"
+          : open
+            ? "Поставить"
+            : "Начать раунд";
   $("#arena-bet-summary").innerHTML = `
     <div><span>Твой шанс победы</span><strong>${
       projectedChance > 0 ? `${numberFormat.format(projectedChance)}%` : "—%"

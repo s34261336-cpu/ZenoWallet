@@ -1467,7 +1467,12 @@ function renderArena(data) {
   const participants = Array.isArray(round?.participants) ? round.participants : [];
   maybeAnimateArenaRound(round);
   const walletBalance = Math.max(0, Number(data.wallet?.earnBalance || 0));
-  const currency = getArenaCurrencyLabel(round?.balanceCurrency || arena.balanceCurrency);
+  const roundCurrency = getArenaCurrencyLabel(
+    round?.balanceCurrency || arena.balanceCurrency,
+  );
+  const betCurrency = getArenaCurrencyLabel(arena.balanceCurrency);
+  const bankCurrency =
+    round?.status === "open" ? roundCurrency : betCurrency;
   const currencyReady = arena.balanceCurrency === "coins";
   const legacyRound =
     round?.status === "open" && round.balanceCurrency !== arena.balanceCurrency;
@@ -1514,20 +1519,23 @@ function renderArena(data) {
         : "Ожидание ставки";
   $("#arena-min-bet").textContent = formatNumber(minBet);
   $("#arena-pool").innerHTML = `${formatNumber(round?.totalPot || 0)} <small>${
-    currency === "ZT" ? "ZT" : "✦"
+    roundCurrency === "ZT" ? "ZT" : "✦"
   }</small>`;
   $("#arena-balance").textContent = `${formatNumber(walletBalance)} ✦`;
   $("#arena-bank").textContent = `${formatNumber(currentBet)} ${
-    currency === "ZT" ? "ZT" : "✦"
+    bankCurrency === "ZT" ? "ZT" : "✦"
   }`;
   renderArenaRace(round);
 
   const betChips = $("#arena-bet-chips");
   if (betChips) {
-    const participantBets = participants
-      .slice(-4)
-      .map((participant) => Number(participant.bet || 0))
-      .filter((bet) => Number.isSafeInteger(bet) && bet > 0);
+    const participantBets =
+      open && !legacyRound
+        ? participants
+            .slice(-4)
+            .map((participant) => Number(participant.bet || 0))
+            .filter((bet) => Number.isSafeInteger(bet) && bet > 0)
+        : [];
     const presets = [
       minBet,
       Math.min(maxBet, minBet * 2),
@@ -1594,7 +1602,7 @@ function renderArena(data) {
                 <strong>${name}</strong>
               </span>
               <span class="arena-contestant-stake">
-                <strong>${formatNumber(participant.bet)} ${currency}</strong><small>ставка</small>
+                <strong>${formatNumber(participant.bet)} ${roundCurrency}</strong><small>ставка</small>
               </span>
               <span class="arena-contestant-chance">
                 <strong>${numberFormat.format(Number(participant.chance || 0))}%</strong><small>шанс</small>
@@ -1610,12 +1618,14 @@ function renderArena(data) {
   if (round?.status === "finished" && winner && !resolvingWinner) {
     const winnerName = escapeHtml(winner.name || "Участник");
     const winnerPhotoUrl = winner.isMe ? getTelegramPhotoUrl() : "";
+    const resultCurrencyLabel =
+      roundCurrency !== betCurrency ? `ПОСЛЕДНИЙ РАУНД · ${roundCurrency}` : "ПОБЕДИТЕЛЬ РАУНДА";
     const resultText =
       round.myResult === "won"
-        ? `Ты победил и получил ${formatNumber(winner.payout || round.payout || 0)} ${currency}`
+        ? `Ты победил и получил ${formatNumber(winner.payout || round.payout || 0)} ${roundCurrency}`
         : round.myResult === "lost"
           ? "В этот раз победил другой участник"
-          : `Ставка ${formatNumber(winner.bet || 0)} ${currency} · шанс ${numberFormat.format(
+          : `Ставка ${formatNumber(winner.bet || 0)} ${roundCurrency} · шанс ${numberFormat.format(
               Number(winner.chance || 0),
             )}%`;
     $("#arena-winner-panel").innerHTML = `
@@ -1625,8 +1635,8 @@ function renderArena(data) {
           winner.avatar || getInitials(winner.name),
         )}
       </span>
-      <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>${resultText} · ${winnerName}</strong></span>
-      <span class="arena-winner-prize">${formatNumber(winner.payout || round.payout || 0)}<small>${currency}</small></span>`;
+      <span><small>${resultCurrencyLabel}</small><strong>${resultText} · ${winnerName}</strong></span>
+      <span class="arena-winner-prize">${formatNumber(winner.payout || round.payout || 0)}<small>${roundCurrency}</small></span>`;
     $("#arena-winner-panel").classList.remove("hidden");
   } else {
     $("#arena-winner-panel").innerHTML = `
@@ -1655,6 +1665,9 @@ function renderArena(data) {
     $("#arena-notice").textContent = "Поставь, чтобы запустить арену.";
   } else if (resolvingWinner) {
     $("#arena-notice").textContent = "Ставки закрыты. Определяем победителя…";
+  } else if (round.status === "finished" && roundCurrency !== betCurrency) {
+    $("#arena-notice").textContent =
+      `Предыдущий раунд завершён в ${roundCurrency}. Новые ставки будут в ${betCurrency} с основного баланса.`;
   } else if (round.status === "finished") {
     $("#arena-notice").textContent = "Раунд завершён. Поставь, чтобы начать следующий.";
   } else if (round.myEntry) {

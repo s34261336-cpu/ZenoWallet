@@ -82,12 +82,15 @@ const arenaRuntime = {
   notice: "",
   raceTimer: null,
   raceAnimating: false,
+  raceAnimationDuration: 0,
   lastAnimatedRoundId: null,
   lastObservedRoundId: null,
   lastObservedRoundStatus: null,
   dismissedRoundId: null,
 };
 const ARENA_POLL_INTERVAL_MS = 1000;
+const ARENA_RACE_ANIMATION_MS = 10000;
+const ARENA_CAMERA_ZOOM = 1.7;
 const ARENA_RESULT_HOLD_MS = 2500;
 
 if (telegram) {
@@ -1379,7 +1382,8 @@ function maybeAnimateArenaRound(round) {
   const animationDuration = window.matchMedia?.("(prefers-reduced-motion: reduce)")
     .matches
     ? 350
-    : 2600;
+    : ARENA_RACE_ANIMATION_MS;
+  arenaRuntime.raceAnimationDuration = animationDuration;
   arenaRuntime.raceTimer = window.setTimeout(() => {
     arenaRuntime.raceAnimating = false;
     arenaRuntime.raceTimer = null;
@@ -1446,14 +1450,14 @@ function renderArenaRace(round) {
     ),
   );
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+  const laneCenters = [];
+  let weightBeforeLane = 0;
+  weights.forEach((weight) => {
+    laneCenters.push(((weightBeforeLane + weight / 2) / totalWeight) * 100);
+    weightBeforeLane += weight;
+  });
   const winnerIndex = participants.findIndex((participant) => participant.isWinner);
-  const winnerCenter =
-    winnerIndex < 0
-      ? 50
-      : ((weights.slice(0, winnerIndex).reduce((sum, weight) => sum + weight, 0) +
-          weights[winnerIndex] / 2) /
-          totalWeight) *
-        100;
+  const winnerCenter = winnerIndex < 0 ? 50 : laneCenters[winnerIndex];
 
   stage.classList.toggle("is-finished", round?.status === "finished");
   stage.classList.toggle("is-animating", arenaRuntime.raceAnimating);
@@ -1461,9 +1465,34 @@ function renderArenaRace(round) {
   stage.dataset.roundId = roundId;
   stage.dataset.state = round?.status || "waiting";
   stage.dataset.winnerCenter = String(winnerCenter);
+  stage.style.setProperty(
+    "--arena-race-duration",
+    `${arenaRuntime.raceAnimationDuration || ARENA_RACE_ANIMATION_MS}ms`,
+  );
+  stage.style.setProperty("--arena-camera-scale", String(ARENA_CAMERA_ZOOM));
   stage.style.setProperty("--arena-orb-x", `${winnerCenter}%`);
+  if (participants.length) {
+    const lastLane = participants.length - 1;
+    const routeIndices = [
+      0,
+      lastLane,
+      Math.floor(lastLane / 2),
+      Math.min(1, lastLane),
+      lastLane,
+    ];
+    const routeHeights = [68, 58, 43, 70, 49];
+    routeIndices.forEach((laneIndex, index) => {
+      stage.style.setProperty(
+        `--arena-route-${index}-x`,
+        `${laneCenters[laneIndex]}%`,
+      );
+      stage.style.setProperty(
+        `--arena-route-${index}-y`,
+        `${routeHeights[index]}%`,
+      );
+    });
+  }
   if (keepRunningAnimation) {
-    updateArenaRaceCamera(stage);
     return;
   }
 
@@ -1500,7 +1529,10 @@ function updateArenaRaceCamera(stage) {
   if (!stage?.classList.contains("has-winner")) return;
   const width = stage.clientWidth || window.innerWidth;
   const center = Number(stage.dataset.winnerCenter) || 50;
-  stage.style.setProperty("--arena-camera-x", `${width / 2 - (center / 100) * width * 1.46}px`);
+  stage.style.setProperty(
+    "--arena-camera-x",
+    `${width / 2 - (center / 100) * width * ARENA_CAMERA_ZOOM}px`,
+  );
 }
 
 window.addEventListener("resize", () => updateArenaRaceCamera($("#arena-race-stage")));

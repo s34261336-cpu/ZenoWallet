@@ -326,7 +326,7 @@ begin
      and v_round.status = 'open'
      and clock_timestamp() >= v_round.created_at
        + make_interval(
-           secs => (2 + mod(abs(hashtext(v_round.id::text)::bigint), 7000) / 1000.0)::double precision
+           secs => (1 + mod(abs(hashtext(v_round.id::text)::bigint), 2000) / 1000.0)::double precision
          )
      and not exists (
        select 1

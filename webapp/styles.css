@@ -8017,7 +8017,32 @@ body::before {
   background-size: cover;
   overflow: hidden;
   place-items: center;
+  position: relative;
   width: 34px;
+}
+
+.arena-avatar-fallback[hidden] {
+  display: none !important;
+}
+
+.arena-avatar-fallback {
+  align-items: center;
+  display: grid;
+  height: 100%;
+  justify-items: center;
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
+.arena-avatar-photo {
+  border-radius: inherit;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+  z-index: 1;
 }
 
 .arena-contestant-mark.has-photo {
@@ -8103,7 +8128,9 @@ body::before {
   font-size: 11px;
   font-weight: 800;
   height: 34px;
+  overflow: hidden;
   place-items: center;
+  position: relative;
   width: 34px;
 }
 
@@ -8940,6 +8967,24 @@ body.arena-active #arena-view:not(.hidden) {
   position: relative;
   text-shadow: 0 8px 24px rgba(14, 10, 38, 0.18);
   z-index: 1;
+}
+
+.arena-field-player {
+  align-items: center;
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, #7467ff, #b53dbd);
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 5px 22px rgba(15, 10, 35, 0.32);
+  color: #fff;
+  display: grid;
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(32px, 11vw, 48px);
+  font-weight: 800;
+  overflow: hidden;
+  position: relative;
+  width: min(82%, 132px);
+  z-index: 3;
 }
 
 .arena-race-orb {

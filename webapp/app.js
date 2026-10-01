@@ -1357,11 +1357,39 @@ function maybeAnimateArenaRound(round) {
   }, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 350 : 2600);
 }
 
+function renderArenaAvatarContents(photoUrl, fallbackText) {
+  return `
+    <span class="arena-avatar-fallback"${photoUrl ? " hidden" : ""}>${escapeHtml(
+      fallbackText || "ZW",
+    )}</span>
+    ${
+      photoUrl
+        ? `<img class="arena-avatar-photo" src="${escapeHtml(
+            photoUrl,
+          )}" alt="" referrerpolicy="no-referrer" decoding="async">`
+        : ""
+    }`;
+}
+
+function bindArenaAvatarFallbacks() {
+  document.querySelectorAll(".arena-avatar-photo").forEach((image) => {
+    const showFallback = () => {
+      image.hidden = true;
+      const fallback = image.parentElement?.querySelector(".arena-avatar-fallback");
+      if (fallback) fallback.hidden = false;
+    };
+    image.addEventListener("error", showFallback, { once: true });
+    if (image.complete && image.naturalWidth === 0) showFallback();
+  });
+}
+
 function renderArenaRace(round) {
   const stage = $("#arena-race-stage");
   const lanes = $("#arena-race-lanes");
   if (!stage || !lanes) return;
 
+  const myEntry = round?.myEntry;
+  const myPhotoUrl = myEntry ? getTelegramPhotoUrl() : "";
   const sections = [
     { letter: "С", color: "coral" },
     { letter: "М", color: "mint" },
@@ -1377,7 +1405,16 @@ function renderArenaRace(round) {
       (section, index) => `
         <div class="arena-race-lane arena-lane-${section.color}" data-lane="${section.letter}" aria-label="Секция ${section.letter}">
           <span class="arena-lane-glow" aria-hidden="true"></span>
-          <span class="arena-lane-letter">${section.letter}</span>
+          ${
+            index === 0 && myEntry
+              ? `<span class="arena-field-player" aria-label="${escapeHtml(
+                  myEntry.name || "Ваш аватар",
+                )}">${renderArenaAvatarContents(
+                  myPhotoUrl,
+                  getInitials(myEntry.name),
+                )}</span>`
+              : `<span class="arena-lane-letter">${section.letter}</span>`
+          }
         </div>`,
     )
     .join("");
@@ -1502,11 +1539,12 @@ function renderArena(data) {
             .join(" ");
           return `
             <article class="${classes}">
-              <span
-                class="arena-contestant-mark${photoUrl ? " has-photo" : ""}"
-                ${photoUrl ? `data-photo-avatar="${escapeHtml(photoUrl)}"` : ""}
-                aria-hidden="true"
-              >${photoUrl ? "" : escapeHtml(participant.avatar || getInitials(participant.name))}</span>
+              <span class="arena-contestant-mark" aria-hidden="true">
+                ${renderArenaAvatarContents(
+                  photoUrl,
+                  participant.avatar || getInitials(participant.name),
+                )}
+              </span>
               <span class="arena-contestant-name">
                 <strong>${name}</strong>
               </span>
@@ -1536,11 +1574,12 @@ function renderArena(data) {
               Number(winner.chance || 0),
             )}%`;
     $("#arena-winner-panel").innerHTML = `
-      <span
-        class="arena-winner-symbol${winnerPhotoUrl ? " has-photo" : ""}"
-        ${winnerPhotoUrl ? `data-photo-avatar="${escapeHtml(winnerPhotoUrl)}"` : ""}
-        aria-hidden="true"
-      >${winnerPhotoUrl ? "" : escapeHtml(winner.avatar || getInitials(winner.name))}</span>
+      <span class="arena-winner-symbol" aria-hidden="true">
+        ${renderArenaAvatarContents(
+          winnerPhotoUrl,
+          winner.avatar || getInitials(winner.name),
+        )}
+      </span>
       <span><small>ПОБЕДИТЕЛЬ РАУНДА</small><strong>${resultText} · ${winnerName}</strong></span>
       <span class="arena-winner-prize">${formatNumber(winner.payout || round.payout || 0)}<small>ZT</small></span>`;
     $("#arena-winner-panel").classList.remove("hidden");
@@ -1557,10 +1596,6 @@ function renderArena(data) {
       <span class="arena-winner-prize">90%<small>пула</small></span>`;
     $("#arena-winner-panel").classList.add("hidden");
   }
-
-  document
-    .querySelectorAll("#arena-contestants [data-photo-avatar], #arena-winner-panel [data-photo-avatar]")
-    .forEach((avatar) => applyPhotoAvatar(avatar, avatar.dataset.photoAvatar || ""));
 
   if (!available) {
     $("#arena-notice").textContent =
@@ -1616,6 +1651,7 @@ function renderArena(data) {
     <div><span>Приз победителю</span><strong>90% пула</strong></div>`;
 
   renderArenaHistory(arena.history);
+  bindArenaAvatarFallbacks();
   updateArenaCountdown();
 }
 
